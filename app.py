@@ -39,12 +39,14 @@ login_manager.login_view = 'login'
 
 @login_manager.user_loader
 def load_user(user_id):
-    return db.session.get(User, int(user_id))
+    return User.query.get(int(user_id))
 
 # 配置数据库 - 使用PostgreSQL
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
-if app.config['SQLALCHEMY_DATABASE_URI'] and app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
-    app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgres://', 'postgresql://', 1)
+database_url = os.environ.get('DATABASE_URL')
+if database_url and database_url.startswith('postgres://'):
+    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # 配置文件上传
@@ -64,15 +66,11 @@ os.makedirs(os.path.join(UPLOAD_FOLDER, 'explanations'), exist_ok=True)
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
-# 确保所有表存在
+# 确保所有表存在并创建默认数据
 def init_db():
     with app.app_context():
-        # 检查数据库连接
         try:
-            db.engine.connect()
-            print("数据库连接成功")
-            
-            # 创建所有表（如果不存在）
+            # 创建所有表
             db.create_all()
             print("数据库表创建/更新成功")
             
@@ -97,17 +95,13 @@ def init_db():
                     is_admin=True
                 )
                 db.session.add(admin)
-                
-                try:
-                    db.session.commit()
-                    print("默认数据创建成功！")
-                except Exception as e:
-                    db.session.rollback()
-                    print(f"创建默认数据时出错: {str(e)}")
+                db.session.commit()
+                print("默认数据创建成功！")
             else:
                 print("管理员账号已存在，跳过创建默认数据。")
         except Exception as e:
             print(f"数据库初始化出错: {str(e)}")
+            db.session.rollback()
             raise
 
 # 课程和班级的多对多关联表
@@ -1853,25 +1847,5 @@ def before_request():
             session['last_backup_date'] = today
 
 if __name__ == '__main__':
-    # 确保备份目录存在
-    os.makedirs(BACKUP_PATH, exist_ok=True)
-    
-    # 如果数据库文件存在，创建备份
-    if os.path.exists(DB_PATH):
-        backup_database()
-    
-    # 确保数据库目录存在
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    
-    # 只在数据库文件不存在时初始化
-    if not os.path.exists(DB_PATH):
-        init_db()
-    else:
-        # 如果数据库文件存在但表不存在，只创建表结构
-        with app.app_context():
-            inspector = db.inspect(db.engine)
-            if not inspector.get_table_names():
-                db.create_all()
-                print("创建数据库表结构")
-    
+    init_db()  # 初始化数据库
     app.run(debug=True, host='0.0.0.0', port=5000) 
