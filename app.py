@@ -40,8 +40,8 @@ login_manager.login_view = 'login'
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# 配置 SQLite 数据库
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///quiz.db'
+# 配置数据库
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')  # Render 会注入环境变量
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # 配置文件上传
@@ -1113,18 +1113,14 @@ def save_uploaded_file(file, allowed_extensions):
 
 def init_db():
     print("检查数据库状态...")
-    # 确保数据库目录存在
-    os.makedirs('instance', exist_ok=True)
     
-    # 只在数据库文件不存在时才初始化
-    db_path = 'instance/quiz.db'
-    if not os.path.exists(db_path):
-        print("数据库不存在，开始初始化...")
+    with app.app_context():
         # 创建所有表
-        with app.app_context():
-            db.create_all()  # 创建所有表
-            print("数据库表已创建！")
-            
+        db.create_all()
+        print("数据库表已创建！")
+        
+        # 检查是否需要创建默认数据
+        if not Class.query.first():
             print("创建默认班级...")
             # 创建默认班级
             default_class = Class(
@@ -1162,9 +1158,7 @@ def init_db():
             db.session.commit()
             print("账号已创建！")
             
-            print("数据库初始化完成！")
-    else:
-        print("数据库已存在，跳过初始化步骤。")
+        print("数据库初始化完成！")
 
 # 试卷管理相关路由
 @app.route('/admin/lesson/<int:lesson_id>/manage_exam')
