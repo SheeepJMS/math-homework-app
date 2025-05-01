@@ -1153,52 +1153,45 @@ def save_uploaded_file(file, allowed_extensions):
 
 def init_db():
     print("检查数据库状态...")
-    
-    with app.app_context():
-        # 创建所有表
-        db.create_all()
-        print("数据库表已创建！")
-        
-        # 检查是否需要创建默认数据
-        if not Class.query.first():
-            print("创建默认班级...")
-            # 创建默认班级
-            default_class = Class(
-                name='默认班级',
-                description='系统默认班级',
-                is_active=True
-            )
-            db.session.add(default_class)
-            db.session.commit()
-            print(f"默认班级已创建，ID: {default_class.id}")
+    try:
+        with app.app_context():
+            # 创建所有表（如果不存在）
+            db.create_all()
+            print("数据库表已创建！")
             
-            print("创建管理员账号...")
-            # 创建管理员账号
-            admin = User(
-                username='admin',
-                email='admin@example.com',
-                password='admin123',
-                is_active=True,
-                is_admin=True,
-                class_id=default_class.id
-            )
-            db.session.add(admin)
+            # 检查是否需要创建默认数据
+            if not User.query.filter_by(username='admin').first():
+                print("创建默认管理员账号...")
+                # 创建默认班级
+                default_class = Class(
+                    name='默认班级',
+                    description='系统默认班级',
+                    is_active=True
+                )
+                db.session.add(default_class)
+                
+                # 创建管理员账号
+                admin = User(
+                    username='admin',
+                    email='admin@example.com',
+                    password='admin123',
+                    is_active=True,
+                    is_admin=True
+                )
+                db.session.add(admin)
+                
+                try:
+                    db.session.commit()
+                    print("默认数据创建成功！")
+                except Exception as e:
+                    db.session.rollback()
+                    print(f"创建默认数据时出错: {str(e)}")
+            else:
+                print("默认数据已存在，跳过初始化。")
             
-            # 创建测试学生账号
-            student = User(
-                username='student',
-                email='student@example.com',
-                password='student123',
-                is_active=True,
-                is_admin=False,
-                class_id=default_class.id
-            )
-            db.session.add(student)
-            
-            db.session.commit()
-            print("账号已创建！")
-            
-        print("数据库初始化完成！")
+            print("数据库初始化完成！")
+    except Exception as e:
+        print(f"数据库初始化出错: {str(e)}")
 
 # 试卷管理相关路由
 @app.route('/admin/lesson/<int:lesson_id>/manage_exam')
@@ -1266,11 +1259,11 @@ def upload_exam_files(lesson_id):
                 continue
     
     if success_count > 0:
-        try:
-            db.session.commit()
+            try:
+                db.session.commit()
             flash(f'成功上传{success_count}个文件', 'success')
-        except Exception as e:
-            db.session.rollback()
+            except Exception as e:
+                db.session.rollback()
             print(f"保存到数据库失败: {str(e)}")
             flash('保存文件记录失败，请重试', 'error')
     
@@ -1322,7 +1315,7 @@ def import_answers(lesson_id):
             flash('答案导入成功', 'success')
         except Exception as e:
             flash('答案导入失败', 'error')
-    else:
+        else:
         flash('请上传Excel文件', 'error')
         
     return redirect(url_for('manage_exam', lesson_id=lesson_id))
