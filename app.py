@@ -1504,30 +1504,24 @@ def add_questions(lesson_id):
         answers = request.form.getlist('answers[]')
         print(f"收到的答案数量: {len(answers)}")  # 调试日志
         
+        if not answers:
+            flash('没有收到答案数据')
+            return redirect(url_for('manage_questions', lesson_id=lesson_id))
+        
         # 开启数据库事务
         with db.session.begin():
-            # 获取当前课程的所有题目编号
-            existing_numbers = set(
-                db.session.query(Question.question_number)
-                .filter_by(lesson_id=lesson_id)
-                .all()
-            )
+            # 获取当前课程的最大题号
+            max_number = db.session.query(func.max(Question.question_number))\
+                .filter_by(lesson_id=lesson_id)\
+                .scalar() or 0
             
-            # 找到最大的可用题号
-            if existing_numbers:
-                max_number = max(num[0] for num in existing_numbers)
-            else:
-                max_number = 0
+            print(f"当前最大题号: {max_number}")  # 调试日志
             
             # 批量添加新题目
             new_questions = []
             for i, answer in enumerate(answers, 1):
-                # 找到下一个可用的题号
-                while max_number + i in existing_numbers:
-                    i += 1
-                
                 question_number = max_number + i
-                answer = answer.strip().upper()  # 转换为大写并去除空白
+                answer = answer.strip().upper() if answer else ''  # 转换为大写并去除空白
                 print(f"处理第{question_number}题答案: {answer}")  # 调试日志
                 
                 # 根据答案判断题目类型
@@ -1541,32 +1535,35 @@ def add_questions(lesson_id):
                 
                 print(f"题目类型: {question_type}")  # 调试日志
                 
-                # 创建新题目
-                question = Question(
-                    lesson_id=lesson_id,
-                    question_number=question_number,
-                    type=question_type,
-                    answer=answer,
-                    content=f"第{question_number}题"  # 添加默认内容
-                )
-                new_questions.append(question)
+                try:
+                    # 创建新题目
+                    question = Question(
+                        lesson_id=lesson_id,
+                        question_number=question_number,
+                        type=question_type,
+                        answer=answer,
+                        content=f"第{question_number}题"  # 添加默认内容
+                    )
+                    db.session.add(question)
+                    db.session.flush()  # 立即获取主键
+                    print(f"成功添加题目 ID: {question.id}")  # 调试日志
+                except Exception as e:
+                    print(f"添加题目失败: {str(e)}")  # 调试日志
+                    raise
             
-            # 批量添加所有题目
-            db.session.bulk_save_objects(new_questions)
+            db.session.commit()
+            flash('题目添加成功')
             
-        flash('题目添加成功')
-        return redirect(url_for('manage_questions', lesson_id=lesson_id))
-        
     except IntegrityError as e:
         db.session.rollback()
         flash('添加题目失败：题号重复')
         print(f"数据库错误: {str(e)}")  # 调试日志
-        return redirect(url_for('manage_questions', lesson_id=lesson_id))
     except Exception as e:
         db.session.rollback()
         flash('添加题目失败：系统错误')
         print(f"系统错误: {str(e)}")  # 调试日志
-        return redirect(url_for('manage_questions', lesson_id=lesson_id))
+    
+    return redirect(url_for('manage_questions', lesson_id=lesson_id))
 
 @app.route('/admin/lesson/<int:lesson_id>/upload_individual_exam_files', methods=['POST'])
 @admin_required
