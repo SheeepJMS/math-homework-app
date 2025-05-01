@@ -43,7 +43,7 @@ def load_user(user_id):
 
 # 配置数据库 - 使用PostgreSQL
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
-if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
+if app.config['SQLALCHEMY_DATABASE_URI'] and app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
     app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgres://', 'postgresql://', 1)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -65,8 +65,50 @@ db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
 # 确保所有表存在
-with app.app_context():
-    db.create_all()
+def init_db():
+    with app.app_context():
+        # 检查数据库连接
+        try:
+            db.engine.connect()
+            print("数据库连接成功")
+            
+            # 创建所有表（如果不存在）
+            db.create_all()
+            print("数据库表创建/更新成功")
+            
+            # 检查是否需要创建默认数据
+            admin = User.query.filter_by(is_admin=True).first()
+            if not admin:
+                print("创建默认管理员账号...")
+                # 创建默认班级
+                default_class = Class(
+                    name='默认班级',
+                    description='系统默认班级',
+                    is_active=True
+                )
+                db.session.add(default_class)
+                
+                # 创建管理员账号
+                admin = User(
+                    username='admin',
+                    email='admin@example.com',
+                    password='admin123',
+                    is_active=True,
+                    is_admin=True
+                )
+                db.session.add(admin)
+                
+                try:
+                    db.session.commit()
+                    print("默认数据创建成功！")
+                except Exception as e:
+                    db.session.rollback()
+                    print(f"创建默认数据时出错: {str(e)}")
+            else:
+                print("管理员账号已存在，跳过创建默认数据。")
+        except Exception as e:
+            print(f"数据库初始化出错: {str(e)}")
+            raise
 
 # 课程和班级的多对多关联表
 lesson_class_association = db.Table('lesson_class_association',
@@ -1157,61 +1199,6 @@ def save_uploaded_file(file, allowed_extensions):
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
         return filename
     return None
-
-def init_db():
-    print("检查数据库状态...")
-    try:
-        with app.app_context():
-            # 检查数据库表是否存在
-            inspector = db.inspect(db.engine)
-            tables_exist = inspector.get_table_names()
-            
-            if not tables_exist:
-                # 只有在表不存在时才创建
-                db.create_all()
-                print("数据库表已创建！")
-                
-                # 检查是否已经有管理员账号
-                admin_exists = User.query.filter_by(is_admin=True).first()
-                if not admin_exists:
-                    print("创建默认管理员账号...")
-                    # 创建默认班级
-                    default_class = Class(
-                        name='默认班级',
-                        description='系统默认班级',
-                        is_active=True
-                    )
-                    db.session.add(default_class)
-                    
-                    # 创建管理员账号
-                    admin = User(
-                        username='admin',
-                        email='admin@example.com',
-                        password='admin123',
-                        is_active=True,
-                        is_admin=True
-                    )
-                    db.session.add(admin)
-                    
-                    try:
-                        db.session.commit()
-                        print("默认数据创建成功！")
-                    except Exception as e:
-                        db.session.rollback()
-                        print(f"创建默认数据时出错: {str(e)}")
-                else:
-                    print("管理员账号已存在，跳过创建默认数据。")
-            else:
-                print("数据库表已存在，跳过初始化。")
-            
-            print("数据库初始化完成！")
-    except Exception as e:
-        print(f"数据库初始化出错: {str(e)}")
-        # 如果出错，尝试回滚
-        try:
-            db.session.rollback()
-        except:
-            pass
 
 # 试卷管理相关路由
 @app.route('/admin/lesson/<int:lesson_id>/manage_exam')
