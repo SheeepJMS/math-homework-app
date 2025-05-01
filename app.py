@@ -41,7 +41,7 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 # 配置数据库
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')  # Render 会注入环境变量
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///quiz.db'  # 使用 SQLite 数据库
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # 配置文件上传
@@ -450,17 +450,54 @@ def toggle_class_status(class_id):
 def delete_class(class_id):
     class_ = Class.query.get_or_404(class_id)
     
-    # 删除关联的用户
-    User.query.filter_by(class_id=class_id).delete()
+    try:
+        # 删除关联的用户
+        User.query.filter_by(class_id=class_id).delete()
+        
+        # 删除与课程的关联（不删除课程本身）
+        class_.lessons = []
+        
+        # 删除班级
+        db.session.delete(class_)
+        db.session.commit()
+        
+        flash(f'班级 {class_.name} 及其所有用户已删除', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'删除失败：{str(e)}', 'error')
     
-    # 删除关联的课程
-    Lesson.query.filter_by(class_id=class_id).delete()
+    return redirect(url_for('admin_classes'))
+
+@app.route('/admin/class/<int:class_id>/edit', methods=['POST'])
+@admin_required
+def edit_class(class_id):
+    class_ = Class.query.get_or_404(class_id)
     
-    # 删除班级
-    db.session.delete(class_)
-    db.session.commit()
+    # 获取表单数据
+    name = request.form.get('name')
+    description = request.form.get('description')
     
-    flash(f'班级 {class_.name} 及其所有用户和课程已删除')
+    if not name:
+        flash('班级名称不能为空')
+        return redirect(url_for('admin_classes'))
+    
+    # 检查名称是否已存在（排除当前班级）
+    existing_class = Class.query.filter(Class.name == name, Class.id != class_id).first()
+    if existing_class:
+        flash('班级名称已存在')
+        return redirect(url_for('admin_classes'))
+    
+    # 更新班级信息
+    class_.name = name
+    class_.description = description
+    
+    try:
+        db.session.commit()
+        flash('班级更新成功')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'更新失败：{str(e)}')
+    
     return redirect(url_for('admin_classes'))
 
 @app.route('/admin/lessons')
