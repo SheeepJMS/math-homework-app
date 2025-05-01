@@ -61,4 +61,11 @@ Thumbs.db
 
 # 临时文件
 *.tmp
-*.temp 
+*.temp
+
+# 数据库文件
+*.db
+instance/
+data/backups/
+backups/
+quiz.db 
