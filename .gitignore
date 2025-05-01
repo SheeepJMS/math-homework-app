@@ -30,10 +30,6 @@ ENV/
 *.swp
 *.swo
 
-# Database
-*.db
-*.sqlite3
-
 # Logs
 *.log
 
@@ -44,10 +40,6 @@ ENV/
 # System Files
 .DS_Store
 Thumbs.db
-
-# SQLite 数据库文件
-*.db
-quiz.db
 
 # 上传的文件
 static/uploads/
@@ -65,4 +57,8 @@ venv/
 
 # 系统文件
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+# 临时文件
+*.tmp
+*.temp 

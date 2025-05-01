@@ -42,7 +42,14 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 # 配置数据库
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///quiz.db'  # 使用 SQLite 数据库
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'quiz.db')
+BACKUP_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'backups')
+
+# 确保数据和备份目录存在
+os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+os.makedirs(BACKUP_PATH, exist_ok=True)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{DB_PATH}'  # 使用固定的数据库路径
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # 配置文件上传
@@ -1181,6 +1188,42 @@ def init_db():
                 )
                 db.session.add(admin)
                 
+                # 创建示例课程
+                example_lesson = Lesson(
+                    title='示例课程',
+                    description='这是一个示例课程',
+                    is_active=True
+                )
+                example_lesson.classes.append(default_class)
+                db.session.add(example_lesson)
+                
+                # 创建示例题目
+                example_questions = [
+                    Question(
+                        lesson_id=1,
+                        question_number=1,
+                        type='choice',
+                        answer='A',
+                        content='示例选择题'
+                    ),
+                    Question(
+                        lesson_id=1,
+                        question_number=2,
+                        type='fill',
+                        answer='示例答案',
+                        content='示例填空题'
+                    ),
+                    Question(
+                        lesson_id=1,
+                        question_number=3,
+                        type='proof',
+                        answer='证明题',
+                        content='示例证明题'
+                    )
+                ]
+                for question in example_questions:
+                    db.session.add(question)
+                
                 try:
                     db.session.commit()
                     print("默认数据创建成功！")
@@ -1193,6 +1236,11 @@ def init_db():
             print("数据库初始化完成！")
     except Exception as e:
         print(f"数据库初始化出错: {str(e)}")
+        # 如果出错，尝试回滚
+        try:
+            db.session.rollback()
+        except:
+            pass
 
 # 试卷管理相关路由
 @app.route('/admin/lesson/<int:lesson_id>/manage_exam')
@@ -1824,6 +1872,45 @@ def add_user():
     
     return redirect(url_for('admin_users'))
 
+# 自动备份函数
+def backup_database():
+    if os.path.exists(DB_PATH):
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        backup_file = os.path.join(BACKUP_PATH, f'quiz_backup_{timestamp}.db')
+        try:
+            import shutil
+            shutil.copy2(DB_PATH, backup_file)
+            print(f'数据库已备份到: {backup_file}')
+            return True
+        except Exception as e:
+            print(f'备份失败: {str(e)}')
+            return False
+    return False
+
+# 在每次请求开始前检查并备份数据库
+@app.before_request
+def before_request():
+    # 每天第一次访问时备份数据库
+    last_backup = session.get('last_backup_date')
+    today = datetime.now().strftime('%Y-%m-%d')
+    if last_backup != today:
+        if backup_database():
+            session['last_backup_date'] = today
+
 if __name__ == '__main__':
+    # 确保备份目录存在
+    os.makedirs('backups', exist_ok=True)
+    
+    # 如果数据库文件存在，创建启动时备份
+    if os.path.exists('quiz.db'):
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        backup_file = f'backups/quiz_startup_{timestamp}.db'
+        try:
+            import shutil
+            shutil.copy2('quiz.db', backup_file)
+            print(f'数据库已备份到: {backup_file}')
+        except Exception as e:
+            print(f'备份失败: {str(e)}')
+    
     init_db()  # 初始化数据库
     app.run(debug=True, host='0.0.0.0', port=5000) 
