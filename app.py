@@ -1210,64 +1210,69 @@ def manage_exam(lesson_id):
 @app.route('/admin/lesson/<int:lesson_id>/upload_exam_files', methods=['POST'])
 @admin_required
 def upload_exam_files(lesson_id):
-    lesson = Lesson.query.get_or_404(lesson_id)
-    if 'files[]' not in request.files:
-        flash('没有选择文件', 'error')
-        return redirect(url_for('manage_questions', lesson_id=lesson_id))
-    
-    files = request.files.getlist('files[]')
-    print(f"收到{len(files)}个文件上传请求")
-    
-    # 获取当前最大页码
-    max_page = db.session.query(func.max(ExamFile.page_number)).filter_by(lesson_id=lesson_id).scalar() or 0
-    
-    success_count = 0
-    for file in files:
-        if file and allowed_file(file.filename, ALLOWED_PDF_EXTENSIONS.union(ALLOWED_IMAGE_EXTENSIONS)):
-            try:
-                # 生成安全的文件名
-                original_filename = secure_filename(file.filename)
-                # 添加时间戳和课程ID，避免文件名冲突
-                filename = f"{lesson_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{original_filename}"
-                
-                # 设置相对路径（用于数据库存储和URL访问）
-                relative_path = f'uploads/exams/{filename}'
-                # 设置绝对路径（用于文件保存）
-                absolute_path = os.path.join('static', relative_path)
-                
-                # 确保目录存在
-                os.makedirs(os.path.dirname(absolute_path), exist_ok=True)
-                
-                # 保存文件
-                file.save(absolute_path)
-                print(f"文件已保存到: {absolute_path}")
-                print(f"数据库存储路径: {relative_path}")
-                
-                # 创建试卷文件记录
-                exam_file = ExamFile(
-                    filename=filename,
-                    path=relative_path,  # 存储相对路径
-                    lesson_id=lesson_id,
-                    page_number=max_page + 1 + success_count
-                )
-                db.session.add(exam_file)
-                success_count += 1
-                
-            except Exception as e:
-                print(f"上传失败: {str(e)}")
-                flash(f'文件 {file.filename} 上传失败：{str(e)}', 'error')
-                continue
-    
-    if success_count > 0:
+    try:
+        lesson = Lesson.query.get_or_404(lesson_id)
+        if 'files[]' not in request.files:
+            flash('没有选择文件', 'error')
+            return redirect(url_for('manage_questions', lesson_id=lesson_id))
+        
+        files = request.files.getlist('files[]')
+        print(f"收到{len(files)}个文件上传请求")
+        
+        # 获取当前最大页码
+        max_page = db.session.query(func.max(ExamFile.page_number)).filter_by(lesson_id=lesson_id).scalar() or 0
+        
+        success_count = 0
+        for file in files:
+            if file and allowed_file(file.filename, ALLOWED_PDF_EXTENSIONS.union(ALLOWED_IMAGE_EXTENSIONS)):
+                try:
+                    # 生成安全的文件名
+                    original_filename = secure_filename(file.filename)
+                    filename = f"{lesson_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{original_filename}"
+                    
+                    # 设置相对路径（用于数据库存储和URL访问）
+                    relative_path = f'uploads/exams/{filename}'
+                    # 设置绝对路径（用于文件保存）
+                    absolute_path = os.path.join('static', relative_path)
+                    
+                    # 确保目录存在
+                    os.makedirs(os.path.dirname(absolute_path), exist_ok=True)
+                    
+                    # 保存文件
+                    file.save(absolute_path)
+                    print(f"文件已保存到: {absolute_path}")
+                    print(f"数据库存储路径: {relative_path}")
+                    
+                    # 创建试卷文件记录
+                    exam_file = ExamFile(
+                        filename=filename,
+                        path=relative_path,
+                        lesson_id=lesson_id,
+                        page_number=max_page + 1 + success_count
+                    )
+                    db.session.add(exam_file)
+                    success_count += 1
+                    
+                except Exception as e:
+                    print(f"上传失败: {str(e)}")
+                    flash(f'文件 {file.filename} 上传失败：{str(e)}', 'error')
+                    continue
+        
+        if success_count > 0:
             try:
                 db.session.commit()
-            flash(f'成功上传{success_count}个文件', 'success')
+                flash(f'成功上传{success_count}个文件', 'success')
             except Exception as e:
                 db.session.rollback()
-            print(f"保存到数据库失败: {str(e)}")
-            flash('保存文件记录失败，请重试', 'error')
-    
-    return redirect(url_for('manage_questions', lesson_id=lesson_id))
+                print(f"保存到数据库失败: {str(e)}")
+                flash('保存文件记录失败，请重试', 'error')
+        
+        return redirect(url_for('manage_questions', lesson_id=lesson_id))
+        
+    except Exception as e:
+        print(f"文件上传过程出错: {str(e)}")
+        flash('文件上传过程出错，请重试', 'error')
+        return redirect(url_for('manage_questions', lesson_id=lesson_id))
 
 @app.route('/admin/exam_file/<int:file_id>/delete', methods=['POST'])
 @admin_required
@@ -1314,8 +1319,9 @@ def import_answers(lesson_id):
             db.session.commit()
             flash('答案导入成功', 'success')
         except Exception as e:
+            db.session.rollback()
             flash('答案导入失败', 'error')
-        else:
+    else:
         flash('请上传Excel文件', 'error')
         
     return redirect(url_for('manage_exam', lesson_id=lesson_id))
@@ -1335,50 +1341,54 @@ def upload_explanation_files(lesson_id):
     max_page = db.session.query(func.max(ExplanationFile.page_number)).filter_by(lesson_id=lesson_id).scalar() or 0
     
     success_count = 0
-    for file in files:
-        if file and allowed_file(file.filename, ALLOWED_PDF_EXTENSIONS):
+    try:
+        for file in files:
+            if file and allowed_file(file.filename, ALLOWED_PDF_EXTENSIONS):
+                try:
+                    # 生成安全的文件名
+                    original_filename = secure_filename(file.filename)
+                    # 添加时间戳和课程ID，避免文件名冲突
+                    filename = f"{lesson_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{original_filename}"
+                    
+                    # 设置相对路径（用于数据库存储和URL访问）
+                    relative_path = f'uploads/explanations/{filename}'
+                    # 设置绝对路径（用于文件保存）
+                    absolute_path = os.path.join('static', relative_path)
+                    
+                    # 确保目录存在
+                    os.makedirs(os.path.dirname(absolute_path), exist_ok=True)
+                    
+                    # 保存文件
+                    file.save(absolute_path)
+                    print(f"解析文件已保存到: {absolute_path}")
+                    print(f"数据库存储路径: {relative_path}")
+                    
+                    # 创建解析文件记录
+                    explanation_file = ExplanationFile(
+                        filename=filename,
+                        path=relative_path,
+                        lesson_id=lesson_id,
+                        page_number=max_page + 1 + success_count
+                    )
+                    db.session.add(explanation_file)
+                    success_count += 1
+                    
+                except Exception as e:
+                    print(f"上传解析文件失败: {str(e)}")
+                    flash(f'文件 {file.filename} 上传失败：{str(e)}', 'error')
+                    continue
+        
+        if success_count > 0:
             try:
-                # 生成安全的文件名
-                original_filename = secure_filename(file.filename)
-                # 添加时间戳和课程ID，避免文件名冲突
-                filename = f"{lesson_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{original_filename}"
-                
-                # 设置相对路径（用于数据库存储和URL访问）
-                relative_path = f'uploads/explanations/{filename}'
-                # 设置绝对路径（用于文件保存）
-                absolute_path = os.path.join('static', relative_path)
-                
-                # 确保目录存在
-                os.makedirs(os.path.dirname(absolute_path), exist_ok=True)
-                
-                # 保存文件
-                file.save(absolute_path)
-                print(f"解析文件已保存到: {absolute_path}")
-                print(f"数据库存储路径: {relative_path}")
-                
-                # 创建解析文件记录
-                explanation_file = ExplanationFile(
-                    filename=filename,
-                    path=relative_path,  # 存储相对路径
-                    lesson_id=lesson_id,
-                    page_number=max_page + 1 + success_count
-                )
-                db.session.add(explanation_file)
-                success_count += 1
-                
+                db.session.commit()
+                flash(f'成功上传{success_count}个解析文件', 'success')
             except Exception as e:
-                print(f"上传解析文件失败: {str(e)}")
-                flash(f'文件 {file.filename} 上传失败：{str(e)}', 'error')
-                continue
-    
-    if success_count > 0:
-        try:
-            db.session.commit()
-            flash(f'成功上传{success_count}个解析文件', 'success')
-        except Exception as e:
-            db.session.rollback()
-            print(f"保存到数据库失败: {str(e)}")
-            flash('保存文件记录失败，请重试', 'error')
+                db.session.rollback()
+                print(f"保存到数据库失败: {str(e)}")
+                flash('保存文件记录失败，请重试', 'error')
+    except Exception as e:
+        print(f"文件上传过程出错: {str(e)}")
+        flash('文件上传过程出错，请重试', 'error')
     
     return redirect(url_for('manage_questions', lesson_id=lesson_id))
 
