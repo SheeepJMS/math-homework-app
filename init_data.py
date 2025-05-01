@@ -74,9 +74,5 @@ def init_data():
         print("数据初始化完成！")
 
 if __name__ == '__main__':
-    # 在初始化数据之前备份现有数据库
-    from app import backup_database
-    backup_database()
-    
     # 初始化数据
     init_data() 

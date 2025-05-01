@@ -4,7 +4,18 @@ from datetime import datetime
 import os
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///quiz.db'
+# 配置数据库
+database_url = os.environ.get('DATABASE_URL')
+if database_url and database_url.startswith('postgres://'):
+    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
+if not database_url:
+    # 如果没有设置环境变量，使用默认的SQLite配置（用于本地开发）
+    base_dir = os.path.abspath(os.path.dirname(__file__))
+    database_url = f'sqlite:///{os.path.join(base_dir, "instance", "quiz.db")}'
+    print(f"警告：未设置DATABASE_URL环境变量，使用SQLite作为默认数据库: {database_url}")
+
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # 初始化数据库
@@ -95,44 +106,50 @@ def init_db():
     
     # 创建所有表
     with app.app_context():
-        db.drop_all()  # 删除所有表
-        db.create_all()  # 重新创建所有表
+        # 使用 SQLAlchemy 的方法创建表
+        db.create_all()
         
-        # 创建默认班级
-        default_class = Class(
-            name='默认班级',
-            description='系统默认班级',
-            is_active=True
-        )
-        db.session.add(default_class)
-        db.session.commit()
-        print("默认班级已创建")
+        # 检查是否已存在默认班级
+        default_class = Class.query.filter_by(name='默认班级').first()
+        if not default_class:
+            default_class = Class(
+                name='默认班级',
+                description='系统默认班级',
+                is_active=True
+            )
+            db.session.add(default_class)
+            db.session.commit()
+            print("默认班级已创建")
         
-        # 创建管理员账号
-        admin = User(
-            name='管理员',
-            username='admin',
-            password='admin123',
-            is_active=True,
-            is_admin=True,
-            class_id=default_class.id,
-            achievement_count=0,
-            badge_level=0
-        )
-        db.session.add(admin)
+        # 检查是否已存在管理员账号
+        admin = User.query.filter_by(username='admin').first()
+        if not admin:
+            admin = User(
+                name='管理员',
+                username='admin',
+                password='admin123',
+                is_active=True,
+                is_admin=True,
+                class_id=default_class.id,
+                achievement_count=0,
+                badge_level=0
+            )
+            db.session.add(admin)
         
-        # 创建测试学生账号
-        student = User(
-            name='测试学生',
-            username='student',
-            password='student123',
-            is_active=True,
-            is_admin=False,
-            class_id=default_class.id,
-            achievement_count=0,
-            badge_level=0
-        )
-        db.session.add(student)
+        # 检查是否已存在测试学生账号
+        student = User.query.filter_by(username='student').first()
+        if not student:
+            student = User(
+                name='测试学生',
+                username='student',
+                password='student123',
+                is_active=True,
+                is_admin=False,
+                class_id=default_class.id,
+                achievement_count=0,
+                badge_level=0
+            )
+            db.session.add(student)
         
         db.session.commit()
         print("默认用户已创建")
