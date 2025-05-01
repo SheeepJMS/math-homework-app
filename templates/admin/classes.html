@@ -181,16 +181,19 @@ function editClass(id, name, description) {
 
 function deleteClass(id) {
     if (confirm('确定要删除这个班级吗？')) {
-        fetch(`/admin/class/${id}/delete`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        }).then(response => {
-            if (response.ok) {
-                window.location.reload();
-            }
-        });
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/admin/class/${id}/delete`;
+        
+        // 添加CSRF令牌
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrf_token';
+        csrfInput.value = '{{ csrf_token() }}';
+        form.appendChild(csrfInput);
+        
+        document.body.appendChild(form);
+        form.submit();
     }
 }
 </script>
