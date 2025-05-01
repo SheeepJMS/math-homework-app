@@ -41,16 +41,15 @@ login_manager.login_view = 'login'
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# 配置数据库路径，使用环境变量或默认路径
-DB_PATH = os.environ.get('DATABASE_PATH', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'quiz.db'))
+# 配置数据库
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'quiz.db')
 BACKUP_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'backups')
-BACKUP_FILE = os.path.join(BACKUP_PATH, 'quiz_backup.db')  # 固定的备份文件名
 
-# 确保数据目录存在
+# 确保数据和备份目录存在
 os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 os.makedirs(BACKUP_PATH, exist_ok=True)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{DB_PATH}'  # 使用环境变量中的数据库路径
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{DB_PATH}'  # 使用固定的数据库路径
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # 配置文件上传
@@ -1173,32 +1172,36 @@ def init_db():
                 db.create_all()
                 print("数据库表已创建！")
                 
-                # 创建默认数据
-                print("创建默认管理员账号...")
-                # 创建默认班级
-                default_class = Class(
-                    name='默认班级',
-                    description='系统默认班级',
-                    is_active=True
-                )
-                db.session.add(default_class)
-                
-                # 创建管理员账号
-                admin = User(
-                    username='admin',
-                    email='admin@example.com',
-                    password='admin123',
-                    is_active=True,
-                    is_admin=True
-                )
-                db.session.add(admin)
-                
-                try:
-                    db.session.commit()
-                    print("默认数据创建成功！")
-                except Exception as e:
-                    db.session.rollback()
-                    print(f"创建默认数据时出错: {str(e)}")
+                # 检查是否已经有管理员账号
+                admin_exists = User.query.filter_by(is_admin=True).first()
+                if not admin_exists:
+                    print("创建默认管理员账号...")
+                    # 创建默认班级
+                    default_class = Class(
+                        name='默认班级',
+                        description='系统默认班级',
+                        is_active=True
+                    )
+                    db.session.add(default_class)
+                    
+                    # 创建管理员账号
+                    admin = User(
+                        username='admin',
+                        email='admin@example.com',
+                        password='admin123',
+                        is_active=True,
+                        is_admin=True
+                    )
+                    db.session.add(admin)
+                    
+                    try:
+                        db.session.commit()
+                        print("默认数据创建成功！")
+                    except Exception as e:
+                        db.session.rollback()
+                        print(f"创建默认数据时出错: {str(e)}")
+                else:
+                    print("管理员账号已存在，跳过创建默认数据。")
             else:
                 print("数据库表已存在，跳过初始化。")
             
@@ -1841,18 +1844,12 @@ def add_user():
 # 自动备份函数
 def backup_database():
     if os.path.exists(DB_PATH):
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        backup_file = os.path.join(BACKUP_PATH, f'quiz_backup_{timestamp}.db')
         try:
             import shutil
-            # 如果已存在备份，先重命名为old
-            if os.path.exists(BACKUP_FILE):
-                old_backup = BACKUP_FILE + '.old'
-                if os.path.exists(old_backup):
-                    os.remove(old_backup)
-                os.rename(BACKUP_FILE, old_backup)
-            
-            # 创建新备份
-            shutil.copy2(DB_PATH, BACKUP_FILE)
-            print(f'数据库已备份到: {BACKUP_FILE}')
+            shutil.copy2(DB_PATH, backup_file)
+            print(f'数据库已备份到: {backup_file}')
             return True
         except Exception as e:
             print(f'备份失败: {str(e)}')
@@ -1877,8 +1874,18 @@ if __name__ == '__main__':
     if os.path.exists(DB_PATH):
         backup_database()
     
+    # 确保数据库目录存在
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    
     # 只在数据库文件不存在时初始化
     if not os.path.exists(DB_PATH):
         init_db()
+    else:
+        # 如果数据库文件存在但表不存在，只创建表结构
+        with app.app_context():
+            inspector = db.inspect(db.engine)
+            if not inspector.get_table_names():
+                db.create_all()
+                print("创建数据库表结构")
     
     app.run(debug=True, host='0.0.0.0', port=5000) 
