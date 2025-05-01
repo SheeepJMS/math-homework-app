@@ -1,0 +1,631 @@
+{% extends "student/base.html" %}
+
+{% block title %}{% if is_admin_view %}查看学生 - {% endif %}学生仪表盘{% endblock %}
+
+{% block content %}
+<div class="container">
+    {% if is_admin_view %}
+    <div class="admin-controls mb-4">
+        <a href="{{ url_for('admin_users') }}" class="btn btn-primary">
+            <i class="fas fa-arrow-left"></i> 返回用户管理
+        </a>
+        <div class="alert alert-info">
+            <i class="fas fa-eye"></i> 正在以管理员身份查看 {{ current_user.name }} 的仪表盘
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- 顶部信息区域 -->
+    <div class="top-info">
+        <div class="user-info">
+            <div class="avatar">{{ current_user.username[0] }}</div>
+            <div class="info-text">
+                <h2>{{ current_user.username }}</h2>
+                <p>{{ current_user.class.name }}</p>
+            </div>
+        </div>
+        <div class="badge-info">
+            <div class="badge-icon" title="{{ current_user.badge_info.name }}">
+                {% if current_user.badge_level == 0 %}
+                    <span class="cute-face">😊</span>
+                {% else %}
+                    {{ current_user.badge_info.icon }}
+                {% endif %}
+            </div>
+            <div class="badge-details">
+                {% if current_user.badge_level == 0 %}
+                    <div class="badge-name">新手冒险家</div>
+                    <div class="badge-progress">
+                        <div class="progress-bar">
+                            <div class="progress" style="width: 0%"></div>
+                        </div>
+                        <div class="progress-text">完成第一次测验即可获得徽章！</div>
+                    </div>
+                    <div class="encouragement">准备好开始你的学习之旅了吗？</div>
+                {% else %}
+                    <div class="badge-name">{{ current_user.badge_info.name }}</div>
+                    <div class="badge-progress">
+                        <div class="progress-bar">
+                            <div class="progress" style="width: {{ (current_user.badge_info.achievements % 2) * 50 }}%"></div>
+                        </div>
+                        {% if current_user.badge_info.next_level_at %}
+                            <div class="progress-text">再获得 {{ current_user.badge_info.next_achievements_needed }} 个达标（80%以上）即可升级</div>
+                        {% else %}
+                            <div class="progress-text">Maximum level reached!</div>
+                        {% endif %}
+                    </div>
+                    <div class="encouragement">{{ current_user.badge_info.encouragement }}</div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="stats">
+            <div class="stat-item">
+                <span class="stat-label">总完成作业</span>
+                <span class="stat-value">{{ total_quizzes }}</span>
+                <span class="stat-unit">次</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">平均正确率</span>
+                <span class="stat-value">{{ average_correct_rate }}</span>
+                <span class="stat-unit">%</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 趋势图 -->
+    <div class="card trend-card">
+        <h2>正确率趋势</h2>
+        <div class="chart-container">
+            <canvas id="trendChart"></canvas>
+        </div>
+    </div>
+
+    <!-- 可用课程 -->
+    <div class="card">
+        <h2>可用课程</h2>
+        <div class="lessons-grid">
+            {% for lesson in lessons %}
+            <div class="lesson-card active">
+                <div class="lesson-header">
+                    <h3>{{ lesson.title }}</h3>
+                    <div class="lesson-status">
+                        {% set completed = quiz_history|selectattr('lesson_id', 'equalto', lesson.id)|list|length > 0 %}
+                        <span class="status-badge {% if completed %}completed{% else %}pending{% endif %}">
+                            {{ '已完成' if completed else '未完成' }}
+                        </span>
+                        <span class="question-count">
+                            {{ lesson.questions|length }} 题
+                        </span>
+                    </div>
+                </div>
+                <div class="lesson-actions">
+                    <a href="{{ url_for('start_quiz', lesson_id=lesson.id) }}" class="btn btn-primary">
+                        <i class="fas fa-pencil-alt"></i> 开始答题
+                    </a>
+                    {% if lesson.video_url %}
+                    <a href="{{ lesson.video_url }}" target="_blank" class="btn btn-info">
+                        <i class="fas fa-video"></i> 查看回放
+                    </a>
+                    {% else %}
+                    <button class="btn btn-secondary" disabled>
+                        <i class="fas fa-video"></i> 暂无回放
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- 历史课程 -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">历史课程</h5>
+            <a href="{{ url_for('wrong_questions') }}" class="btn btn-danger btn-sm">
+                <i class="fas fa-book"></i> 错题本
+            </a>
+        </div>
+        <div class="card-body">
+            {% if history_data %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>课程名称</th>
+                            <th>完成时间</th>
+                            <th>正确率</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for lesson, quiz in history_data %}
+                        <tr>
+                            <td>{{ lesson.title }}</td>
+                            <td>{{ quiz.completed_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>{{ quiz.correct_rate|round(1) }}%</td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    {% if lesson.video_url %}
+                                    <a href="{{ lesson.video_url }}" target="_blank" class="btn btn-info btn-sm">
+                                        <i class="fas fa-video"></i> 查看回放
+                                    </a>
+                                    {% else %}
+                                    <button class="btn btn-secondary btn-sm" disabled>
+                                        <i class="fas fa-video"></i> 暂无回放
+                                    </button>
+                                    {% endif %}
+                                    
+                                    <a href="{{ url_for('view_history', lesson_id=lesson.id) }}" class="btn btn-warning btn-sm ms-2">
+                                        <i class="fas fa-history"></i> 查看历史
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted mb-0">暂无历史课程</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.top-info {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.avatar {
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #4CAF50, #45a049);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 24px;
+    font-weight: bold;
+}
+
+.info-text h2 {
+    margin: 0;
+    color: #333;
+    font-size: 1.5em;
+}
+
+.info-text p {
+    margin: 5px 0 0;
+    color: #666;
+}
+
+.badge-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 0 30px;
+    border-left: 1px solid #eee;
+    border-right: 1px solid #eee;
+}
+
+.badge-icon {
+    font-size: 40px;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f8f9fa;
+    border-radius: 50%;
+    transition: transform 0.3s ease;
+    cursor: pointer;
+}
+
+.badge-icon:hover {
+    transform: scale(1.1);
+}
+
+.badge-details {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.badge-name {
+    font-weight: bold;
+    color: #333;
+    font-size: 1.1em;
+}
+
+.badge-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.progress-bar {
+    width: 150px;
+    height: 6px;
+    background: #eee;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.progress {
+    height: 100%;
+    background: linear-gradient(90deg, #4CAF50, #45a049);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.progress-text {
+    font-size: 0.8em;
+    color: #666;
+}
+
+.encouragement {
+    color: #4CAF50;
+    font-weight: 500;
+    font-style: italic;
+    margin-top: 5px;
+    font-size: 0.9em;
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.stats {
+    display: flex;
+    gap: 30px;
+}
+
+.stat-item {
+    text-align: center;
+    padding: 0 20px;
+    border-left: 1px solid #eee;
+}
+
+.stat-label {
+    display: block;
+    color: #666;
+    font-size: 0.9em;
+    margin-bottom: 5px;
+}
+
+.stat-value {
+    display: block;
+    font-size: 2em;
+    font-weight: bold;
+    color: #333;
+    line-height: 1;
+}
+
+.stat-unit {
+    display: block;
+    color: #666;
+    font-size: 0.9em;
+    margin-top: 5px;
+}
+
+.trend-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.chart-container {
+    height: 200px;
+    margin: 10px 0;
+}
+
+.card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.lessons-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.lesson-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.lesson-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.lesson-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 15px;
+}
+
+.lesson-header h3 {
+    margin: 0;
+    font-size: 1.2em;
+    color: #333;
+    flex: 1;
+    padding-right: 10px;
+}
+
+.lesson-status {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 5px;
+}
+
+.status-badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.8em;
+    font-weight: 500;
+}
+
+.status-badge.completed {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+}
+
+.status-badge.pending {
+    background-color: #fff3e0;
+    color: #ef6c00;
+}
+
+.question-count {
+    font-size: 0.9em;
+    color: #666;
+}
+
+.lesson-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.lesson-actions .btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 8px 12px;
+    font-size: 0.9em;
+}
+
+.history-list {
+    margin-top: 20px;
+}
+
+.history-list table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.history-list th,
+.history-list td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+}
+
+.history-list th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    color: #495057;
+}
+
+.history-list tr:hover {
+    background-color: #f8f9fa;
+}
+
+.history-list td:last-child {
+    text-align: right;
+}
+
+.cute-face {
+    font-size: 36px;
+    animation: bounce 2s infinite;
+    display: inline-block;
+}
+
+@keyframes bounce {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-5px);
+    }
+}
+
+.personal-info {
+    margin-top: 20px;
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.personal-info h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 1.5em;
+    color: #333;
+}
+
+.personal-info p {
+    margin: 5px 0;
+    color: #666;
+}
+
+.personal-info .btn {
+    margin-top: 15px;
+}
+
+.btn-danger {
+    background-color: #dc3545;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: bold;
+}
+
+.btn-danger:hover {
+    background-color: #c82333;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    color: white;
+    text-decoration: none;
+}
+
+.btn-danger i {
+    font-size: 1.2em;
+}
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // 趋势图数据处理
+    const trendData = JSON.parse('{{ trend_data | safe }}');
+    const dates = trendData.map(item => item.date);
+    const correctRates = trendData.map(item => Math.round(item.correct_rate));
+    const classAvgs = trendData.map(item => Math.round(item.class_avg));
+    const lessonTitles = trendData.map(item => item.lesson_title);
+
+    // 创建趋势图
+    const ctx = document.getElementById('trendChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: lessonTitles,
+            datasets: [
+                {
+                    label: '你的正确率',
+                    data: correctRates,
+                    borderColor: 'rgb(75, 192, 192)',
+                    tension: 0.1,
+                    fill: false
+                },
+                {
+                    label: '班级平均',
+                    data: classAvgs,
+                    borderColor: 'rgba(255, 99, 132, 0.8)',
+                    borderDash: [5, 5],
+                    tension: 0.1,
+                    fill: false
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const datasetLabel = context.dataset.label;
+                            const value = Math.round(context.parsed.y);
+                            const date = dates[context.dataIndex];
+                            return `${datasetLabel}: ${value}% (${date})`;
+                        }
+                    }
+                },
+                legend: {
+                    display: true,
+                    position: 'top'
+                }
+            },
+            scales: {
+                x: {
+                    ticks: {
+                        maxRotation: 45,
+                        minRotation: 45,
+                        autoSkip: false,
+                        callback: function(value, index) {
+                            const title = this.getLabelForValue(value);
+                            const words = title.split(' ');
+                            const lines = [];
+                            let currentLine = '';
+                            
+                            for (let word of words) {
+                                if (currentLine.length + word.length > 10) {
+                                    lines.push(currentLine);
+                                    currentLine = word;
+                                } else {
+                                    currentLine = currentLine ? currentLine + ' ' + word : word;
+                                }
+                            }
+                            if (currentLine) {
+                                lines.push(currentLine);
+                            }
+                            return lines;
+                        }
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        callback: function(value) {
+                            return Math.round(value) + '%';
+                        }
+                    }
+                }
+            }
+        }
+    });
+</script>
+{% endblock %} 

@@ -1,0 +1,408 @@
+{% extends "student/base.html" %}
+
+{% block title %}答题 - {{ lesson.title }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card mb-3">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">{{ lesson.title }} - 答题</h5>
+            <div id="timer" class="text-white">
+                用时：<span id="minutes">00</span>:<span id="seconds">00</span>
+            </div>
+        </div>
+    </div>
+
+    <form id="quizForm" method="POST" action="{{ url_for('submit_quiz', lesson_id=lesson.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="time_spent" id="timeSpent" value="0">
+        <input type="hidden" name="lesson_id" value="{{ lesson.id }}">
+        
+        {% for question in questions %}
+        <div class="card mb-4 question-container">
+            <!-- 题目头部 -->
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">第{{ question.question_number }}题</h6>
+                <div class="d-flex align-items-center gap-2">
+                    <div class="idk-option">
+                        <input class="option-input idk-input" 
+                               type="checkbox"
+                               name="answer_{{ question.id }}_idk" 
+                               id="question_{{ question.id }}_idk"
+                               value="IDK">
+                        <label class="option-label idk-label" for="question_{{ question.id }}_idk">
+                            <span class="emoji">😭</span>
+                            <span class="option-text">IDK 不会做！</span>
+                        </label>
+                    </div>
+                    <span class="badge {% if question.type == 'choice' %}bg-primary{% elif question.type == 'proof' %}bg-warning{% else %}bg-info{% endif %}">
+                        {% if question.type == 'choice' %}
+                        选择题
+                        {% elif question.type == 'proof' %}
+                        解答题
+                        {% else %}
+                        填空题
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+
+            <div class="card-body">
+                <div class="row">
+                    <!-- 左侧试题区域 -->
+                    <div class="col-md-10">
+                        <!-- 试题图片 -->
+                        {% if exam_files[question.question_number - 1] %}
+                        <div class="question-image-container">
+                            <img src="{{ url_for('static', filename=exam_files[question.question_number - 1].path) }}" 
+                                 class="question-image" 
+                                 alt="第{{ question.question_number }}题">
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- 右侧答题区域 -->
+                    <div class="col-md-2">
+                        <div class="answer-area">
+                            {% if question.type == 'choice' %}
+                                <div class="options-vertical">
+                                    {% for choice in ['A', 'B', 'C', 'D', 'E'] %}
+                                    <div class="option-item-vertical">
+                                        <input class="option-input" 
+                                               type="radio" 
+                                               name="answer_{{ question.id }}" 
+                                               id="question_{{ question.id }}_{{ choice }}"
+                                               value="{{ choice }}"
+                                               required>
+                                        <label class="option-label-vertical" for="question_{{ question.id }}_{{ choice }}">
+                                            <span class="choice-text">{{ choice }}</span>
+                                            <span class="choice-emoji"></span>
+                                        </label>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            {% elif question.type == 'proof' %}
+                                <div class="form-group">
+                                    <textarea class="form-control" 
+                                              name="answer_{{ question.id }}"
+                                              rows="3"
+                                              placeholder="请在此处书写解答过程"></textarea>
+                                </div>
+                            {% else %}
+                                <div class="form-group">
+                                    <input type="text" 
+                                           class="form-control" 
+                                           name="answer_{{ question.id }}"
+                                           placeholder="请输入答案"
+                                           required>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        
+        <div class="text-center mb-4">
+            <button type="submit" class="btn btn-primary btn-lg">提交答案</button>
+        </div>
+    </form>
+</div>
+
+<style>
+.container {
+    max-width: 1200px;
+}
+
+.question-container {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.question-image-container {
+    background: #f8f9fa;
+    padding: 10px;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.question-image {
+    max-width: 100%;
+    max-height: 450px;
+    object-fit: contain;
+}
+
+.answer-area {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    padding-top: 1rem;
+    width: 100%;
+}
+
+.options-vertical {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 1rem;
+    width: 100%;
+}
+
+.option-item-vertical {
+    position: relative;
+    width: 100%;
+}
+
+.option-label-vertical {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    padding: 8px 16px;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    background: #f8f9fa;
+    border: 2px solid #dee2e6;
+    margin: 0;
+    font-weight: 500;
+    color: #495057;
+    width: 100%;
+}
+
+.option-input:checked + .option-label-vertical {
+    background: #e7f3ff;
+    border-color: #0d6efd;
+    color: #0d6efd;
+}
+
+.option-label-vertical:hover {
+    background: #e9ecef;
+    transform: translateX(4px);
+}
+
+.option-input {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.idk-option {
+    display: inline-flex;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+}
+
+.idk-label {
+    background: #fff3cd;
+    border: 2px dashed #ffc107;
+    padding: 4px 12px;
+    border-radius: 20px;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    gap: 6px;
+    user-select: none;
+}
+
+.idk-input {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    height: 100%;
+    width: 100%;
+    left: 0;
+    top: 0;
+    margin: 0;
+    z-index: 2;
+}
+
+.idk-label .emoji {
+    font-size: 0;
+    transition: all 0.3s ease;
+    opacity: 0;
+}
+
+.idk-input:checked + .idk-label .emoji {
+    font-size: 1.2rem;
+    opacity: 1;
+}
+
+.idk-label:hover {
+    background: #ffe5b4;
+    transform: translateY(-2px);
+}
+
+.idk-input:checked + .idk-label {
+    background: #ffc107;
+    color: #000;
+    border-style: solid;
+    padding-left: 8px;
+}
+
+.gap-2 {
+    gap: 0.75rem !important;
+}
+
+.card-header .badge {
+    min-width: 56px;
+    text-align: center;
+}
+
+.form-control {
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    padding: 8px;
+    transition: all 0.3s ease;
+    width: 100%;
+}
+
+.form-control:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+textarea.form-control {
+    min-height: 100px;
+    resize: vertical;
+}
+
+@media (max-width: 768px) {
+    .col-md-10, .col-md-2 {
+        width: 100%;
+    }
+    
+    .answer-area {
+        margin-top: 1rem;
+        padding-top: 0;
+    }
+
+    .options-vertical {
+        max-width: 200px;
+        margin: 0 auto;
+    }
+}
+
+.option-input:disabled + .option-label-vertical,
+.form-control:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+    background-color: #e9ecef;
+}
+
+.choice-text {
+    font-size: 16px;
+}
+
+.choice-emoji {
+    font-size: 20px;
+    min-width: 24px;
+    text-align: center;
+}
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let startTime = Date.now();
+let timerInterval = setInterval(updateTimer, 1000);
+
+function updateTimer() {
+    let elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+    let minutes = Math.floor(elapsedTime / 60);
+    let seconds = elapsedTime % 60;
+    
+    document.getElementById('minutes').textContent = String(minutes).padStart(2, '0');
+    document.getElementById('seconds').textContent = String(seconds).padStart(2, '0');
+    document.getElementById('timeSpent').value = elapsedTime;
+}
+
+// 处理"不会做"按钮的点击事件
+document.addEventListener('DOMContentLoaded', function() {
+    const idkInputs = document.querySelectorAll('.idk-input');
+    
+    idkInputs.forEach(function(idkInput) {
+        idkInput.addEventListener('click', function(event) {
+            const questionId = this.id.replace('question_', '').replace('_idk', '');
+            const answerInputs = document.querySelectorAll(`[name="answer_${questionId}"]`);
+            const radioGroup = document.querySelectorAll(`input[type="radio"][name="answer_${questionId}"]`);
+            
+            // 如果已经选中，则取消选中
+            if (this.checked) {
+                // 禁用并清空答案输入
+                answerInputs.forEach(input => {
+                    input.removeAttribute('required');
+                    if (input.type === 'radio') {
+                        input.checked = false;
+                    } else {
+                        input.value = '';
+                    }
+                    input.disabled = true;
+                });
+                
+                // 如果是选择题，禁用所有选项
+                radioGroup.forEach(radio => {
+                    radio.checked = false;
+                    radio.disabled = true;
+                });
+            } else {
+                // 重新启用答案输入
+                answerInputs.forEach(input => {
+                    if (input.type === 'radio' || input.type === 'text') {
+                        input.setAttribute('required', '');
+                    }
+                    input.disabled = false;
+                });
+                
+                // 重新启用选择题选项
+                radioGroup.forEach(radio => {
+                    radio.disabled = false;
+                });
+            }
+        });
+    });
+
+    // 选择题emoji处理
+    const choiceEmojis = {
+        'A': '🍎',  // 苹果
+        'B': '🐝',  // 蜜蜂
+        'C': '🐱',  // 猫
+        'D': '🐕',  // 狗
+        'E': '🐘'   // 大象
+    };
+
+    // 为所有选择题选项添加点击事件
+    document.querySelectorAll('.option-input[type="radio"]').forEach(input => {
+        input.addEventListener('change', function() {
+            // 获取当前问题的所有选项
+            const questionId = this.name;
+            const allOptions = document.querySelectorAll(`input[name="${questionId}"]`);
+            
+            // 清除所有emoji
+            allOptions.forEach(option => {
+                const emojiSpan = option.nextElementSibling.querySelector('.choice-emoji');
+                emojiSpan.textContent = '';
+            });
+            
+            // 如果选中，显示对应的emoji
+            if (this.checked) {
+                const choice = this.value;
+                const emojiSpan = this.nextElementSibling.querySelector('.choice-emoji');
+                emojiSpan.textContent = choiceEmojis[choice];
+            }
+        });
+    });
+});
+
+// 提交表单时停止计时器
+document.getElementById('quizForm').addEventListener('submit', function() {
+    clearInterval(timerInterval);
+});
+</script>
+{% endblock %} 

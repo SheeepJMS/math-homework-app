@@ -1,0 +1,57 @@
+{% extends "student/base.html" %}
+
+{% block title %}答题历史{% endblock %}
+
+{% block extra_css %}
+<style>
+    .history-card {
+        transition: transform 0.2s;
+    }
+    .history-card:hover {
+        transform: translateY(-2px);
+    }
+    .score-badge {
+        font-size: 1.2rem;
+        padding: 0.5rem 1rem;
+    }
+    .time-info {
+        color: #6c757d;
+        font-size: 0.9rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <h2 class="mb-4">答题历史</h2>
+        
+        {% if history %}
+            {% for record in history %}
+            <div class="card mb-3 history-card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">{{ record.lesson.title }}</h5>
+                        <span class="badge bg-primary score-badge">得分：{{ record.score }}</span>
+                    </div>
+                    <div class="time-info mt-2">
+                        <span>答题时间：{{ record.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                        <span class="ms-3">用时：{{ record.time_spent }}秒</span>
+                    </div>
+                    <div class="mt-3">
+                        <a href="{{ url_for('view_detail', history_id=record.id) }}" 
+                           class="btn btn-outline-primary btn-sm">
+                            查看详情
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="alert alert-info">
+                暂无答题记录
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %} 

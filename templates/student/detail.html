@@ -1,0 +1,203 @@
+{% extends "student/base.html" %}
+
+{% block title %}答题详情{% endblock %}
+
+{% block styles %}
+{{ super() }}
+<style>
+    .question-card {
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .correct {
+        color: #28a745;
+    }
+    .incorrect {
+        color: #dc3545;
+    }
+    .status-badge {
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 14px;
+        margin-left: 10px;
+    }
+    .correct-badge {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    .incorrect-badge {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+    .section-separator {
+        border-top: 2px solid #eee;
+        margin: 20px 0;
+        padding-top: 20px;
+    }
+    .answer-section {
+        margin-top: 15px;
+        padding-left: 20px;
+    }
+    .explanation {
+        margin-top: 15px;
+        padding: 15px;
+        background-color: #f8f9fa;
+        border-left: 4px solid #6c757d;
+        border-radius: 4px;
+    }
+    .question-content {
+        font-size: 16px;
+        margin-bottom: 15px;
+        padding: 10px;
+        background-color: #fff;
+        border-radius: 4px;
+    }
+    .card {
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .display-4 {
+        font-size: 2.5rem;
+        font-weight: 300;
+    }
+    .badge {
+        font-size: 1rem;
+        padding: 0.5em 1em;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- 答题统计信息卡片 -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0">答题统计</h4>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="text-center">
+                        <h2 class="display-4 text-primary">{{ (quiz_history.correct_answers / quiz_history.total_questions * 100) | int }}%</h2>
+                        <p class="lead">正确率</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="text-center">
+                        <h2 class="display-4">{{ quiz_history.total_questions }}</h2>
+                        <p class="lead">总题数</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="text-center">
+                        <h2 class="display-4 text-success">{{ quiz_history.correct_answers }}</h2>
+                        <p class="lead">正确题数</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="text-center">
+                        <h2 class="display-4">{{ quiz_history.time_spent }}秒</h2>
+                        <p class="lead">答题用时</p>
+                    </div>
+                </div>
+            </div>
+            <div class="text-muted mt-2">
+                完成时间：{{ quiz_history.completed_at.strftime('%Y-%m-%d %H:%M:%S') }}
+            </div>
+        </div>
+    </div>
+
+    <!-- 答题详情表格 -->
+    <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+            <h4 class="mb-0">答题详情</h4>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>题号</th>
+                            <th>题目类型</th>
+                            <th>你的答案</th>
+                            <th>正确答案</th>
+                            <th>结果</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for question, answer_info in question_answers.items() %}
+                        <tr>
+                            <td>{{ question.question_number }}</td>
+                            <td>
+                                {% if question.type == 'choice' %}
+                                选择题
+                                {% elif question.type == 'proof' %}
+                                证明题
+                                {% else %}
+                                填空题
+                                {% endif %}
+                            </td>
+                            <td>{{ answer_info.selected_answer }}</td>
+                            <td>{{ question.answer }}</td>
+                            <td>
+                                {% if answer_info.is_correct %}
+                                <span class="badge bg-success">正确</span>
+                                {% else %}
+                                <span class="badge bg-danger">错误</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 试卷原题 -->
+    <div class="card mb-4">
+        <div class="card-header bg-warning">
+            <h4 class="mb-0">试卷原题</h4>
+        </div>
+        <div class="card-body">
+            {% for file in exam_files %}
+            <div class="mb-4">
+                <h5>第 {{ file.page_number }} 页</h5>
+                <div class="ratio ratio-16x9">
+                    <embed src="{{ url_for('static', filename=file.path) }}"
+                           type="application/pdf"
+                           width="100%"
+                           height="600px">
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- 解析 -->
+    <div class="card mb-4">
+        <div class="card-header bg-success text-white">
+            <h4 class="mb-0">题目解析</h4>
+        </div>
+        <div class="card-body">
+            {% for file in explanation_files %}
+            <div class="mb-4">
+                <h5>第 {{ file.page_number }} 页</h5>
+                <div class="ratio ratio-16x9">
+                    <embed src="{{ url_for('static', filename=file.path) }}"
+                           type="application/pdf"
+                           width="100%"
+                           height="600px">
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="text-center mb-4">
+        <a href="{{ url_for('student_dashboard') }}" class="btn btn-primary">返回首页</a>
+    </div>
+</div>
+{% endblock %} 

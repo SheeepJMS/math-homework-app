@@ -1,0 +1,228 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>试卷管理 - {{ lesson.title }}</h2>
+    
+    <!-- 第一部分：试卷文件上传和管理 -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0">第一部分：试卷文件</h4>
+        </div>
+        <div class="card-body">
+            <form action="{{ url_for('upload_exam_files', lesson_id=lesson.id) }}" method="post" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="mb-3">
+                    <label for="exam_files" class="form-label">上传试卷文件（支持PDF和图片）</label>
+                    <input type="file" class="form-control" id="exam_files" name="files[]" multiple accept=".pdf,.jpg,.jpeg,.png">
+                    <div class="form-text">可以同时上传多个文件，将按照上传顺序排序</div>
+                </div>
+                <button type="submit" class="btn btn-primary">上传试卷</button>
+            </form>
+            
+            <div class="mt-4">
+                <h5>已上传的试卷文件：</h5>
+                <div class="list-group">
+                    {% for file in exam_files %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="badge bg-info me-2">第{{ file.page_number }}页</span>
+                            {{ file.filename }}
+                        </div>
+                        <div>
+                            <a href="{{ url_for('static', filename=file.path) }}" class="btn btn-sm btn-info me-2" target="_blank">预览</a>
+                            <form action="{{ url_for('delete_exam_file', file_id=file.id) }}" method="post" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('确定要删除这个文件吗？')">删除</button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 第二部分：答案管理 -->
+    <div class="card mb-4">
+        <div class="card-header bg-success text-white">
+            <h4 class="mb-0">第二部分：答案管理</h4>
+        </div>
+        <div class="card-body">
+            <form action="{{ url_for('import_questions', lesson_id=lesson.id) }}" method="post" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="mb-3">
+                    <label for="answer_file" class="form-label">导入答案（Excel文件）</label>
+                    <input type="file" class="form-control" id="answer_file" name="file" accept=".xlsx,.xls">
+                    <div class="form-text">Excel文件格式：第一列为题号，第二列为题目类型（choice或fill），第三列为答案，第四列为分值（可选）</div>
+                </div>
+                <button type="submit" class="btn btn-success">导入答案</button>
+            </form>
+            
+            <div class="mt-4">
+                <h5>题目列表：</h5>
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>题号</th>
+                                <th>类型</th>
+                                <th>答案</th>
+                                <th>分值</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for question in questions %}
+                            <tr>
+                                <td>{{ question.question_number }}</td>
+                                <td>{{ question.type }}</td>
+                                <td class="answer-cell">{{ question.answer }}</td>
+                                <td class="points-cell">{{ question.points }}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-primary edit-btn">编辑</button>
+                                    <button class="btn btn-sm btn-success save-btn d-none" data-question-id="{{ question.id }}">保存</button>
+                                    <button class="btn btn-sm btn-secondary cancel-btn d-none">取消</button>
+                                    <form action="{{ url_for('delete_question', question_id=question.id) }}" method="post" class="d-inline">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('确定要删除这道题目吗？')">删除</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 第三部分：解析文件管理 -->
+    <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+            <h4 class="mb-0">第三部分：解析文件</h4>
+        </div>
+        <div class="card-body">
+            <form action="{{ url_for('upload_explanation_files', lesson_id=lesson.id) }}" method="post" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="mb-3">
+                    <label for="explanation_files" class="form-label">上传解析文件（支持PDF和图片）</label>
+                    <input type="file" class="form-control" id="explanation_files" name="files[]" multiple accept=".pdf,.jpg,.jpeg,.png">
+                    <div class="form-text">可以同时上传多个文件，将按照上传顺序排序</div>
+                </div>
+                <button type="submit" class="btn btn-info">上传解析</button>
+            </form>
+            
+            <div class="mt-4">
+                <h5>已上传的解析文件：</h5>
+                <div class="list-group">
+                    {% for file in explanation_files %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="badge bg-info me-2">第{{ file.page_number }}页</span>
+                            {{ file.filename }}
+                        </div>
+                        <div>
+                            <a href="{{ url_for('static', filename=file.path) }}" class="btn btn-sm btn-info me-2" target="_blank">预览</a>
+                            <form action="{{ url_for('delete_explanation_file', file_id=file.id) }}" method="post" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('确定要删除这个文件吗？')">删除</button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 添加JavaScript代码 -->
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 编辑按钮点击事件
+    $('.edit-btn').click(function() {
+        var row = $(this).closest('tr');
+        var answerCell = row.find('.answer-cell');
+        var pointsCell = row.find('.points-cell');
+        
+        // 保存原始值
+        answerCell.data('original', answerCell.text());
+        pointsCell.data('original', pointsCell.text());
+        
+        // 创建输入框
+        var answerInput = $('<input>').attr({
+            type: 'text',
+            class: 'form-control form-control-sm',
+            value: answerCell.text()
+        });
+        
+        var pointsInput = $('<input>').attr({
+            type: 'number',
+            class: 'form-control form-control-sm',
+            value: pointsCell.text()
+        });
+        
+        // 替换单元格内容
+        answerCell.html(answerInput);
+        pointsCell.html(pointsInput);
+        
+        // 显示/隐藏按钮
+        $(this).addClass('d-none');
+        row.find('.save-btn, .cancel-btn').removeClass('d-none');
+    });
+    
+    // 保存按钮点击事件
+    $('.save-btn').click(function() {
+        var row = $(this).closest('tr');
+        var questionId = $(this).data('question-id');
+        var answer = row.find('.answer-cell input').val();
+        var points = row.find('.points-cell input').val();
+        
+        // 发送AJAX请求
+        $.ajax({
+            url: '/admin/question/' + questionId + '/edit',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                answer: answer,
+                points: points
+            }),
+            headers: {
+                'X-CSRFToken': '{{ csrf_token() }}'
+            },
+            success: function(response) {
+                // 更新显示
+                row.find('.answer-cell').text(answer);
+                row.find('.points-cell').text(points);
+                
+                // 恢复按钮状态
+                row.find('.edit-btn').removeClass('d-none');
+                row.find('.save-btn, .cancel-btn').addClass('d-none');
+            },
+            error: function(xhr) {
+                alert('保存失败：' + xhr.responseJSON.error);
+            }
+        });
+    });
+    
+    // 取消按钮点击事件
+    $('.cancel-btn').click(function() {
+        var row = $(this).closest('tr');
+        var answerCell = row.find('.answer-cell');
+        var pointsCell = row.find('.points-cell');
+        
+        // 恢复原始值
+        answerCell.text(answerCell.data('original'));
+        pointsCell.text(pointsCell.data('original'));
+        
+        // 恢复按钮状态
+        row.find('.edit-btn').removeClass('d-none');
+        row.find('.save-btn, .cancel-btn').addClass('d-none');
+    });
+});
+</script>
+{% endblock %}
+
+{% endblock %} 

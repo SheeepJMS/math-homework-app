@@ -1,0 +1,305 @@
+{% extends "student/base.html" %}
+
+{% block title %}答题历史{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h2 class="mb-4">{{ lesson.title }} - 答题历史</h2>
+            
+            {% if not quiz_history %}
+            <div class="alert alert-info">
+                <h4 class="alert-heading">还没有答题记录！</h4>
+                <p>您还没有完成这门课程的任何测验。现在开始答题吧！</p>
+                <hr>
+                <a href="{{ url_for('start_quiz', lesson_id=lesson.id) }}" class="btn btn-primary">
+                    开始答题
+                </a>
+            </div>
+            {% else %}
+            <!-- 答题统计 -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-4">
+                            <div class="progress-circle-container">
+                                <div class="progress-circle" data-percentage="{{ (quiz_history[0].correct_answers / quiz_history[0].total_questions * 100)|round|int }}">
+                                    <div class="progress-circle-inner">
+                                        <div class="progress-circle-value">
+                                            {{ (quiz_history[0].correct_answers / quiz_history[0].total_questions * 100)|round|int }}%
+                                        </div>
+                                        <div class="progress-circle-label">正确率</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="row stats">
+                                <div class="col-md-4">
+                                    <div class="stat-item">
+                                        <div class="stat-value">{{ quiz_history[0].total_questions }}</div>
+                                        <div class="stat-label">总题数</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="stat-item">
+                                        <div class="stat-value text-danger">{{ quiz_history[0].total_questions - quiz_history[0].correct_answers }}</div>
+                                        <div class="stat-label">错题数</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="stat-item">
+                                        <div class="stat-value">{{ quiz_history[0].time_spent }}秒</div>
+                                        <div class="stat-label">答题用时</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-3 text-muted">
+                                完成时间：{{ quiz_history[0].completed_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 试题和解析 -->
+            {% for answer in latest_answers %}
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center">
+                        <h5 class="mb-0 me-3">第{{ answer.question.question_number }}题</h5>
+                        <span class="badge {% if answer.question.type == 'choice' %}bg-primary{% elif answer.question.type == 'proof' %}bg-warning{% else %}bg-info{% endif %} me-2">
+                            {% if answer.question.type == 'choice' %}选择题
+                            {% elif answer.question.type == 'proof' %}证明题
+                            {% else %}填空题{% endif %}
+                        </span>
+                    </div>
+                    <div class="result-badge {% if answer.answer == answer.question.answer %}correct{% else %}incorrect{% endif %}">
+                        <i class="fas {% if answer.answer == answer.question.answer %}fa-check{% else %}fa-times{% endif %}"></i>
+                        {{ '正确' if answer.answer == answer.question.answer else '错误' }}
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <!-- 试题 -->
+                        <div class="col-md-6">
+                            <div class="question-section">
+                                <h6 class="section-title">
+                                    <i class="fas fa-question-circle me-2"></i>试题
+                                </h6>
+                                {% set question_number = answer.question.question_number %}
+                                {% for file in exam_files %}
+                                    {% if file.page_number == question_number %}
+                                    <div class="question-image-container">
+                                        <img src="{{ url_for('static', filename=file.path) }}" 
+                                             class="img-fluid" 
+                                             alt="试题图片">
+                                    </div>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                            
+                            <div class="answer-info mt-3">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <div class="standard-answer">
+                                            <strong>标准答案：</strong> {{ answer.question.answer }}
+                                        </div>
+                                        <div class="your-answer mt-1 {% if answer.answer != answer.question.answer %}text-danger{% endif %}">
+                                            <strong>你的答案：</strong> 
+                                            {% if answer.answer == 'IDK' %}
+                                                不会做
+                                            {% elif answer.answer == '' %}
+                                                未作答
+                                            {% else %}
+                                                {{ answer.answer }}
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 解析 -->
+                        <div class="col-md-6">
+                            <div class="explanation-section">
+                                <h6 class="section-title">
+                                    <i class="fas fa-book-open me-2"></i>解析
+                                </h6>
+                                {% for file in explanation_files %}
+                                    {% if file.page_number == question_number %}
+                                    <div class="explanation-image-container">
+                                        <img src="{{ url_for('static', filename=file.path) }}" 
+                                             class="img-fluid" 
+                                             alt="解析图片">
+                                    </div>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+.section-title {
+    color: #495057;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.question-image-container,
+.explanation-image-container {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.img-fluid {
+    max-width: 100%;
+    height: auto;
+    max-height: 300px;
+    object-fit: contain;
+}
+
+.answer-info {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+}
+
+.standard-answer {
+    color: #28a745;
+}
+
+.your-answer {
+    color: #333;
+}
+
+.your-answer.text-danger {
+    color: #dc3545 !important;
+}
+
+.result-badge {
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-weight: 500;
+}
+
+.result-badge.correct {
+    background-color: #28a745;
+    color: white;
+}
+
+.result-badge.incorrect {
+    background-color: #dc3545;
+    color: white;
+}
+
+.badge {
+    padding: 6px 12px;
+    font-size: 0.9em;
+}
+
+.progress-circle-container {
+    position: relative;
+    width: 200px;
+    height: 200px;
+    margin: 0 auto;
+}
+
+.progress-circle {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: #f8f9fa;
+    overflow: hidden;
+}
+
+.progress-circle::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: conic-gradient(
+        #28a745 calc(var(--percentage) * 1%),
+        #dc3545 calc(var(--percentage) * 1%) 100%
+    );
+}
+
+.progress-circle-inner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80%;
+    height: 80%;
+    background: white;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.progress-circle-value {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #333;
+}
+
+.progress-circle-label {
+    font-size: 1rem;
+    color: #666;
+}
+
+.stats {
+    margin-top: 1rem;
+}
+
+.stat-item {
+    text-align: center;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #333;
+}
+
+.stat-label {
+    color: #666;
+    margin-top: 0.5rem;
+}
+
+.text-danger {
+    color: #dc3545;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const circles = document.querySelectorAll('.progress-circle');
+    circles.forEach(circle => {
+        const percentage = circle.dataset.percentage;
+        circle.style.setProperty('--percentage', percentage);
+    });
+});
+</script>
+{% endblock %} 

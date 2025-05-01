@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>答题结果</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .result {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .correct {
+            color: green;
+        }
+        .incorrect {
+            color: red;
+        }
+        .explanation {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border-radius: 4px;
+        }
+        .back-btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 20px;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .back-btn:hover {
+            background-color: #45a049;
+        }
+        .score-summary {
+            background-color: #e8f5e9;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .score {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2e7d32;
+        }
+        .question-number {
+            font-weight: bold;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <h1>答题结果</h1>
+    
+    <div class="score-summary">
+        <h2>得分统计</h2>
+        <p>总题数：{{ results|length }} 题</p>
+        <p>答对：{{ results|selectattr('is_correct')|list|length }} 题</p>
+        <p class="score">总分：{{ (results|selectattr('is_correct')|list|length / results|length * 100)|round|int }} 分</p>
+    </div>
+
+    {% for result in results %}
+    <div class="result">
+        <h3><span class="question-number">第 {{ loop.index }} 题</span></h3>
+        <p>{{ result['题目'] }}</p>
+        <p>你的答案: <strong>{{ result['用户答案'] }}</strong></p>
+        <p>正确答案: <strong>{{ result['正确答案'] }}</strong></p>
+        <p class="{{ 'correct' if result['is_correct'] else 'incorrect' }}">
+            {{ '回答正确！' if result['is_correct'] else '回答错误！' }}
+        </p>
+        <div class="explanation">
+            <strong>解析：</strong>
+            <p>{{ result['解析'] }}</p>
+        </div>
+    </div>
+    {% endfor %}
+    
+    <a href="{{ url_for('show_questions') }}" class="back-btn">返回答题</a>
+</body>
+</html> 

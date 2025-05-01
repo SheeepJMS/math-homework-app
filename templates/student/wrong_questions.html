@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<style>
+.section-title {
+    color: #495057;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.question-image-container,
+.explanation-image-container {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.img-fluid {
+    max-width: 100%;
+    height: auto;
+    max-height: 300px;
+    object-fit: contain;
+}
+
+.answer-info {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+}
+
+.standard-answer {
+    color: #28a745;
+}
+
+.your-answer {
+    color: #dc3545;
+}
+
+.result-badge {
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-weight: 500;
+}
+
+.result-badge.incorrect {
+    background-color: #dc3545;
+    color: white;
+}
+
+.badge {
+    padding: 6px 12px;
+    font-size: 0.9em;
+}
+
+.btn-outline-primary {
+    border-radius: 20px;
+    padding: 8px 16px;
+    transition: all 0.3s ease;
+}
+
+.btn-outline-primary:hover,
+.btn-outline-primary.active {
+    background-color: #0d6efd;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(13, 110, 253, 0.2);
+}
+
+.card {
+    border: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+}
+
+@media (max-width: 768px) {
+    .col-md-6 {
+        margin-bottom: 1.5rem;
+    }
+    
+    .answer-info {
+        margin-top: 1rem;
+    }
+}
+
+/* 添加图表x轴标题样式 */
+.chart-container {
+    width: 100%;
+    height: auto;
+}
+
+/* 设置x轴标题换行 */
+.chart-container text {
+    word-wrap: break-word;
+    word-break: break-all;
+    white-space: pre-wrap;
+}
+
+/* 增加图表底部边距以适应换行的标题 */
+.chart-container svg {
+    margin-bottom: 20px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">我的错题本</h2>
+
+    <!-- 课程选择 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">选择课程</h5>
+            <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-outline-primary active" onclick="filterByLesson('all')">全部</button>
+                {% for lesson in lessons %}
+                <button class="btn btn-outline-primary" onclick="filterByLesson('{{ lesson.id }}')">
+                    {{ lesson.title }}
+                </button>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 错题列表 -->
+    {% for wa in wrong_answers %}
+    <div class="card mb-4 wrong-question" data-lesson="{{ wa.Lesson.id }}">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center">
+                <h5 class="mb-0 me-3">第{{ wa.Question.question_number }}题</h5>
+                <span class="badge {% if wa.Question.type == 'choice' %}bg-primary{% elif wa.Question.type == 'proof' %}bg-warning{% else %}bg-info{% endif %} me-2">
+                    {% if wa.Question.type == 'choice' %}选择题
+                    {% elif wa.Question.type == 'proof' %}证明题
+                    {% else %}填空题{% endif %}
+                </span>
+            </div>
+            <div class="result-badge incorrect">
+                <i class="fas fa-times"></i> 错误
+            </div>
+        </div>
+        
+        <div class="card-body">
+            <div class="row">
+                <!-- 试题 -->
+                <div class="col-md-6">
+                    <div class="question-section">
+                        <h6 class="section-title">
+                            <i class="fas fa-question-circle me-2"></i>试题
+                        </h6>
+                        {% if images[(wa.Lesson.id, wa.Question.question_number)]['exam'] %}
+                        <div class="question-image-container">
+                            <img src="{{ url_for('static', filename=images[(wa.Lesson.id, wa.Question.question_number)]['exam']) }}" 
+                                 class="img-fluid" 
+                                 alt="试题图片">
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="answer-info mt-3">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="standard-answer">
+                                    <strong>标准答案：</strong> {{ wa.Question.answer }}
+                                </div>
+                                <div class="your-answer mt-1 text-danger">
+                                    <strong>你的答案：</strong> 
+                                    {% if wa.UserAnswer.answer == 'IDK' %}
+                                        不会做
+                                    {% elif wa.UserAnswer.answer == '' %}
+                                        未作答
+                                    {% else %}
+                                        {{ wa.UserAnswer.answer }}
+                                    {% endif %}
+                                </div>
+                                <div class="answer-time mt-1 text-muted">
+                                    <small>答题时间：{{ wa.QuizHistory.completed_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 解析 -->
+                <div class="col-md-6">
+                    <div class="explanation-section">
+                        <h6 class="section-title">
+                            <i class="fas fa-book-open me-2"></i>解析
+                        </h6>
+                        {% if images[(wa.Lesson.id, wa.Question.question_number)]['explanation'] %}
+                        <div class="explanation-image-container">
+                            <img src="{{ url_for('static', filename=images[(wa.Lesson.id, wa.Question.question_number)]['explanation']) }}" 
+                                 class="img-fluid" 
+                                 alt="解析图片">
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% block extra_js %}
+<script>
+function filterByLesson(lessonId) {
+    // 更新按钮状态
+    document.querySelectorAll('.btn-outline-primary').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.target.classList.add('active');
+
+    // 筛选错题
+    document.querySelectorAll('.wrong-question').forEach(question => {
+        if (lessonId === 'all' || question.dataset.lesson === lessonId) {
+            question.style.display = 'block';
+        } else {
+            question.style.display = 'none';
+        }
+    });
+}
+</script>
+{% endblock %}
+
+{% endblock %} 

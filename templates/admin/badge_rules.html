@@ -1,0 +1,113 @@
+{% extends "admin/base.html" %}
+
+{% block title %}徽章规则说明{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h2 class="mb-0">徽章等级规则说明</h2>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info">
+                <h4 class="alert-heading">徽章升级规则</h4>
+                <p>学生通过完成作业和获得好成绩来升级徽章。不同等级有不同的升级要求：</p>
+            </div>
+
+            <div class="badge-rules">
+                <!-- Level 0 到 Level 1 -->
+                <div class="rule-section">
+                    <h5>新手 → Level 1 小毛毛虫 🐛</h5>
+                    <div class="rule-content">
+                        <p>只要提交第一次作业就可以升级，不看正确率。</p>
+                    </div>
+                </div>
+
+                <!-- Level 1 到 Level 3 -->
+                <div class="rule-section">
+                    <h5>Level 1-3 升级规则（小毛毛虫 🐛 → 蝴蝶 🦋 → 蛇 🐍）</h5>
+                    <div class="rule-content">
+                        <ul>
+                            <li>需要达到60%以上的正确率</li>
+                            <li>Level 1 升 Level 2：需要2次达标</li>
+                            <li>Level 2 升 Level 3：需要3次达标</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Level 3 到 Level 8 -->
+                <div class="rule-section">
+                    <h5>Level 3-8 升级规则（蛇 🐍 → 狼 🐺 → 虎 🐯 → 龙 🐲 → 小怪兽 👾 → 大怪兽 👹）</h5>
+                    <div class="rule-content">
+                        <ul>
+                            <li>需要达到80%以上的正确率</li>
+                            <li>每个等级需要2次达标才能升级</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Level 8 以上 -->
+                <div class="rule-section">
+                    <h5>Level 8 以上升级规则（野兽 🦖 → 哥斯拉 🐉 及更高等级）</h5>
+                    <div class="rule-content">
+                        <ul>
+                            <li>需要达到80%以上的正确率</li>
+                            <li>每个等级需要5次达标才能升级</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alert alert-warning mt-4">
+                <h4 class="alert-heading">注意事项</h4>
+                <ul>
+                    <li>达标次数会累计保存</li>
+                    <li>每次作业只能提交一次，提交后不能修改</li>
+                    <li>徽章等级越高，升级难度越大，需要更多的努力和坚持</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.badge-rules {
+    margin: 20px 0;
+}
+
+.rule-section {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    border-left: 4px solid #0d6efd;
+}
+
+.rule-section h5 {
+    color: #0d6efd;
+    margin-bottom: 15px;
+}
+
+.rule-content {
+    padding-left: 15px;
+}
+
+.rule-content ul {
+    padding-left: 20px;
+}
+
+.rule-content li {
+    margin-bottom: 8px;
+}
+
+.alert-heading {
+    color: inherit;
+    margin-bottom: 15px;
+    font-size: 1.2rem;
+}
+
+.alert ul {
+    margin-bottom: 0;
+}
+</style>
+{% endblock %} 

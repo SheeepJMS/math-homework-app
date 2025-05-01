@@ -1,0 +1,123 @@
+{% extends "admin/base.html" %}
+
+{% block admin_content %}
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h2 class="card-title">管理员仪表盘</h2>
+                    <div class="row mt-4">
+                        <div class="col-md-4">
+                            <div class="stats-card bg-primary text-white">
+                                <div class="stats-icon">
+                                    <i class="fas fa-users"></i>
+                                </div>
+                                <div class="stats-info">
+                                    <h3>{{ total_students }}</h3>
+                                    <p>总学生数</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="stats-card bg-success text-white">
+                                <div class="stats-icon">
+                                    <i class="fas fa-book"></i>
+                                </div>
+                                <div class="stats-info">
+                                    <h3>{{ total_lessons }}</h3>
+                                    <p>总课程数</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="stats-card bg-info text-white">
+                                <div class="stats-icon">
+                                    <i class="fas fa-graduation-cap"></i>
+                                </div>
+                                <div class="stats-info">
+                                    <h3>{{ total_classes }}</h3>
+                                    <p>总班级数</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 最近活动 -->
+            <div class="card">
+                <div class="card-body">
+                    <h3 class="card-title">最近活动</h3>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>时间</th>
+                                    <th>学生</th>
+                                    <th>课程</th>
+                                    <th>正确率</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for activity in recent_activities %}
+                                <tr>
+                                    <td>{{ activity.completed_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td>{{ activity.student_name }}</td>
+                                    <td>{{ activity.lesson_title }}</td>
+                                    <td>
+                                        <div class="progress" style="height: 20px;">
+                                            <div class="progress-bar {% if activity.correct_rate >= 80 %}bg-success{% elif activity.correct_rate >= 60 %}bg-warning{% else %}bg-danger{% endif %}"
+                                                 role="progressbar"
+                                                 style="width: {{ activity.correct_rate }}%"
+                                                 aria-valuenow="{{ activity.correct_rate }}"
+                                                 aria-valuemin="0"
+                                                 aria-valuemax="100">
+                                                {{ activity.correct_rate }}%
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.stats-card {
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+}
+
+.stats-icon {
+    font-size: 2.5rem;
+    margin-right: 20px;
+}
+
+.stats-info h3 {
+    font-size: 2rem;
+    margin: 0;
+}
+
+.stats-info p {
+    margin: 0;
+    opacity: 0.8;
+}
+
+.progress {
+    background-color: rgba(0,0,0,0.1);
+}
+
+.table th {
+    border-top: none;
+}
+</style>
+{% endblock %} 

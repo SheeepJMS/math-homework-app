@@ -1,0 +1,23 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>课程管理 - {{ lesson.title }}</h2>
+    
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">课程信息</h5>
+                    <p class="card-text">
+                        <strong>标题：</strong>{{ lesson.title }}<br>
+                        <strong>班级：</strong>{{ lesson.class_id }}<br>
+                        <strong>状态：</strong>{{ "激活" if lesson.is_active else "未激活" }}
+                    </p>
+                    <a href="{{ url_for('manage_exam', lesson_id=lesson.id) }}" class="btn btn-primary">试卷管理</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

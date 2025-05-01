@@ -1,0 +1,96 @@
+{% extends "student/base.html" %}
+
+{% block title %}开始答题{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{{ lesson.title }} - 答题</h2>
+
+    <form id="quizForm" method="POST" action="{{ url_for('submit_quiz', lesson_id=lesson.id) }}">
+        {{ form.csrf_token }}
+        <input type="hidden" name="time_spent" id="timeSpent" value="0">
+        <!-- 试卷预览 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4 class="mb-0">试卷预览</h4>
+            </div>
+            <div class="card-body">
+                {% for file in exam_files %}
+                <div class="mb-4">
+                    <h5>第 {{ file.page_number }} 页</h5>
+                    <div class="ratio ratio-16x9">
+                        <embed src="{{ url_for('static', filename=file.path) }}"
+                               type="application/pdf"
+                               width="100%"
+                               height="600px">
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- 答题区域 -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">答题区</h4>
+                <div class="timer">
+                    用时：<span id="minutes">00</span>:<span id="seconds">00</span>
+                </div>
+            </div>
+            <div class="card-body">
+                {% for question in questions %}
+                <div class="mb-4">
+                    <label class="form-label">第{{ question.question_number }}题
+                        {% if question.type == 'choice' %}
+                            (选择题)
+                        {% elif question.type == 'proof' %}
+                            (证明题)
+                        {% else %}
+                            (填空题)
+                        {% endif %}
+                    </label>
+                    {% if question.type == 'choice' %}
+                        <div class="btn-group" role="group">
+                            {% for option in ['A', 'B', 'C', 'D', 'E'] %}
+                            <input type="radio" class="btn-check" name="answer_{{ question.id }}" 
+                                   id="answer_{{ question.id }}_{{ option }}" value="{{ option }}">
+                            <label class="btn btn-outline-primary" 
+                                   for="answer_{{ question.id }}_{{ option }}">{{ option }}</label>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <input type="text" class="form-control" name="answer_{{ question.id }}" 
+                               placeholder="请输入答案">
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+            <button type="submit" class="btn btn-primary">提交答案</button>
+            <a href="{{ url_for('student_dashboard') }}" class="btn btn-secondary">返回</a>
+        </div>
+    </form>
+</div>
+
+<script>
+let startTime = Date.now();
+let timerInterval = setInterval(updateTimer, 1000);
+
+function updateTimer() {
+    let elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+    let minutes = Math.floor(elapsedTime / 60);
+    let seconds = elapsedTime % 60;
+    
+    document.getElementById('minutes').textContent = String(minutes).padStart(2, '0');
+    document.getElementById('seconds').textContent = String(seconds).padStart(2, '0');
+    document.getElementById('timeSpent').value = elapsedTime;
+}
+
+// 提交表单时停止计时器
+document.getElementById('quizForm').addEventListener('submit', function() {
+    clearInterval(timerInterval);
+});
+</script>
+{% endblock %} 

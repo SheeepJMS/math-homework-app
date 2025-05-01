@@ -1,0 +1,89 @@
+{% extends "admin/base.html" %}
+
+{% block title %}上传试卷 - {{ lesson.title }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- 页面标题 -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>{{ lesson.title }} - 试卷管理</h2>
+        <a href="{{ url_for('admin_lessons') }}" class="btn btn-secondary">返回课程列表</a>
+    </div>
+
+    <!-- 上传试卷区域 -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">上传试卷</h5>
+        </div>
+        <div class="card-body">
+            <form action="{{ url_for('upload_exam_files', lesson_id=lesson.id) }}" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="mb-3">
+                    <label for="examFiles" class="form-label">选择试卷文件（支持PDF、JPG、PNG）</label>
+                    <input type="file" class="form-control" id="examFiles" name="files[]" multiple accept=".pdf,.jpg,.jpeg,.png" required>
+                    <div class="form-text">可以同时选择多个文件，将按顺序作为试卷页面</div>
+                </div>
+                <button type="submit" class="btn btn-primary">上传试卷</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 已上传试卷列表 -->
+    <div class="card">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0">已上传试卷页面</h5>
+        </div>
+        <div class="card-body">
+            {% if exam_files %}
+            <div class="row">
+                {% for file in exam_files %}
+                <div class="col-md-4 mb-4">
+                    <div class="card">
+                        <div class="card-body">
+                            <h6 class="card-title">第 {{ file.page_number }} 页</h6>
+                            {% if file.filename.lower().endswith('.pdf') %}
+                            <div class="text-center">
+                                <img src="{{ url_for('static', filename='images/pdf-icon.png') }}" 
+                                     class="img-fluid mb-2" 
+                                     style="width: 100px;"
+                                     alt="PDF文件">
+                                <div>
+                                    <a href="{{ url_for('static', filename=file.path) }}" 
+                                       class="btn btn-sm btn-primary" 
+                                       target="_blank">查看PDF</a>
+                                </div>
+                            </div>
+                            {% else %}
+                            <img src="{{ url_for('static', filename=file.path) }}" 
+                                 class="img-fluid mb-2" 
+                                 alt="试卷预览">
+                            {% endif %}
+                            <form action="{{ url_for('delete_exam_file', file_id=file.id) }}" method="POST" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('确定要删除这页试卷吗？')">删除</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-center">暂无已上传的试卷</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.card-header {
+    font-weight: 500;
+}
+.img-fluid {
+    max-height: 300px;
+    object-fit: contain;
+}
+</style>
+{% endblock %} 

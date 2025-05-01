@@ -1,0 +1,197 @@
+{% extends "admin/base.html" %}
+
+{% block admin_content %}
+<div class="container">
+    <div class="card">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="card-title mb-0">班级管理</h2>
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addClassModal">
+                    <i class="fas fa-plus"></i> 添加班级
+                </button>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>班级名称</th>
+                            <th>描述</th>
+                            <th>状态</th>
+                            <th>创建时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for class in classes %}
+                        <tr>
+                            <td>{{ class.name }}</td>
+                            <td>{{ class.description }}</td>
+                            <td>
+                                <span class="badge {% if class.is_active %}bg-success{% else %}bg-secondary{% endif %}">
+                                    {{ '已激活' if class.is_active else '未激活' }}
+                                </span>
+                            </td>
+                            <td>{{ class.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-warning btn-sm" 
+                                            onclick="editClass('{{ class.id }}', '{{ class.name }}', '{{ class.description }}')">
+                                        <i class="fas fa-edit"></i> 编辑
+                                    </button>
+                                    <button type="button" class="btn btn-danger btn-sm ms-2" 
+                                            onclick="deleteClass('{{ class.id }}')">
+                                        <i class="fas fa-trash"></i> 删除
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 添加班级模态框 -->
+<div class="modal fade" id="addClassModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">添加班级</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('add_class') }}" method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="className" class="form-label">班级名称</label>
+                        <input type="text" class="form-control" id="className" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="classDescription" class="form-label">班级描述</label>
+                        <textarea class="form-control" id="classDescription" name="description" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-primary">添加</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑班级模态框 -->
+<div class="modal fade" id="editClassModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">编辑班级</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editClassForm" method="post">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="editClassName" class="form-label">班级名称</label>
+                        <input type="text" class="form-control" id="editClassName" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editClassDescription" class="form-label">班级描述</label>
+                        <textarea class="form-control" id="editClassDescription" name="description" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    border: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.card-title {
+    color: #333;
+}
+
+.table th {
+    border-top: none;
+    color: #666;
+    font-weight: 600;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+.badge {
+    padding: 0.5em 0.8em;
+    font-weight: 500;
+}
+
+.btn-group .btn {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.modal-content {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.modal-header {
+    border-bottom: 1px solid #eee;
+    padding: 1rem 1.5rem;
+}
+
+.modal-footer {
+    border-top: 1px solid #eee;
+    padding: 1rem 1.5rem;
+}
+
+.form-control {
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    padding: 0.5rem 1rem;
+}
+
+.form-control:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.2rem rgba(13,110,253,0.25);
+}
+</style>
+
+<script>
+function editClass(id, name, description) {
+    document.getElementById('editClassName').value = name;
+    document.getElementById('editClassDescription').value = description;
+    document.getElementById('editClassForm').action = `/admin/class/${id}/edit`;
+    new bootstrap.Modal(document.getElementById('editClassModal')).show();
+}
+
+function deleteClass(id) {
+    if (confirm('确定要删除这个班级吗？')) {
+        fetch(`/admin/class/${id}/delete`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        }).then(response => {
+            if (response.ok) {
+                window.location.reload();
+            }
+        });
+    }
+}
+</script>
+{% endblock %} 

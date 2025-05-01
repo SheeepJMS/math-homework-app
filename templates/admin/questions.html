@@ -1,0 +1,714 @@
+{% extends "admin/base.html" %}
+
+{% block title %}题目管理 - {{ lesson.title }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- 页面标题 -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>{{ lesson.title }} - 题目管理</h2>
+        <div>
+            <a href="{{ url_for('admin_lessons') }}" class="btn btn-secondary me-2">返回课程列表</a>
+            <form action="{{ url_for('delete_lesson', lesson_id=lesson.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('确定要删除该课程吗？这将同时删除该课程的所有题目和文件。')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-danger">删除课程</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 上传方式选择 -->
+    <ul class="nav nav-tabs mb-4" id="uploadTabs" role="tablist" style="display: none;">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="batch-tab" data-bs-toggle="tab" data-bs-target="#batch" type="button" role="tab">
+                整体上传方式
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="individual-tab" data-bs-toggle="tab" data-bs-target="#individual" type="button" role="tab">
+                逐个上传方式
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="uploadTabContent">
+        <!-- 整体上传方式 -->
+        <div class="tab-pane fade" id="batch" role="tabpanel" style="display: none;">
+            <!-- 第一部分：上传试卷 -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">第一步：上传试卷</h5>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('upload_exam_files', lesson_id=lesson.id) }}" method="POST" enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="mb-3">
+                            <label for="examFiles" class="form-label">选择试卷文件（支持PDF）</label>
+                            <input type="file" class="form-control" id="examFiles" name="files[]" accept=".pdf" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">上传试卷</button>
+                    </form>
+
+                    {% if exam_files %}
+                    <div class="mt-4">
+                        <h6>已上传试卷预览：</h6>
+                        <div class="row">
+                            {% for file in exam_files %}
+                            <div class="col-md-12 mb-3">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h6 class="card-title">第 {{ file.page_number }} 页</h6>
+                                        <div class="ratio ratio-16x9">
+                                            <embed src="{{ url_for('static', filename=file.path) }}"
+                                                   type="application/pdf"
+                                                   width="100%"
+                                                   height="600px">
+                                        </div>
+                                        <form action="{{ url_for('delete_exam_file', file_id=file.id) }}" method="POST" class="mt-2">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('确定要删除这页试卷吗？')">删除</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 第二部分：添加题目答案 -->
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">第二步：添加题目答案</h5>
+                </div>
+                <div class="card-body">
+                    <form id="questionForm" action="{{ url_for('add_questions', lesson_id=lesson.id) }}" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="mb-3">
+                            <label for="questionCount" class="form-label">题目数量</label>
+                            <input type="number" class="form-control" id="questionCount" min="1" required>
+                            <button type="button" class="btn btn-primary mt-2" onclick="generateQuestionFields()">生成答案输入框</button>
+                        </div>
+                        <div id="questionFields" class="mb-3">
+                            <!-- 这里将通过JavaScript动态生成题目输入框 -->
+                        </div>
+                        <button type="submit" class="btn btn-success" style="display: none;" id="submitAnswers">保存答案</button>
+                    </form>
+
+                    {% if questions %}
+                    <div class="mt-4">
+                        <h6>已添加的题目：</h6>
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>题号</th>
+                                        <th>类型</th>
+                                        <th>答案</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for question in questions %}
+                                    <tr>
+                                        <td>{{ question.question_number }}</td>
+                                        <td>
+                                            {% if question.type == 'choice' %}
+                                            选择题
+                                            {% elif question.type == 'proof' %}
+                                            证明题
+                                            {% else %}
+                                            填空题
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ question.answer }}</td>
+                                        <td>
+                                            <form action="{{ url_for('delete_question', question_id=question.id) }}" method="POST" class="d-inline">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('确定要删除这道题目吗？')">删除</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 第三部分：上传解析 -->
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">第三步：上传解析</h5>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('upload_explanation_files', lesson_id=lesson.id) }}" method="POST" enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="mb-3">
+                            <label for="explanationFiles" class="form-label">选择解析文件（支持PDF）</label>
+                            <input type="file" class="form-control" id="explanationFiles" name="files[]" accept=".pdf" required>
+                        </div>
+                        <button type="submit" class="btn btn-info">上传解析</button>
+                    </form>
+
+                    {% if explanation_files %}
+                    <div class="mt-4">
+                        <h6>已上传解析预览：</h6>
+                        <div class="row">
+                            {% for file in explanation_files %}
+                            <div class="col-md-12 mb-3">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h6 class="card-title">第 {{ file.page_number }} 页</h6>
+                                        <div class="ratio ratio-16x9">
+                                            <embed src="{{ url_for('static', filename=file.path) }}"
+                                                   type="application/pdf"
+                                                   width="100%"
+                                                   height="600px">
+                                        </div>
+                                        <form action="{{ url_for('delete_explanation_file', file_id=file.id) }}" method="POST" class="mt-2">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('确定要删除这页解析吗？')">删除</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 逐个上传方式 -->
+        <div class="tab-pane fade show active" id="individual" role="tabpanel">
+            <!-- 第一部分：逐个上传试题 -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">第一步：逐个上传试题</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">粘贴试题图片</label>
+                        <div class="paste-area" id="examPasteArea" tabindex="0">
+                            <div class="paste-placeholder">点击此处获取焦点，然后粘贴图片 (Ctrl+V)，支持批量粘贴</div>
+                            <div id="examPreviewContainer" class="preview-container"></div>
+                        </div>
+                        <form id="examUploadForm" style="display: none;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div id="examImageDataContainer"></div>
+                            <button type="button" class="btn btn-primary mt-2" onclick="uploadExamImages()">确认上传全部</button>
+                            <button type="button" class="btn btn-secondary mt-2" onclick="cancelExamUpload()">取消</button>
+                        </form>
+                    </div>
+
+                    {% if exam_files %}
+                    <div class="mt-4">
+                        <h6>已上传试题预览：</h6>
+                        <div class="row">
+                            {% for file in exam_files %}
+                            <div class="col-md-4 mb-3">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h6 class="card-title">第 {{ file.page_number }} 题</h6>
+                                        <img src="{{ url_for('static', filename=file.path) }}" class="img-fluid" alt="试题图片">
+                                        <form action="{{ url_for('delete_exam_file', file_id=file.id) }}" method="POST" class="mt-2">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('确定要删除这道试题吗？')">删除</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 第二部分：添加题目答案 -->
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">第二步：添加题目答案</h5>
+                </div>
+                <div class="card-body">
+                    <form id="individualQuestionForm" action="{{ url_for('add_questions', lesson_id=lesson.id) }}" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="mb-3">
+                            <label for="individualQuestionCount" class="form-label">题目数量</label>
+                            <input type="number" class="form-control" id="individualQuestionCount" min="1" required>
+                            <button type="button" class="btn btn-primary mt-2" onclick="generateIndividualQuestionFields()">生成答案输入框</button>
+                        </div>
+                        <div id="individualQuestionFields" class="mb-3">
+                            <!-- 这里将通过JavaScript动态生成题目输入框 -->
+                        </div>
+                        <button type="submit" class="btn btn-success" style="display: none;" id="submitIndividualAnswers">保存答案</button>
+                    </form>
+
+                    {% if questions %}
+                    <div class="mt-4">
+                        <h6>已添加的题目：</h6>
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>题号</th>
+                                        <th>类型</th>
+                                        <th>答案</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for question in questions %}
+                                    <tr>
+                                        <td>{{ question.question_number }}</td>
+                                        <td>
+                                            {% if question.type == 'choice' %}
+                                            选择题
+                                            {% elif question.type == 'proof' %}
+                                            证明题
+                                            {% else %}
+                                            填空题
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ question.answer }}</td>
+                                        <td>
+                                            <form action="{{ url_for('delete_question', question_id=question.id) }}" method="POST" style="display: inline;">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('确定要删除这道题目吗？')">删除</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 第三部分：逐个上传解析 -->
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">第三步：逐个上传解析</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">粘贴解析图片</label>
+                        <div class="paste-area" id="explanationPasteArea" tabindex="0">
+                            <div class="paste-placeholder">点击此处获取焦点，然后粘贴图片 (Ctrl+V)，支持批量粘贴</div>
+                            <div id="explanationPreviewContainer" class="preview-container"></div>
+                        </div>
+                        <form id="explanationUploadForm" style="display: none;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div id="explanationImageDataContainer"></div>
+                            <button type="button" class="btn btn-primary mt-2" onclick="uploadExplanationImages()">确认上传全部</button>
+                            <button type="button" class="btn btn-secondary mt-2" onclick="cancelExplanationUpload()">取消</button>
+                        </form>
+                    </div>
+
+                    {% if explanation_files %}
+                    <div class="mt-4">
+                        <h6>已上传解析预览：</h6>
+                        <div class="row">
+                            {% for file in explanation_files %}
+                            <div class="col-md-4 mb-3">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h6 class="card-title">第 {{ file.page_number }} 题解析</h6>
+                                        <img src="{{ url_for('static', filename=file.path) }}" class="img-fluid" alt="解析图片">
+                                        <form action="{{ url_for('delete_explanation_file', file_id=file.id) }}" method="POST" class="mt-2">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('确定要删除这道题的解析吗？')">删除</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+.card-header {
+    font-weight: 500;
+}
+.table th, .table td {
+    vertical-align: middle;
+}
+.answer-input {
+    max-width: 100px;
+}
+.nav-tabs .nav-link {
+    color: #495057;
+    font-weight: 500;
+}
+.nav-tabs .nav-link.active {
+    color: #007bff;
+    border-color: #007bff #dee2e6 #fff;
+}
+.paste-area {
+    border: 2px dashed #ccc;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    background-color: #f8f9fa;
+    min-height: 150px;
+    position: relative;
+    margin-bottom: 10px;
+}
+
+.paste-area:focus {
+    outline: none;
+    border-color: #007bff;
+}
+
+.paste-placeholder {
+    color: #6c757d;
+    font-size: 1.1em;
+}
+
+.paste-area.dragover {
+    background-color: #e9ecef;
+    border-color: #007bff;
+}
+
+.preview-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.preview-item {
+    position: relative;
+    width: 200px;
+}
+
+.preview-item img {
+    width: 100%;
+    height: auto;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.preview-item .remove-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: rgba(255, 255, 255, 0.8);
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #dc3545;
+}
+
+.preview-item .remove-btn:hover {
+    background: rgba(255, 255, 255, 1);
+    color: #bd2130;
+}
+</style>
+
+<script>
+function generateQuestionFields() {
+    const count = parseInt(document.getElementById('questionCount').value);
+    if (count <= 0) {
+        alert('请输入有效的题目数量');
+        return;
+    }
+
+    const container = document.getElementById('questionFields');
+    container.innerHTML = '';
+
+    for (let i = 1; i <= count; i++) {
+        const div = document.createElement('div');
+        div.className = 'mb-3 row align-items-center';
+        div.innerHTML = `
+            <div class="col-auto">
+                <label class="col-form-label">第${i}题答案：</label>
+            </div>
+            <div class="col-auto">
+                <input type="text" 
+                       class="form-control answer-input" 
+                       name="answers[]" 
+                       placeholder="答案"
+                       required>
+                <div class="form-text">留空表示证明题，ABCDE为选择题，其他为填空题</div>
+            </div>
+        `;
+        container.appendChild(div);
+    }
+
+    document.getElementById('submitAnswers').style.display = 'block';
+}
+
+function generateIndividualQuestionFields() {
+    const count = parseInt(document.getElementById('individualQuestionCount').value);
+    if (count <= 0) {
+        alert('请输入有效的题目数量');
+        return;
+    }
+
+    const container = document.getElementById('individualQuestionFields');
+    container.innerHTML = '';
+
+    for (let i = 1; i <= count; i++) {
+        const div = document.createElement('div');
+        div.className = 'mb-3 row align-items-center';
+        div.innerHTML = `
+            <div class="col-auto">
+                <label class="col-form-label">第${i}题答案：</label>
+            </div>
+            <div class="col-auto">
+                <input type="text" 
+                       class="form-control answer-input" 
+                       name="answers[]" 
+                       placeholder="留空表示解答题，ABCDE为选择题，其他为填空题">
+                <div class="form-text">留空表示解答题，ABCDE为选择题，其他为填空题</div>
+            </div>
+        `;
+        container.appendChild(div);
+    }
+
+    document.getElementById('submitIndividualAnswers').style.display = 'block';
+}
+
+// 试题上传相关函数
+let examImages = [];
+
+function handleExamPaste(e) {
+    const items = e.clipboardData.items;
+    for (let item of items) {
+        if (item.type.indexOf('image') === 0) {
+            const blob = item.getAsFile();
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const imageData = e.target.result;
+                examImages.push(imageData);
+                updateExamPreviews();
+            };
+            reader.readAsDataURL(blob);
+        }
+    }
+}
+
+function updateExamPreviews() {
+    const container = document.getElementById('examPreviewContainer');
+    container.innerHTML = '';
+    examImages.forEach((imageData, index) => {
+        const previewItem = document.createElement('div');
+        previewItem.className = 'preview-item';
+        previewItem.innerHTML = `
+            <img src="${imageData}" alt="预览图片 ${index + 1}">
+            <button type="button" class="remove-btn" onclick="removeExamImage(${index})">×</button>
+        `;
+        container.appendChild(previewItem);
+    });
+    
+    document.getElementById('examUploadForm').style.display = examImages.length > 0 ? 'block' : 'none';
+    document.querySelector('#examPasteArea .paste-placeholder').style.display = examImages.length > 0 ? 'none' : 'block';
+}
+
+function removeExamImage(index) {
+    examImages.splice(index, 1);
+    updateExamPreviews();
+}
+
+function cancelExamUpload() {
+    examImages = [];
+    updateExamPreviews();
+}
+
+async function uploadExamImages() {
+    const form = document.getElementById('examUploadForm');
+    const lessonId = window.location.pathname.split('/')[3];
+    
+    for (let imageData of examImages) {
+        try {
+            const formData = new FormData();
+            formData.append('csrf_token', form.querySelector('[name="csrf_token"]').value);
+            formData.append('file', imageData);
+            
+            const response = await fetch(`/admin/lesson/${lessonId}/upload_individual_exam_files`, {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) {
+                throw new Error('上传失败');
+            }
+        } catch (error) {
+            console.error('上传出错:', error);
+        }
+    }
+    
+    // 刷新页面以显示新上传的图片
+    window.location.reload();
+}
+
+// 解析上传相关函数
+let explanationImages = [];
+
+function handleExplanationPaste(e) {
+    const items = e.clipboardData.items;
+    for (let item of items) {
+        if (item.type.indexOf('image') === 0) {
+            const blob = item.getAsFile();
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const imageData = e.target.result;
+                explanationImages.push(imageData);
+                updateExplanationPreviews();
+            };
+            reader.readAsDataURL(blob);
+        }
+    }
+}
+
+function updateExplanationPreviews() {
+    const container = document.getElementById('explanationPreviewContainer');
+    container.innerHTML = '';
+    explanationImages.forEach((imageData, index) => {
+        const previewItem = document.createElement('div');
+        previewItem.className = 'preview-item';
+        previewItem.innerHTML = `
+            <img src="${imageData}" alt="预览图片 ${index + 1}">
+            <button type="button" class="remove-btn" onclick="removeExplanationImage(${index})">×</button>
+        `;
+        container.appendChild(previewItem);
+    });
+    
+    document.getElementById('explanationUploadForm').style.display = explanationImages.length > 0 ? 'block' : 'none';
+    document.querySelector('#explanationPasteArea .paste-placeholder').style.display = explanationImages.length > 0 ? 'none' : 'block';
+}
+
+function removeExplanationImage(index) {
+    explanationImages.splice(index, 1);
+    updateExplanationPreviews();
+}
+
+function cancelExplanationUpload() {
+    explanationImages = [];
+    updateExplanationPreviews();
+}
+
+async function uploadExplanationImages() {
+    const form = document.getElementById('explanationUploadForm');
+    const lessonId = window.location.pathname.split('/')[3];
+    
+    for (let imageData of explanationImages) {
+        try {
+            const formData = new FormData();
+            formData.append('csrf_token', form.querySelector('[name="csrf_token"]').value);
+            formData.append('file', imageData);
+            
+            const response = await fetch(`/admin/lesson/${lessonId}/upload_individual_explanation_files`, {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) {
+                throw new Error('上传失败');
+            }
+        } catch (error) {
+            console.error('上传出错:', error);
+        }
+    }
+    
+    // 刷新页面以显示新上传的图片
+    window.location.reload();
+}
+
+// 初始化粘贴区域事件监听
+document.addEventListener('DOMContentLoaded', function() {
+    const examPasteArea = document.getElementById('examPasteArea');
+    const explanationPasteArea = document.getElementById('explanationPasteArea');
+
+    examPasteArea.addEventListener('paste', handleExamPaste);
+    explanationPasteArea.addEventListener('paste', handleExplanationPaste);
+
+    // 添加拖放支持
+    [examPasteArea, explanationPasteArea].forEach(area => {
+        area.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            this.classList.add('dragover');
+        });
+
+        area.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            this.classList.remove('dragover');
+        });
+
+        area.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            
+            if (area.id === 'examPasteArea') {
+                handleExamDrop(files);
+            } else {
+                handleExplanationDrop(files);
+            }
+        });
+    });
+});
+
+function handleExamDrop(files) {
+    Array.from(files).forEach(file => {
+        if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                examImages.push(e.target.result);
+                updateExamPreviews();
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+}
+
+function handleExplanationDrop(files) {
+    Array.from(files).forEach(file => {
+        if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                explanationImages.push(e.target.result);
+                updateExplanationPreviews();
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+}
+
+// 添加表单提交事件监听
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('individualQuestionForm');
+    form.addEventListener('submit', function(e) {
+        const answers = Array.from(form.querySelectorAll('input[name="answers[]"]'));
+        if (answers.length === 0) {
+            e.preventDefault();
+            alert('请先生成答案输入框');
+            return;
+        }
+    });
+});
+</script>
+{% endblock %} 
