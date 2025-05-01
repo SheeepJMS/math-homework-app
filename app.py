@@ -17,6 +17,7 @@ from flask_migrate import Migrate
 import json
 import time
 from collections import namedtuple
+from sqlalchemy.exc import IntegrityError
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'  # 用于 flash 消息和 session
@@ -1455,60 +1456,69 @@ def add_questions(lesson_id):
         answers = request.form.getlist('answers[]')
         print(f"收到的答案数量: {len(answers)}")  # 调试日志
         
-        # 获取当前最大题号
-        max_question_number = db.session.query(func.max(Question.question_number)).filter_by(lesson_id=lesson_id).scalar() or 0
-        
-        # 添加新题目
-        for i, answer in enumerate(answers, max_question_number + 1):
-            answer = answer.strip().upper()  # 转换为大写并去除空白
-            print(f"处理第{i}题答案: {answer}")  # 调试日志
+        # 开启数据库事务
+        with db.session.begin():
+            # 获取当前课程的所有题目编号
+            existing_numbers = set(
+                db.session.query(Question.question_number)
+                .filter_by(lesson_id=lesson_id)
+                .all()
+            )
             
-            # 根据答案判断题目类型
-            if not answer:  # 空答案表示证明题
-                question_type = 'proof'
-                answer = '证明题'
-            elif answer in ['A', 'B', 'C', 'D', 'E']:  # ABCDE表示选择题
-                question_type = 'choice'
-            else:  # 其他情况为填空题
-                question_type = 'fill'
-            
-            print(f"题目类型: {question_type}")  # 调试日志
-            
-            # 查找是否已存在该题号的题目
-            existing_question = Question.query.filter_by(
-                lesson_id=lesson_id,
-                question_number=i
-            ).first()
-            
-            if existing_question:
-                # 更新现有题目
-                existing_question.type = question_type
-                existing_question.answer = answer
+            # 找到最大的可用题号
+            if existing_numbers:
+                max_number = max(num[0] for num in existing_numbers)
             else:
+                max_number = 0
+            
+            # 批量添加新题目
+            new_questions = []
+            for i, answer in enumerate(answers, 1):
+                # 找到下一个可用的题号
+                while max_number + i in existing_numbers:
+                    i += 1
+                
+                question_number = max_number + i
+                answer = answer.strip().upper()  # 转换为大写并去除空白
+                print(f"处理第{question_number}题答案: {answer}")  # 调试日志
+                
+                # 根据答案判断题目类型
+                if not answer:  # 空答案表示证明题
+                    question_type = 'proof'
+                    answer = '证明题'
+                elif answer in ['A', 'B', 'C', 'D', 'E']:  # ABCDE表示选择题
+                    question_type = 'choice'
+                else:  # 其他情况为填空题
+                    question_type = 'fill'
+                
+                print(f"题目类型: {question_type}")  # 调试日志
+                
                 # 创建新题目
                 question = Question(
                     lesson_id=lesson_id,
-                    question_number=i,
+                    question_number=question_number,
                     type=question_type,
                     answer=answer,
-                    content=f"第{i}题"  # 添加默认内容
+                    content=f"第{question_number}题"  # 添加默认内容
                 )
-                db.session.add(question)
+                new_questions.append(question)
             
-            print(f"已处理第{i}题")  # 调试日志
+            # 批量添加所有题目
+            db.session.bulk_save_objects(new_questions)
+            
+        flash('题目添加成功')
+        return redirect(url_for('manage_questions', lesson_id=lesson_id))
         
-        print("准备提交到数据库...")  # 调试日志
-        db.session.commit()
-        print("成功提交到数据库")  # 调试日志
-        flash('题目添加成功', 'success')
-        
+    except IntegrityError as e:
+        db.session.rollback()
+        flash('添加题目失败：题号重复')
+        print(f"数据库错误: {str(e)}")  # 调试日志
+        return redirect(url_for('manage_questions', lesson_id=lesson_id))
     except Exception as e:
         db.session.rollback()
-        print(f"添加题目时出错: {str(e)}")  # 调试日志
-        print(f"错误类型: {type(e)}")  # 添加错误类型信息
-        flash(f'添加题目时出错: {str(e)}', 'error')
-    
-    return redirect(url_for('manage_questions', lesson_id=lesson_id))
+        flash('添加题目失败：系统错误')
+        print(f"系统错误: {str(e)}")  # 调试日志
+        return redirect(url_for('manage_questions', lesson_id=lesson_id))
 
 @app.route('/admin/lesson/<int:lesson_id>/upload_individual_exam_files', methods=['POST'])
 @admin_required
