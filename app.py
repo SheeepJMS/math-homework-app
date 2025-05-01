@@ -448,14 +448,16 @@ def toggle_class_status(class_id):
 @app.route('/admin/class/<int:class_id>/delete', methods=['POST'])
 @admin_required
 def delete_class(class_id):
-    class_ = Class.query.get_or_404(class_id)
-    
     try:
+        class_ = Class.query.get_or_404(class_id)
+        
         # 删除关联的用户
         User.query.filter_by(class_id=class_id).delete()
         
-        # 删除与课程的关联（不删除课程本身）
-        class_.lessons = []
+        # 删除班级和课程的关联（通过关联表）
+        db.session.execute(lesson_class_association.delete().where(
+            lesson_class_association.c.class_id == class_id
+        ))
         
         # 删除班级
         db.session.delete(class_)
@@ -465,6 +467,7 @@ def delete_class(class_id):
     except Exception as e:
         db.session.rollback()
         flash(f'删除失败：{str(e)}', 'error')
+        print(f"删除班级时出错: {str(e)}")  # 添加日志
     
     return redirect(url_for('admin_classes'))
 
