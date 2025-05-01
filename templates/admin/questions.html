@@ -439,6 +439,14 @@ function generateQuestionFields() {
     const container = document.getElementById('questionFields');
     container.innerHTML = '';
 
+    // 添加CSRF令牌
+    const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrf_token';
+    csrfInput.value = csrfToken;
+    container.appendChild(csrfInput);
+
     for (let i = 1; i <= count; i++) {
         const div = document.createElement('div');
         div.className = 'mb-3 row align-items-center';
@@ -700,15 +708,26 @@ function handleExplanationDrop(files) {
 
 // 添加表单提交事件监听
 document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('individualQuestionForm');
-    form.addEventListener('submit', function(e) {
-        const answers = Array.from(form.querySelectorAll('input[name="answers[]"]'));
-        if (answers.length === 0) {
-            e.preventDefault();
-            alert('请先生成答案输入框');
-            return;
-        }
-    });
+    const form = document.getElementById('questionForm');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            const answers = Array.from(form.querySelectorAll('input[name="answers[]"]'));
+            if (answers.length === 0) {
+                e.preventDefault();
+                alert('请先生成答案输入框');
+                return;
+            }
+            
+            // 验证答案格式
+            for (let i = 0; i < answers.length; i++) {
+                const answer = answers[i].value.trim().toUpperCase();
+                if (answer && !['A', 'B', 'C', 'D', 'E'].includes(answer) && answer !== '证明题') {
+                    // 如果不是空的（证明题），也不是选择题答案，就是填空题
+                    continue;
+                }
+            }
+        });
+    }
 });
 </script>
 {% endblock %} 
