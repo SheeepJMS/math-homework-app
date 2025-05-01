@@ -46,6 +46,11 @@ database_url = os.environ.get('DATABASE_URL')
 if database_url and database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
 
+if not database_url:
+    # 如果没有设置环境变量，使用默认的SQLite配置（用于本地开发）
+    database_url = 'sqlite:///instance/quiz.db'
+    print("警告：未设置DATABASE_URL环境变量，使用SQLite作为默认数据库")
+
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -59,8 +64,8 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 限制文件大小为16MB
 
 # 确保上传目录存在
-os.makedirs(os.path.join(UPLOAD_FOLDER, 'exams'), exist_ok=True)
-os.makedirs(os.path.join(UPLOAD_FOLDER, 'explanations'), exist_ok=True)
+os.makedirs(os.path.join('static', UPLOAD_FOLDER, 'exams'), exist_ok=True)
+os.makedirs(os.path.join('static', UPLOAD_FOLDER, 'explanations'), exist_ok=True)
 
 # 初始化数据库
 db = SQLAlchemy(app)
@@ -70,7 +75,10 @@ migrate = Migrate(app, db)
 def init_db():
     with app.app_context():
         try:
-            # 创建所有表
+            # 使用Flask-Migrate进行数据库迁移
+            print("开始数据库迁移...")
+            
+            # 创建所有表（如果不存在）
             db.create_all()
             print("数据库表创建/更新成功")
             
@@ -78,25 +86,35 @@ def init_db():
             admin = User.query.filter_by(is_admin=True).first()
             if not admin:
                 print("创建默认管理员账号...")
-                # 创建默认班级
-                default_class = Class(
-                    name='默认班级',
-                    description='系统默认班级',
-                    is_active=True
-                )
-                db.session.add(default_class)
-                
-                # 创建管理员账号
-                admin = User(
-                    username='admin',
-                    email='admin@example.com',
-                    password='admin123',
-                    is_active=True,
-                    is_admin=True
-                )
-                db.session.add(admin)
-                db.session.commit()
-                print("默认数据创建成功！")
+                try:
+                    # 创建默认班级
+                    default_class = Class(
+                        name='默认班级',
+                        description='系统默认班级',
+                        is_active=True
+                    )
+                    db.session.add(default_class)
+                    db.session.flush()  # 获取default_class的ID
+                    
+                    # 创建管理员账号
+                    admin = User(
+                        username='admin',
+                        email='admin@example.com',
+                        password='admin123',
+                        is_active=True,
+                        is_admin=True,
+                        class_id=default_class.id
+                    )
+                    db.session.add(admin)
+                    db.session.commit()
+                    print("默认数据创建成功！")
+                except IntegrityError:
+                    print("默认数据已存在，跳过创建")
+                    db.session.rollback()
+                except Exception as e:
+                    print(f"创建默认数据时出错: {str(e)}")
+                    db.session.rollback()
+                    raise
             else:
                 print("管理员账号已存在，跳过创建默认数据。")
         except Exception as e:
