@@ -41,12 +41,12 @@ login_manager.login_view = 'login'
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# 配置数据库
+# 配置数据库路径，使用环境变量或默认路径
 DB_PATH = os.environ.get('DATABASE_PATH', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'quiz.db'))
 BACKUP_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'backups')
 BACKUP_FILE = os.path.join(BACKUP_PATH, 'quiz_backup.db')  # 固定的备份文件名
 
-# 确保数据和备份目录存在
+# 确保数据目录存在
 os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 os.makedirs(BACKUP_PATH, exist_ok=True)
 
