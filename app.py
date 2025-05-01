@@ -42,14 +42,9 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 # 配置数据库
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'quiz.db')
-BACKUP_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'backups')
-
-# 确保数据和备份目录存在
-os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-os.makedirs(BACKUP_PATH, exist_ok=True)
-
-app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{DB_PATH}'  # 使用固定的数据库路径
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
+if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
+    app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgres://', 'postgresql://', 1)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # 配置文件上传
@@ -68,6 +63,10 @@ os.makedirs(os.path.join(UPLOAD_FOLDER, 'explanations'), exist_ok=True)
 # 初始化数据库
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
+
+# 确保所有表存在
+with app.app_context():
+    db.create_all()
 
 # 课程和班级的多对多关联表
 lesson_class_association = db.Table('lesson_class_association',
