@@ -1821,31 +1821,6 @@ def add_user():
     
     return redirect(url_for('admin_users'))
 
-# 自动备份函数
-def backup_database():
-    if os.path.exists(DB_PATH):
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        backup_file = os.path.join(BACKUP_PATH, f'quiz_backup_{timestamp}.db')
-        try:
-            import shutil
-            shutil.copy2(DB_PATH, backup_file)
-            print(f'数据库已备份到: {backup_file}')
-            return True
-        except Exception as e:
-            print(f'备份失败: {str(e)}')
-            return False
-    return False
-
-# 在每次请求开始前检查并备份数据库
-@app.before_request
-def before_request():
-    # 每天第一次访问时备份数据库
-    last_backup = session.get('last_backup_date')
-    today = datetime.now().strftime('%Y-%m-%d')
-    if last_backup != today:
-        if backup_database():
-            session['last_backup_date'] = today
-
 if __name__ == '__main__':
     init_db()  # 初始化数据库
     app.run(debug=True, host='0.0.0.0', port=5000) 
