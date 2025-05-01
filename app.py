@@ -72,6 +72,30 @@ os.makedirs(os.path.join('static', UPLOAD_FOLDER, 'explanations'), exist_ok=True
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
+def create_default_admin():
+    """创建默认管理员账户（如果不存在）"""
+    admin = User.query.filter_by(username='admin').first()
+    if not admin:
+        admin = User(
+            username='admin',
+            email='admin@example.com',
+            password='admin123',  # 请在首次登录后立即修改此密码
+            is_admin=True,
+            is_active=True
+        )
+        db.session.add(admin)
+        try:
+            db.session.commit()
+            print("默认管理员账户已创建")
+        except Exception as e:
+            db.session.rollback()
+            print(f"创建默认管理员账户失败: {str(e)}")
+
+@app.before_first_request
+def initialize_app():
+    """在第一次请求之前初始化应用"""
+    create_default_admin()
+
 # 确保所有表存在并创建默认数据
 def init_db():
     with app.app_context():
@@ -502,8 +526,8 @@ def delete_class(class_id):
     try:
         class_ = Class.query.get_or_404(class_id)
         
-        # 删除关联的用户
-        User.query.filter_by(class_id=class_id).delete()
+        # 只删除非管理员用户
+        User.query.filter_by(class_id=class_id, is_admin=False).delete()
         
         # 删除班级和课程的关联（通过关联表）
         db.session.execute(lesson_class_association.delete().where(
@@ -514,7 +538,7 @@ def delete_class(class_id):
         db.session.delete(class_)
         db.session.commit()
         
-        flash(f'班级 {class_.name} 及其所有用户已删除', 'success')
+        flash(f'班级 {class_.name} 及其所有非管理员用户已删除', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'删除失败：{str(e)}', 'error')
