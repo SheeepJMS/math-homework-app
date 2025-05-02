@@ -1,0 +1,11 @@
+# 不忽略 static/uploads 目录
+static/uploads/
+static/uploads/exams/
+static/uploads/explanations/
+
+# 不忽略数据库文件
+!instance/
+!instance/*.db
+
+# 不忽略 data 目录
+data/ 
