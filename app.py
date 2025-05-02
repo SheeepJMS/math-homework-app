@@ -1603,9 +1603,8 @@ def upload_individual_exam_files(lesson_id):
         filename = f"{lesson_id}_{timestamp}_{random_suffix}.png"
         
         # 设置文件路径
-        file_dir = os.path.join('uploads', 'exams')
-        relative_path = os.path.join(file_dir, filename)
-        absolute_path = os.path.join('static', file_dir, filename)
+        relative_path = f'uploads/exams/{filename}'  # 修改这里：移除多余的路径拼接
+        absolute_path = os.path.join('static', relative_path)
         
         # 确保目录存在
         os.makedirs(os.path.dirname(absolute_path), exist_ok=True)
@@ -1616,7 +1615,7 @@ def upload_individual_exam_files(lesson_id):
         # 创建试卷文件记录
         exam_file = ExamFile(
             filename=filename,
-            path=relative_path,
+            path=relative_path,  # 保持一致的相对路径
             lesson_id=lesson_id,
             page_number=max_page + 1
         )
@@ -1879,6 +1878,24 @@ def add_user():
         db.session.rollback()
     
     return redirect(url_for('admin_users'))
+
+@app.route('/debug/static/<path:filename>')
+def debug_static(filename):
+    """调试路由：检查静态文件访问"""
+    try:
+        # 检查文件是否存在
+        file_path = os.path.join('static', filename)
+        if os.path.exists(file_path):
+            # 打印文件信息
+            print(f"文件存在: {file_path}")
+            print(f"文件大小: {os.path.getsize(file_path)} bytes")
+            return send_from_directory('static', filename)
+        else:
+            print(f"文件不存在: {file_path}")
+            return f"文件不存在: {file_path}", 404
+    except Exception as e:
+        print(f"访问文件出错: {str(e)}")
+        return f"访问文件出错: {str(e)}", 500
 
 if __name__ == '__main__':
     init_db()  # 初始化数据库
