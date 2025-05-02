@@ -1448,43 +1448,6 @@ def delete_explanation_file(file_id):
         
     return redirect(url_for('manage_questions', lesson_id=lesson_id))
 
-@app.route('/static/<path:filename>')
-def serve_static(filename):
-    """静态文件服务"""
-    try:
-        # 移除路径中的重复 'static' 前缀
-        if filename.startswith('static/'):
-            filename = filename[7:]
-            
-        # 如果路径包含 uploads，确保使用正确的目录结构
-        if 'uploads' in filename:
-            # 分离路径组件
-            parts = filename.split('/')
-            if 'uploads' in parts:
-                # 重构路径，确保格式正确
-                uploads_index = parts.index('uploads')
-                filename = '/'.join(parts[uploads_index:])
-        
-        # 检查文件是否存在于静态目录
-        static_path = os.path.join(app.static_folder, filename)
-        if os.path.exists(static_path):
-            return send_from_directory(app.static_folder, filename)
-            
-        # 如果文件不在静态目录，检查是否在上传目录
-        uploads_path = os.path.join(app.static_folder, 'uploads', filename.replace('uploads/', ''))
-        if os.path.exists(uploads_path):
-            dir_path = os.path.dirname(uploads_path)
-            base_name = os.path.basename(uploads_path)
-            return send_from_directory(dir_path, base_name)
-            
-        # 文件不存在
-        print(f"文件不存在: 尝试路径1: {static_path}, 路径2: {uploads_path}")
-        return f"文件不存在", 404
-        
-    except Exception as e:
-        print(f"访问文件出错: {str(e)}")
-        return f"访问文件出错: {str(e)}", 500
-
 @app.route('/uploads/<path:filename>')
 def serve_upload(filename):
     """上传文件服务"""
@@ -1494,18 +1457,64 @@ def serve_upload(filename):
             os.path.join(app.static_folder, 'uploads', filename),  # 标准路径
             os.path.join(app.static_folder, filename),  # 完整路径
             os.path.join('uploads', filename),  # 相对路径
+            filename  # 原始路径
         ]
         
         # 尝试所有可能的路径
         for path in paths_to_try:
+            print(f"尝试访问路径: {path}")  # 添加调试日志
             if os.path.exists(path):
                 dir_path = os.path.dirname(path)
                 base_name = os.path.basename(path)
+                print(f"找到文件: {path}")  # 添加调试日志
                 return send_from_directory(dir_path, base_name)
         
         # 如果所有路径都不存在，记录错误并返回404
         print(f"文件不存在，尝试过以下路径: {paths_to_try}")
-        return "文件不存在", 404
+        return f"文件不存在，尝试过以下路径: {paths_to_try}", 404
+        
+    except Exception as e:
+        print(f"访问文件出错: {str(e)}")
+        return f"访问文件出错: {str(e)}", 500
+
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    """静态文件服务"""
+    try:
+        print(f"请求访问文件: {filename}")  # 添加调试日志
+        
+        # 移除路径中的重复 'static' 前缀
+        if filename.startswith('static/'):
+            filename = filename[7:]
+            print(f"移除static前缀后的路径: {filename}")  # 添加调试日志
+            
+        # 如果路径包含 uploads，确保使用正确的目录结构
+        if 'uploads' in filename:
+            # 分离路径组件
+            parts = filename.split('/')
+            if 'uploads' in parts:
+                # 重构路径，确保格式正确
+                uploads_index = parts.index('uploads')
+                filename = '/'.join(parts[uploads_index:])
+                print(f"重构后的路径: {filename}")  # 添加调试日志
+        
+        # 检查文件是否存在于静态目录
+        static_path = os.path.join(app.static_folder, filename)
+        print(f"尝试静态目录路径: {static_path}")  # 添加调试日志
+        if os.path.exists(static_path):
+            return send_from_directory(app.static_folder, filename)
+            
+        # 如果文件不在静态目录，检查是否在上传目录
+        uploads_path = os.path.join(app.static_folder, 'uploads', filename.replace('uploads/', ''))
+        print(f"尝试上传目录路径: {uploads_path}")  # 添加调试日志
+        if os.path.exists(uploads_path):
+            dir_path = os.path.dirname(uploads_path)
+            base_name = os.path.basename(uploads_path)
+            return send_from_directory(dir_path, base_name)
+            
+        # 文件不存在
+        print(f"文件不存在: 尝试路径1: {static_path}, 路径2: {uploads_path}")
+        return f"文件不存在: 尝试路径1: {static_path}, 路径2: {uploads_path}", 404
         
     except Exception as e:
         print(f"访问文件出错: {str(e)}")
@@ -2012,6 +2021,42 @@ def fix_render_paths():
         print(f"修复文件路径时出错: {str(e)}")
     
     return redirect(url_for('admin_lessons'))
+
+@app.route('/admin/fix_db_paths')
+@admin_required
+def fix_db_paths():
+    """修复数据库中的文件路径记录"""
+    try:
+        # 获取所有试卷文件记录
+        exam_files = ExamFile.query.all()
+        explanation_files = ExplanationFile.query.all()
+        
+        exam_fixed = 0
+        explanation_fixed = 0
+        
+        # 修复试卷文件路径
+        for file in exam_files:
+            if 'uploads/uploads/' in file.path:
+                file.path = file.path.replace('uploads/uploads/', 'uploads/')
+                exam_fixed += 1
+        
+        # 修复解析文件路径
+        for file in explanation_files:
+            if 'uploads/uploads/' in file.path:
+                file.path = file.path.replace('uploads/uploads/', 'uploads/')
+                explanation_fixed += 1
+        
+        if exam_fixed > 0 or explanation_fixed > 0:
+            db.session.commit()
+            flash(f'成功修复 {exam_fixed} 个试卷文件和 {explanation_fixed} 个解析文件的路径', 'success')
+        else:
+            flash('没有需要修复的文件路径', 'info')
+        
+        return redirect(url_for('admin_lessons'))
+        
+    except Exception as e:
+        flash(f'修复文件路径时出错：{str(e)}', 'error')
+        return redirect(url_for('admin_lessons'))
 
 if __name__ == '__main__':
     init_db()  # 初始化数据库
