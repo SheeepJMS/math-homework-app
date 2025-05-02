@@ -1264,9 +1264,10 @@ def upload_exam_files(lesson_id):
                     filename = f"{lesson_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{original_filename}"
                     
                     # 设置相对路径（用于数据库存储和URL访问）
-                    relative_path = f'uploads/exams/{filename}'
+                    relative_path = f'uploads/exams/{filename}'  # 统一使用这种格式的路径
+                    
                     # 设置绝对路径（用于文件保存）
-                    absolute_path = os.path.join(app.static_folder, relative_path)
+                    absolute_path = os.path.join('static', relative_path)
                     
                     # 确保目录存在
                     os.makedirs(os.path.dirname(absolute_path), exist_ok=True)
@@ -1279,7 +1280,7 @@ def upload_exam_files(lesson_id):
                     # 创建试卷文件记录
                     exam_file = ExamFile(
                         filename=filename,
-                        path=relative_path,
+                        path=relative_path,  # 使用统一的相对路径格式
                         lesson_id=lesson_id,
                         page_number=max_page + 1 + success_count
                     )
@@ -1449,35 +1450,55 @@ def delete_explanation_file(file_id):
 
 @app.route('/static/<path:filename>')
 def serve_static(filename):
-    # 移除路径中的重复 'static'
-    if filename.startswith('static/'):
-        filename = filename[7:]
-    
-    # 检查是否是PDF文件
-    if filename.lower().endswith('.pdf'):
-        # 设置响应头，禁止下载
-        response = send_from_directory('static', filename)
-        response.headers['Content-Disposition'] = 'inline'
-        response.headers['X-Content-Type-Options'] = 'nosniff'
-        return response
-    
-    return send_from_directory('static', filename)
+    """静态文件服务"""
+    try:
+        # 移除路径中的重复 'static' 前缀
+        if filename.startswith('static/'):
+            filename = filename[7:]
+        
+        # 检查文件是否存在
+        file_path = os.path.join(app.static_folder, filename)
+        if not os.path.exists(file_path):
+            print(f"文件不存在: {file_path}")  # 添加调试日志
+            return f"文件不存在: {file_path}", 404
+        
+        # 对于PDF文件设置特殊响应头
+        if filename.lower().endswith('.pdf'):
+            response = send_from_directory(app.static_folder, filename)
+            response.headers['Content-Disposition'] = 'inline'
+            response.headers['X-Content-Type-Options'] = 'nosniff'
+            return response
+        
+        # 其他文件直接返回
+        return send_from_directory(app.static_folder, filename)
+        
+    except Exception as e:
+        print(f"访问文件出错: {str(e)}")  # 添加调试日志
+        return f"访问文件出错: {str(e)}", 500
 
 @app.route('/uploads/<path:filename>')
 def serve_upload(filename):
-    # 确保路径正确
-    if filename.startswith('uploads/'):
-        filename = filename[8:]
-    
-    # 检查是否是PDF文件
-    if filename.lower().endswith('.pdf'):
-        # 设置响应头，禁止下载
-        response = send_from_directory('uploads', filename)
-        response.headers['Content-Disposition'] = 'inline'
-        response.headers['X-Content-Type-Options'] = 'nosniff'
-        return response
-    
-    return send_from_directory('uploads', filename)
+    """上传文件服务"""
+    try:
+        # 构建完整的文件路径
+        file_path = os.path.join(app.static_folder, 'uploads', filename)
+        if not os.path.exists(file_path):
+            print(f"文件不存在: {file_path}")  # 添加调试日志
+            return f"文件不存在: {file_path}", 404
+            
+        # 对于PDF文件设置特殊响应头
+        if filename.lower().endswith('.pdf'):
+            response = send_from_directory(os.path.join(app.static_folder, 'uploads'), filename)
+            response.headers['Content-Disposition'] = 'inline'
+            response.headers['X-Content-Type-Options'] = 'nosniff'
+            return response
+            
+        # 其他文件直接返回
+        return send_from_directory(os.path.join(app.static_folder, 'uploads'), filename)
+        
+    except Exception as e:
+        print(f"访问文件出错: {str(e)}")  # 添加调试日志
+        return f"访问文件出错: {str(e)}", 500
 
 @app.route('/admin/lesson/<int:lesson_id>/add_questions', methods=['POST'])
 @admin_required
@@ -1937,6 +1958,47 @@ def fix_file_paths():
     except Exception as e:
         db.session.rollback()
         flash(f'修复文件路径时出错：{str(e)}', 'error')
+    
+    return redirect(url_for('admin_lessons'))
+
+@app.route('/admin/fix_render_paths')
+@admin_required
+def fix_render_paths():
+    """修复 Render 端数据库中的文件路径"""
+    try:
+        # 获取所有试卷文件记录
+        exam_files = ExamFile.query.all()
+        fixed_count = 0
+        
+        for file in exam_files:
+            # 检查并修正文件路径
+            current_path = file.path
+            filename = os.path.basename(current_path)
+            
+            # 确保路径格式正确
+            if not current_path.startswith('uploads/'):
+                # 如果路径以 static/ 开头，移除它
+                if current_path.startswith('static/'):
+                    current_path = current_path[7:]
+                # 如果路径不包含 uploads/，添加它
+                if not current_path.startswith('uploads/'):
+                    current_path = f'uploads/exams/{filename}'
+                
+                # 更新数据库记录
+                file.path = current_path
+                fixed_count += 1
+                print(f"修复文件路径: {file.path} -> {current_path}")
+        
+        if fixed_count > 0:
+            db.session.commit()
+            flash(f'成功修复 {fixed_count} 个文件路径', 'success')
+        else:
+            flash('没有需要修复的文件路径', 'info')
+            
+    except Exception as e:
+        db.session.rollback()
+        flash(f'修复文件路径时出错：{str(e)}', 'error')
+        print(f"修复文件路径时出错: {str(e)}")
     
     return redirect(url_for('admin_lessons'))
 
