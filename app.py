@@ -1455,49 +1455,60 @@ def serve_static(filename):
         # 移除路径中的重复 'static' 前缀
         if filename.startswith('static/'):
             filename = filename[7:]
+            
+        # 如果路径包含 uploads，确保使用正确的目录结构
+        if 'uploads' in filename:
+            # 分离路径组件
+            parts = filename.split('/')
+            if 'uploads' in parts:
+                # 重构路径，确保格式正确
+                uploads_index = parts.index('uploads')
+                filename = '/'.join(parts[uploads_index:])
         
-        # 检查文件是否存在
-        file_path = os.path.join(app.static_folder, filename)
-        if not os.path.exists(file_path):
-            print(f"文件不存在: {file_path}")  # 添加调试日志
-            return f"文件不存在: {file_path}", 404
-        
-        # 对于PDF文件设置特殊响应头
-        if filename.lower().endswith('.pdf'):
-            response = send_from_directory(app.static_folder, filename)
-            response.headers['Content-Disposition'] = 'inline'
-            response.headers['X-Content-Type-Options'] = 'nosniff'
-            return response
-        
-        # 其他文件直接返回
-        return send_from_directory(app.static_folder, filename)
+        # 检查文件是否存在于静态目录
+        static_path = os.path.join(app.static_folder, filename)
+        if os.path.exists(static_path):
+            return send_from_directory(app.static_folder, filename)
+            
+        # 如果文件不在静态目录，检查是否在上传目录
+        uploads_path = os.path.join(app.static_folder, 'uploads', filename.replace('uploads/', ''))
+        if os.path.exists(uploads_path):
+            dir_path = os.path.dirname(uploads_path)
+            base_name = os.path.basename(uploads_path)
+            return send_from_directory(dir_path, base_name)
+            
+        # 文件不存在
+        print(f"文件不存在: 尝试路径1: {static_path}, 路径2: {uploads_path}")
+        return f"文件不存在", 404
         
     except Exception as e:
-        print(f"访问文件出错: {str(e)}")  # 添加调试日志
+        print(f"访问文件出错: {str(e)}")
         return f"访问文件出错: {str(e)}", 500
 
 @app.route('/uploads/<path:filename>')
 def serve_upload(filename):
     """上传文件服务"""
     try:
-        # 构建完整的文件路径
-        file_path = os.path.join(app.static_folder, 'uploads', filename)
-        if not os.path.exists(file_path):
-            print(f"文件不存在: {file_path}")  # 添加调试日志
-            return f"文件不存在: {file_path}", 404
-            
-        # 对于PDF文件设置特殊响应头
-        if filename.lower().endswith('.pdf'):
-            response = send_from_directory(os.path.join(app.static_folder, 'uploads'), filename)
-            response.headers['Content-Disposition'] = 'inline'
-            response.headers['X-Content-Type-Options'] = 'nosniff'
-            return response
-            
-        # 其他文件直接返回
-        return send_from_directory(os.path.join(app.static_folder, 'uploads'), filename)
+        # 构建可能的文件路径
+        paths_to_try = [
+            os.path.join(app.static_folder, 'uploads', filename),  # 标准路径
+            os.path.join(app.static_folder, filename),  # 完整路径
+            os.path.join('uploads', filename),  # 相对路径
+        ]
+        
+        # 尝试所有可能的路径
+        for path in paths_to_try:
+            if os.path.exists(path):
+                dir_path = os.path.dirname(path)
+                base_name = os.path.basename(path)
+                return send_from_directory(dir_path, base_name)
+        
+        # 如果所有路径都不存在，记录错误并返回404
+        print(f"文件不存在，尝试过以下路径: {paths_to_try}")
+        return "文件不存在", 404
         
     except Exception as e:
-        print(f"访问文件出错: {str(e)}")  # 添加调试日志
+        print(f"访问文件出错: {str(e)}")
         return f"访问文件出错: {str(e)}", 500
 
 @app.route('/admin/lesson/<int:lesson_id>/add_questions', methods=['POST'])
