@@ -642,20 +642,20 @@ def delete_lesson(lesson_id):
         lesson = Lesson.query.get_or_404(lesson_id)
         print(f"找到课程: {lesson.title}")  # 调试日志
         
-        # 首先删除与课程相关的所有考试记录
-        quiz_count = QuizHistory.query.filter_by(lesson_id=lesson_id).delete()
-        print(f"删除了 {quiz_count} 条考试记录")  # 调试日志
+        # 首先删除与课程相关的所有答题记录
+        UserAnswer.query.filter_by(lesson_id=lesson_id).delete()
+        print("删除了答题记录")  # 调试日志
         
-        # 删除与课程相关的所有答题记录
-        answer_count = UserAnswer.query.filter_by(lesson_id=lesson_id).delete()
-        print(f"删除了 {answer_count} 条答题记录")  # 调试日志
+        # 然后删除考试记录
+        QuizHistory.query.filter_by(lesson_id=lesson_id).delete()
+        print("删除了考试记录")  # 调试日志
         
         # 删除与课程相关的所有试卷文件
         exam_files = ExamFile.query.filter_by(lesson_id=lesson_id).all()
         print(f"找到 {len(exam_files)} 个试卷文件")  # 调试日志
         for file in exam_files:
             try:
-                # 删除物理文件
+                # 删除物理文件（如果是本地存储的话）
                 file_path = os.path.join('static', file.path)
                 print(f"尝试删除文件: {file_path}")  # 调试日志
                 if os.path.exists(file_path):
@@ -665,15 +665,15 @@ def delete_lesson(lesson_id):
                 print(f"删除文件失败: {str(e)}")  # 记录文件删除错误但继续执行
         
         # 删除数据库中的试卷文件记录
-        file_count = ExamFile.query.filter_by(lesson_id=lesson_id).delete()
-        print(f"删除了 {file_count} 条试卷文件记录")  # 调试日志
+        ExamFile.query.filter_by(lesson_id=lesson_id).delete()
+        print("删除了试卷文件记录")  # 调试日志
 
         # 删除与课程相关的所有解析文件
         explanation_files = ExplanationFile.query.filter_by(lesson_id=lesson_id).all()
         print(f"找到 {len(explanation_files)} 个解析文件")  # 调试日志
         for file in explanation_files:
             try:
-                # 删除物理文件
+                # 删除物理文件（如果是本地存储的话）
                 file_path = os.path.join('static', file.path)
                 print(f"尝试删除解析文件: {file_path}")  # 调试日志
                 if os.path.exists(file_path):
@@ -683,12 +683,16 @@ def delete_lesson(lesson_id):
                 print(f"删除解析文件失败: {str(e)}")  # 记录文件删除错误但继续执行
         
         # 删除数据库中的解析文件记录
-        explanation_count = ExplanationFile.query.filter_by(lesson_id=lesson_id).delete()
-        print(f"删除了 {explanation_count} 条解析文件记录")  # 调试日志
+        ExplanationFile.query.filter_by(lesson_id=lesson_id).delete()
+        print("删除了解析文件记录")  # 调试日志
         
         # 删除与课程相关的所有问题
-        question_count = Question.query.filter_by(lesson_id=lesson_id).delete()
-        print(f"删除了 {question_count} 道题目")  # 调试日志
+        Question.query.filter_by(lesson_id=lesson_id).delete()
+        print("删除了题目记录")  # 调试日志
+        
+        # 删除课程和班级的关联
+        lesson.classes = []
+        print("删除了课程和班级的关联")  # 调试日志
         
         # 最后删除课程本身
         db.session.delete(lesson)
@@ -703,7 +707,7 @@ def delete_lesson(lesson_id):
         error_msg = str(e)
         print(f"删除课程时出错: {error_msg}")  # 调试日志
         flash(f'删除课程时出错: {error_msg}', 'error')
-        return redirect(url_for('manage_questions', lesson_id=lesson_id))
+        return redirect(url_for('admin_lessons'))
 
 @app.route('/admin/lesson/<int:lesson_id>/questions')
 @admin_required
@@ -1246,22 +1250,32 @@ def manage_exam(lesson_id):
 def upload_to_cloudinary(file_data, resource_type='image'):
     """上传文件到 Cloudinary 并返回 URL"""
     try:
+        print("开始上传到 Cloudinary...")
         # 对于 Base64 图片数据
         if isinstance(file_data, str) and file_data.startswith('data:image'):
+            print("正在上传 Base64 图片数据...")
             # 上传 Base64 图片数据
             result = cloudinary.uploader.upload(
                 file_data,
                 resource_type=resource_type
             )
         else:
+            print("正在上传文件对象...")
             # 上传文件对象
             result = cloudinary.uploader.upload(
                 file_data,
                 resource_type=resource_type
             )
-        return result['secure_url']
+        print("上传结果: ", result)
+        if 'secure_url' in result:
+            print("上传成功，URL:", result['secure_url'])
+            return result['secure_url']
+        else:
+            print("上传成功但未返回 secure_url:", result)
+            return None
     except Exception as e:
         print(f"Cloudinary 上传失败: {str(e)}")
+        print(f"错误类型: {type(e)}")
         return None
 
 @app.route('/admin/lesson/<int:lesson_id>/upload_exam_files', methods=['POST'])
