@@ -842,6 +842,7 @@ def upload_exam(lesson_id):
 def start_quiz(lesson_id):
     user = current_user
     lesson = Lesson.query.get_or_404(lesson_id)
+    print(f"开始答题 - 课程ID: {lesson_id}, 课程名称: {lesson.title}")
     
     # 验证课程是否属于用户班级且已激活
     user_class = Class.query.get(user.class_id)
@@ -861,18 +862,27 @@ def start_quiz(lesson_id):
     
     # 检查课程是否有题目
     questions = Question.query.filter_by(lesson_id=lesson_id).order_by(Question.question_number).all()
+    print(f"题目数量: {len(questions)}")
+    for q in questions:
+        print(f"题号: {q.question_number}, 类型: {q.type}, 答案: {q.answer}")
+    
     if not questions:
         flash('该课程还没有题目，请等待教师上传题目')
         return redirect(url_for('student_dashboard'))
     
     # 获取试题文件
     exam_files = ExamFile.query.filter_by(lesson_id=lesson_id).order_by(ExamFile.page_number).all()
+    print(f"试题文件数量: {len(exam_files)}")
+    for f in exam_files:
+        print(f"文件ID: {f.id}, 页码: {f.page_number}, 路径: {f.path}")
+    
     if not exam_files:
         flash('该课程还没有上传试卷，请等待教师上传试卷')
         return redirect(url_for('student_dashboard'))
 
     # 获取解析文件
     explanation_files = ExplanationFile.query.filter_by(lesson_id=lesson_id).order_by(ExplanationFile.page_number).all()
+    print(f"解析文件数量: {len(explanation_files)}")
 
     # 创建一个空的表单用于CSRF保护
     form = FlaskForm()
@@ -1500,9 +1510,15 @@ def serve_upload(filename):
 @app.route('/static/<path:filename>')
 def serve_static(filename):
     """处理静态文件请求"""
-    # 如果是 Cloudinary URL，直接重定向
-    if filename.startswith('http://') or filename.startswith('https://'):
-        return redirect(filename)
+    # 如果是完整的URL（包括错误格式的URL），提取实际的URL并重定向
+    if 'https://' in filename or 'http://' in filename:
+        # 处理错误格式的URL（包含/static/前缀的情况）
+        if filename.startswith('https://') or filename.startswith('http://'):
+            actual_url = filename
+        else:
+            # 从路径中提取实际的URL
+            actual_url = filename[filename.find('http'):]
+        return redirect(actual_url)
         
     try:
         return send_from_directory(app.static_folder, filename)

@@ -52,13 +52,15 @@
                     <!-- 左侧试题区域 -->
                     <div class="col-md-10">
                         <!-- 试题图片 -->
-                        {% if exam_files[question.question_number - 1] %}
-                        <div class="question-image-container">
-                            <img src="{{ url_for('static', filename=exam_files[question.question_number - 1].path) }}" 
-                                 class="question-image" 
-                                 alt="第{{ question.question_number }}题">
-                        </div>
-                        {% endif %}
+                        {% for file in exam_files %}
+                            {% if file.page_number == question.question_number %}
+                            <div class="question-image-container">
+                                <img src="{{ file.path | safe }}" 
+                                     class="question-image" 
+                                     alt="第{{ question.question_number }}题">
+                            </div>
+                            {% endif %}
+                        {% endfor %}
                     </div>
 
                     <!-- 右侧答题区域 -->

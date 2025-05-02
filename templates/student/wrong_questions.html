@@ -155,7 +155,7 @@
                         </h6>
                         {% if images[(wa.Lesson.id, wa.Question.question_number)]['exam'] %}
                         <div class="question-image-container">
-                            <img src="{{ url_for('static', filename=images[(wa.Lesson.id, wa.Question.question_number)]['exam']) }}" 
+                            <img src="{{ images[(wa.Lesson.id, wa.Question.question_number)]['exam'] }}" 
                                  class="img-fluid" 
                                  alt="试题图片">
                         </div>
@@ -194,7 +194,7 @@
                         </h6>
                         {% if images[(wa.Lesson.id, wa.Question.question_number)]['explanation'] %}
                         <div class="explanation-image-container">
-                            <img src="{{ url_for('static', filename=images[(wa.Lesson.id, wa.Question.question_number)]['explanation']) }}" 
+                            <img src="{{ images[(wa.Lesson.id, wa.Question.question_number)]['explanation'] }}" 
                                  class="img-fluid" 
                                  alt="解析图片">
                         </div>

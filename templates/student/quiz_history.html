@@ -92,7 +92,7 @@
                                 {% for file in exam_files %}
                                     {% if file.page_number == question_number %}
                                     <div class="question-image-container">
-                                        <img src="{{ url_for('static', filename=file.path) }}" 
+                                        <img src="{{ file.path }}" 
                                              class="img-fluid" 
                                              alt="试题图片">
                                     </div>
@@ -130,7 +130,7 @@
                                 {% for file in explanation_files %}
                                     {% if file.page_number == question_number %}
                                     <div class="explanation-image-container">
-                                        <img src="{{ url_for('static', filename=file.path) }}" 
+                                        <img src="{{ file.path }}" 
                                              class="img-fluid" 
                                              alt="解析图片">
                                     </div>
