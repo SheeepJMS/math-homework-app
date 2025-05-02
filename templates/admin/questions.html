@@ -60,7 +60,7 @@
                                     <div class="card-body">
                                         <h6 class="card-title">第 {{ file.page_number }} 页</h6>
                                         <div class="ratio ratio-16x9">
-                                            <embed src="{{ url_for('static', filename=file.path) }}"
+                                            <embed src="{{ file.path }}"
                                                    type="application/pdf"
                                                    width="100%"
                                                    height="600px">
@@ -167,7 +167,7 @@
                                     <div class="card-body">
                                         <h6 class="card-title">第 {{ file.page_number }} 页</h6>
                                         <div class="ratio ratio-16x9">
-                                            <embed src="{{ url_for('static', filename=file.path) }}"
+                                            <embed src="{{ file.path }}"
                                                    type="application/pdf"
                                                    width="100%"
                                                    height="600px">
@@ -218,7 +218,7 @@
                                 <div class="card">
                                     <div class="card-body">
                                         <h6 class="card-title">第 {{ file.page_number }} 题</h6>
-                                        <img src="{{ url_for('static', filename=file.path) }}" class="img-fluid" alt="试题图片">
+                                        <img src="{{ file.path }}" class="img-fluid" alt="试题图片">
                                         <form action="{{ url_for('delete_exam_file', file_id=file.id) }}" method="POST" class="mt-2">
                                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                             <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('确定要删除这道试题吗？')">删除</button>
@@ -325,7 +325,7 @@
                                 <div class="card">
                                     <div class="card-body">
                                         <h6 class="card-title">第 {{ file.page_number }} 题解析</h6>
-                                        <img src="{{ url_for('static', filename=file.path) }}" class="img-fluid" alt="解析图片">
+                                        <img src="{{ file.path }}" class="img-fluid" alt="解析图片">
                                         <form action="{{ url_for('delete_explanation_file', file_id=file.id) }}" method="POST" class="mt-2">
                                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                             <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('确定要删除这道题的解析吗？')">删除</button>
