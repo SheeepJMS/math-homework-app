@@ -1499,54 +1499,16 @@ def serve_upload(filename):
 
 @app.route('/static/<path:filename>')
 def serve_static(filename):
-    """静态文件服务"""
+    """处理静态文件请求"""
+    # 如果是 Cloudinary URL，直接重定向
+    if filename.startswith('http://') or filename.startswith('https://'):
+        return redirect(filename)
+        
     try:
-        print(f"请求访问文件: {filename}")
-        
-        # 标准化文件路径
-        normalized_path = filename
-        
-        # 1. 移除重复的static前缀
-        if normalized_path.startswith('static/'):
-            normalized_path = normalized_path[7:]
-        
-        # 2. 处理uploads路径
-        if 'uploads/uploads/' in normalized_path:
-            normalized_path = normalized_path.replace('uploads/uploads/', 'uploads/')
-        
-        # 3. 构建可能的文件路径
-        paths_to_try = [
-            os.path.join(app.static_folder, normalized_path),  # 标准路径
-            os.path.join(app.static_folder, 'uploads', os.path.basename(normalized_path)),  # 仅文件名在uploads目录
-            os.path.join(app.static_folder, normalized_path.replace('uploads/', '')),  # 不带uploads前缀
-        ]
-        
-        # 4. 尝试所有可能的路径
-        for path in paths_to_try:
-            print(f"尝试访问路径: {path}")
-            if os.path.exists(path) and os.path.isfile(path):
-                dir_path = os.path.dirname(path)
-                base_name = os.path.basename(path)
-                print(f"找到文件: {path}")
-                return send_from_directory(dir_path, base_name)
-        
-        # 5. 如果所有路径都不存在，返回详细的错误信息
-        error_msg = {
-            "error": "文件不存在",
-            "requested_path": filename,
-            "normalized_path": normalized_path,
-            "tried_paths": paths_to_try
-        }
-        print(f"文件访问失败: {error_msg}")
-        return jsonify(error_msg), 404
-        
+        return send_from_directory(app.static_folder, filename)
     except Exception as e:
-        error_msg = {
-            "error": str(e),
-            "requested_path": filename
-        }
-        print(f"文件访问错误: {error_msg}")
-        return jsonify(error_msg), 500
+        print(f"静态文件访问错误: {str(e)}")
+        abort(404)
 
 @app.route('/admin/lesson/<int:lesson_id>/add_questions', methods=['POST'])
 @admin_required
