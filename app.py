@@ -1266,7 +1266,7 @@ def upload_exam_files(lesson_id):
                     # 设置相对路径（用于数据库存储和URL访问）
                     relative_path = f'uploads/exams/{filename}'
                     # 设置绝对路径（用于文件保存）
-                    absolute_path = os.path.join('static', relative_path)
+                    absolute_path = os.path.join(app.static_folder, relative_path)
                     
                     # 确保目录存在
                     os.makedirs(os.path.dirname(absolute_path), exist_ok=True)
@@ -1881,39 +1881,52 @@ def add_user():
 
 @app.route('/debug/static/<path:filename>')
 def debug_static(filename):
-    """调试路由：检查静态文件访问"""
+    """调试静态文件访问"""
     try:
         # 检查文件是否存在
-        file_path = os.path.join('static', filename)
+        file_path = os.path.join(app.static_folder, filename)
         if os.path.exists(file_path):
-            # 打印文件信息
-            print(f"文件存在: {file_path}")
-            print(f"文件大小: {os.path.getsize(file_path)} bytes")
-            return send_from_directory('static', filename)
+            return {
+                'status': 'success',
+                'exists': True,
+                'absolute_path': file_path,
+                'relative_path': filename,
+                'file_size': os.path.getsize(file_path)
+            }
         else:
-            print(f"文件不存在: {file_path}")
-            return f"文件不存在: {file_path}", 404
+            return {
+                'status': 'error',
+                'exists': False,
+                'attempted_path': file_path
+            }
     except Exception as e:
-        print(f"访问文件出错: {str(e)}")
-        return f"访问文件出错: {str(e)}", 500
+        return {
+            'status': 'error',
+            'error': str(e)
+        }
 
 @app.route('/admin/fix_file_paths')
 @admin_required
 def fix_file_paths():
     """修复数据库中的文件路径"""
     try:
-        # 修复试题文件路径
+        # 获取所有试卷文件记录
         exam_files = ExamFile.query.all()
         fixed_count = 0
         
         for file in exam_files:
-            # 检查路径是否需要修复
-            if file.path.startswith('static/'):
-                # 移除 'static/' 前缀
-                new_path = file.path[7:]
-                file.path = new_path
-                fixed_count += 1
-                print(f"修复文件路径: {file.path} -> {new_path}")
+            # 检查文件是否存在
+            current_path = os.path.join('static', file.path)
+            if not os.path.exists(current_path):
+                # 尝试在uploads/exams目录中查找文件
+                filename = os.path.basename(file.path)
+                new_path = f'uploads/exams/{filename}'
+                new_full_path = os.path.join('static', new_path)
+                
+                if os.path.exists(new_full_path):
+                    # 更新数据库中的路径
+                    file.path = new_path
+                    fixed_count += 1
         
         if fixed_count > 0:
             db.session.commit()
@@ -1924,9 +1937,8 @@ def fix_file_paths():
     except Exception as e:
         db.session.rollback()
         flash(f'修复文件路径时出错：{str(e)}', 'error')
-        print(f"修复文件路径时出错: {str(e)}")
     
-    return redirect(request.referrer or url_for('admin_dashboard'))
+    return redirect(url_for('admin_lessons'))
 
 if __name__ == '__main__':
     init_db()  # 初始化数据库
