@@ -18,6 +18,9 @@ import json
 import time
 from collections import namedtuple
 from sqlalchemy.exc import IntegrityError
+import cloudinary
+import cloudinary.uploader
+from cloudinary_config import *  # 导入 Cloudinary 配置
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'  # 用于 flash 消息和 session
@@ -1240,6 +1243,27 @@ def manage_exam(lesson_id):
                          questions=questions,
                          explanation_files=explanation_files)
 
+def upload_to_cloudinary(file_data, resource_type='image'):
+    """上传文件到 Cloudinary 并返回 URL"""
+    try:
+        # 对于 Base64 图片数据
+        if isinstance(file_data, str) and file_data.startswith('data:image'):
+            # 上传 Base64 图片数据
+            result = cloudinary.uploader.upload(
+                file_data,
+                resource_type=resource_type
+            )
+        else:
+            # 上传文件对象
+            result = cloudinary.uploader.upload(
+                file_data,
+                resource_type=resource_type
+            )
+        return result['secure_url']
+    except Exception as e:
+        print(f"Cloudinary 上传失败: {str(e)}")
+        return None
+
 @app.route('/admin/lesson/<int:lesson_id>/upload_exam_files', methods=['POST'])
 @admin_required
 def upload_exam_files(lesson_id):
@@ -1263,24 +1287,15 @@ def upload_exam_files(lesson_id):
                     original_filename = secure_filename(file.filename)
                     filename = f"{lesson_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{original_filename}"
                     
-                    # 设置相对路径（用于数据库存储和URL访问）
-                    relative_path = f'{UPLOAD_FOLDER}/exams/{filename}'  # 使用配置的 UPLOAD_FOLDER
-                    
-                    # 设置绝对路径（用于文件保存）
-                    absolute_path = os.path.join('static', relative_path)
-                    
-                    # 确保目录存在
-                    os.makedirs(os.path.dirname(absolute_path), exist_ok=True)
-                    
-                    # 保存文件
-                    file.save(absolute_path)
-                    print(f"文件已保存到: {absolute_path}")
-                    print(f"数据库存储路径: {relative_path}")
+                    # 上传到 Cloudinary
+                    cloudinary_url = upload_to_cloudinary(file)
+                    if not cloudinary_url:
+                        raise Exception("Cloudinary 上传失败")
                     
                     # 创建试卷文件记录
                     exam_file = ExamFile(
                         filename=filename,
-                        path=relative_path,
+                        path=cloudinary_url,  # 使用 Cloudinary URL
                         lesson_id=lesson_id,
                         page_number=max_page + 1 + success_count
                     )
@@ -1381,26 +1396,17 @@ def upload_explanation_files(lesson_id):
                 try:
                     # 生成安全的文件名
                     original_filename = secure_filename(file.filename)
-                    # 添加时间戳和课程ID，避免文件名冲突
                     filename = f"{lesson_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{original_filename}"
                     
-                    # 设置相对路径（用于数据库存储和URL访问）
-                    relative_path = f'{UPLOAD_FOLDER}/explanations/{filename}'
-                    # 设置绝对路径（用于文件保存）
-                    absolute_path = os.path.join('static', relative_path)
-                    
-                    # 确保目录存在
-                    os.makedirs(os.path.dirname(absolute_path), exist_ok=True)
-                    
-                    # 保存文件
-                    file.save(absolute_path)
-                    print(f"解析文件已保存到: {absolute_path}")
-                    print(f"数据库存储路径: {relative_path}")
+                    # 上传到 Cloudinary
+                    cloudinary_url = upload_to_cloudinary(file)
+                    if not cloudinary_url:
+                        raise Exception("Cloudinary 上传失败")
                     
                     # 创建解析文件记录
                     explanation_file = ExplanationFile(
                         filename=filename,
-                        path=relative_path,
+                        path=cloudinary_url,  # 使用 Cloudinary URL
                         lesson_id=lesson_id,
                         page_number=max_page + 1 + success_count
                     )
@@ -1634,13 +1640,6 @@ def upload_individual_exam_files(lesson_id):
             flash('无效的图片数据', 'error')
             return redirect(url_for('manage_questions', lesson_id=lesson_id))
         
-        # 解析Base64数据
-        image_data = image_data.split(',')[1]
-        image_bytes = base64.b64decode(image_data)
-        
-        # 使用PIL打开图片并转换为PNG格式
-        image = Image.open(io.BytesIO(image_bytes))
-        
         # 获取当前最大页码
         max_page = db.session.query(func.max(ExamFile.page_number)).filter_by(lesson_id=lesson_id).scalar() or 0
         
@@ -1649,27 +1648,20 @@ def upload_individual_exam_files(lesson_id):
         random_suffix = random.randint(1000, 9999)
         filename = f"{lesson_id}_{timestamp}_{random_suffix}.png"
         
-        # 设置文件路径（确保路径一致性）
-        relative_path = f'uploads/exams/{filename}'  # 数据库中存储的相对路径
-        absolute_path = os.path.join('static', relative_path)  # 文件系统中的绝对路径
-        
-        # 确保目录存在
-        os.makedirs(os.path.dirname(absolute_path), exist_ok=True)
-        
-        # 保存图片
-        image.save(absolute_path, 'PNG')
-        print(f"试题图片已保存到: {absolute_path}")
+        # 上传到 Cloudinary
+        cloudinary_url = upload_to_cloudinary(image_data)
+        if not cloudinary_url:
+            raise Exception("Cloudinary 上传失败")
         
         # 创建试卷文件记录
         exam_file = ExamFile(
             filename=filename,
-            path=relative_path,  # 存储标准化的相对路径
+            path=cloudinary_url,  # 使用 Cloudinary URL
             lesson_id=lesson_id,
             page_number=max_page + 1
         )
         db.session.add(exam_file)
         db.session.commit()
-        print(f"试题记录已保存到数据库: {relative_path}")
         
         flash('试题上传成功', 'success')
         
@@ -1692,13 +1684,6 @@ def upload_individual_explanation_files(lesson_id):
             flash('无效的图片数据', 'error')
             return redirect(url_for('manage_questions', lesson_id=lesson_id))
         
-        # 解析Base64数据
-        image_data = image_data.split(',')[1]
-        image_bytes = base64.b64decode(image_data)
-        
-        # 使用PIL打开图片并转换为PNG格式
-        image = Image.open(io.BytesIO(image_bytes))
-        
         # 获取当前最大页码
         max_page = db.session.query(func.max(ExplanationFile.page_number)).filter_by(lesson_id=lesson_id).scalar() or 0
         
@@ -1707,27 +1692,20 @@ def upload_individual_explanation_files(lesson_id):
         random_suffix = random.randint(1000, 9999)
         filename = f"{lesson_id}_{timestamp}_{random_suffix}.png"
         
-        # 设置文件路径（确保路径一致性）
-        relative_path = f'uploads/explanations/{filename}'  # 数据库中存储的相对路径
-        absolute_path = os.path.join('static', relative_path)  # 文件系统中的绝对路径
-        
-        # 确保目录存在
-        os.makedirs(os.path.dirname(absolute_path), exist_ok=True)
-        
-        # 保存图片
-        image.save(absolute_path, 'PNG')
-        print(f"解析图片已保存到: {absolute_path}")
+        # 上传到 Cloudinary
+        cloudinary_url = upload_to_cloudinary(image_data)
+        if not cloudinary_url:
+            raise Exception("Cloudinary 上传失败")
         
         # 创建解析文件记录
         explanation_file = ExplanationFile(
             filename=filename,
-            path=relative_path,  # 存储标准化的相对路径
+            path=cloudinary_url,  # 使用 Cloudinary URL
             lesson_id=lesson_id,
             page_number=max_page + 1
         )
         db.session.add(explanation_file)
         db.session.commit()
-        print(f"解析记录已保存到数据库: {relative_path}")
         
         flash('解析上传成功', 'success')
         
