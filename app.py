@@ -56,7 +56,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # 配置文件上传
-UPLOAD_FOLDER = 'static/uploads'  # 修改为相对路径
+UPLOAD_FOLDER = 'uploads'  # 修改为不带 static 前缀的路径
 ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 ALLOWED_PDF_EXTENSIONS = {'pdf'}
 ALLOWED_EXCEL_EXTENSIONS = {'xlsx', 'xls'}
@@ -1264,7 +1264,7 @@ def upload_exam_files(lesson_id):
                     filename = f"{lesson_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{original_filename}"
                     
                     # 设置相对路径（用于数据库存储和URL访问）
-                    relative_path = f'uploads/exams/{filename}'  # 统一使用这种格式的路径
+                    relative_path = f'{UPLOAD_FOLDER}/exams/{filename}'  # 使用配置的 UPLOAD_FOLDER
                     
                     # 设置绝对路径（用于文件保存）
                     absolute_path = os.path.join('static', relative_path)
@@ -1280,7 +1280,7 @@ def upload_exam_files(lesson_id):
                     # 创建试卷文件记录
                     exam_file = ExamFile(
                         filename=filename,
-                        path=relative_path,  # 使用统一的相对路径格式
+                        path=relative_path,
                         lesson_id=lesson_id,
                         page_number=max_page + 1 + success_count
                     )
@@ -1385,7 +1385,7 @@ def upload_explanation_files(lesson_id):
                     filename = f"{lesson_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{original_filename}"
                     
                     # 设置相对路径（用于数据库存储和URL访问）
-                    relative_path = f'uploads/explanations/{filename}'
+                    relative_path = f'{UPLOAD_FOLDER}/explanations/{filename}'
                     # 设置绝对路径（用于文件保存）
                     absolute_path = os.path.join('static', relative_path)
                     
