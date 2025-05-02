@@ -1897,6 +1897,37 @@ def debug_static(filename):
         print(f"访问文件出错: {str(e)}")
         return f"访问文件出错: {str(e)}", 500
 
+@app.route('/admin/fix_file_paths')
+@admin_required
+def fix_file_paths():
+    """修复数据库中的文件路径"""
+    try:
+        # 修复试题文件路径
+        exam_files = ExamFile.query.all()
+        fixed_count = 0
+        
+        for file in exam_files:
+            # 检查路径是否需要修复
+            if file.path.startswith('static/'):
+                # 移除 'static/' 前缀
+                new_path = file.path[7:]
+                file.path = new_path
+                fixed_count += 1
+                print(f"修复文件路径: {file.path} -> {new_path}")
+        
+        if fixed_count > 0:
+            db.session.commit()
+            flash(f'成功修复 {fixed_count} 个文件路径', 'success')
+        else:
+            flash('没有需要修复的文件路径', 'info')
+            
+    except Exception as e:
+        db.session.rollback()
+        flash(f'修复文件路径时出错：{str(e)}', 'error')
+        print(f"修复文件路径时出错: {str(e)}")
+    
+    return redirect(request.referrer or url_for('admin_dashboard'))
+
 if __name__ == '__main__':
     init_db()  # 初始化数据库
     app.run(debug=True, host='0.0.0.0', port=5000) 
