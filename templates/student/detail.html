@@ -166,7 +166,7 @@
             <div class="mb-4">
                 <h5>第 {{ file.page_number }} 页</h5>
                 <div class="ratio ratio-16x9">
-                    <embed src="{{ url_for('static', filename=file.path) }}"
+                    <embed src="{{ file.path }}"
                            type="application/pdf"
                            width="100%"
                            height="600px">
@@ -186,7 +186,7 @@
             <div class="mb-4">
                 <h5>第 {{ file.page_number }} 页</h5>
                 <div class="ratio ratio-16x9">
-                    <embed src="{{ url_for('static', filename=file.path) }}"
+                    <embed src="{{ file.path }}"
                            type="application/pdf"
                            width="100%"
                            height="600px">
