@@ -87,7 +87,8 @@
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div class="mb-3">
                             <label for="questionCount" class="form-label">题目数量</label>
-                            <input type="number" class="form-control" id="questionCount" min="1" required>
+                            <input type="number" class="form-control" id="questionCount" min="1" max="35" required>
+                            <div class="form-text">请输入1-35之间的数字</div>
                             <button type="button" class="btn btn-primary mt-2" onclick="generateQuestionFields()">生成答案输入框</button>
                         </div>
                         <div id="questionFields" class="mb-3">
@@ -240,7 +241,8 @@
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div class="mb-3">
                             <label for="individualQuestionCount" class="form-label">题目数量</label>
-                            <input type="number" class="form-control" id="individualQuestionCount" min="1" required>
+                            <input type="number" class="form-control" id="individualQuestionCount" min="1" max="35" required>
+                            <div class="form-text">请输入1-35之间的数字</div>
                             <button type="button" class="btn btn-primary mt-2" onclick="generateIndividualQuestionFields()">生成答案输入框</button>
                         </div>
                         <div id="individualQuestionFields" class="mb-3">
@@ -431,8 +433,8 @@
 <script>
 function generateQuestionFields() {
     const count = parseInt(document.getElementById('questionCount').value);
-    if (count <= 0) {
-        alert('请输入有效的题目数量');
+    if (count <= 0 || count > 35) {
+        alert('请输入1-35之间的题目数量');
         return;
     }
 
@@ -462,8 +464,8 @@ function generateQuestionFields() {
 
 function generateIndividualQuestionFields() {
     const count = parseInt(document.getElementById('individualQuestionCount').value);
-    if (count <= 0) {
-        alert('请输入有效的题目数量');
+    if (count <= 0 || count > 35) {
+        alert('请输入1-35之间的题目数量');
         return;
     }
 
