@@ -1484,6 +1484,11 @@ def serve_upload(filename):
 def add_questions(lesson_id):
     try:
         print("开始添加题目...")  # 调试日志
+        
+        # 验证CSRF令牌
+        if not request.form.get('csrf_token'):
+            raise ValueError('CSRF验证失败')
+            
         # 获取所有答案
         answers = request.form.getlist('answers[]')
         print(f"收到的答案数量: {len(answers)}")  # 调试日志
@@ -1509,6 +1514,11 @@ def add_questions(lesson_id):
                 question_number = max_number + i
                 answer = answer.strip().upper() if answer else ''  # 转换为大写并去除空白
                 print(f"处理第{question_number}题答案: {answer}")  # 调试日志
+                
+                # 验证答案格式
+                if answer and len(answer) > 1 and answer != '证明题':
+                    error_messages.append(f"第{question_number}题答案格式不正确")
+                    continue
                 
                 # 根据答案判断题目类型
                 if not answer:  # 空答案表示证明题
@@ -1562,6 +1572,7 @@ def add_questions(lesson_id):
             flash('所有题目添加失败：' + '; '.join(error_messages), 'error')
         
     except Exception as e:
+        db.session.rollback()
         print(f"系统错误: {str(e)}")  # 调试日志
         flash(f'添加题目失败：系统错误 - {str(e)}', 'error')
     
@@ -1595,8 +1606,11 @@ def upload_individual_exam_files(lesson_id):
         # 生成文件名（添加随机数以确保唯一性）
         random_suffix = random.randint(1000, 9999)
         filename = f"{lesson_id}_{timestamp}_{random_suffix}.png"
-        relative_path = f'uploads/exams/{filename}'
-        absolute_path = os.path.join('static', relative_path)
+        
+        # 设置文件路径
+        file_dir = os.path.join('uploads', 'exams')
+        relative_path = os.path.join(file_dir, filename)
+        absolute_path = os.path.join('static', file_dir, filename)
         
         # 确保目录存在
         os.makedirs(os.path.dirname(absolute_path), exist_ok=True)

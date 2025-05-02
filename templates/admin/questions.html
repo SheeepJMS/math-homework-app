@@ -215,7 +215,7 @@
                                 <div class="card">
                                     <div class="card-body">
                                         <h6 class="card-title">第 {{ file.page_number }} 题</h6>
-                                        <img src="{{ url_for('static', filename=file.path) }}" class="img-fluid" alt="试题图片">
+                                        <img src="/static/{{ file.path }}" class="img-fluid" alt="试题图片">
                                         <form action="{{ url_for('delete_exam_file', file_id=file.id) }}" method="POST" class="mt-2">
                                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                             <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('确定要删除这道试题吗？')">删除</button>
@@ -439,14 +439,6 @@ function generateQuestionFields() {
     const container = document.getElementById('questionFields');
     container.innerHTML = '';
 
-    // 添加CSRF令牌
-    const csrfToken = document.querySelector('input[name="csrf_token"]').value;
-    const csrfInput = document.createElement('input');
-    csrfInput.type = 'hidden';
-    csrfInput.name = 'csrf_token';
-    csrfInput.value = csrfToken;
-    container.appendChild(csrfInput);
-
     for (let i = 1; i <= count; i++) {
         const div = document.createElement('div');
         div.className = 'mb-3 row align-items-center';
@@ -459,7 +451,7 @@ function generateQuestionFields() {
                        class="form-control answer-input" 
                        name="answers[]" 
                        placeholder="答案"
-                       required>
+                       maxlength="1">
                 <div class="form-text">留空表示证明题，ABCDE为选择题，其他为填空题</div>
             </div>
         `;
@@ -490,7 +482,8 @@ function generateIndividualQuestionFields() {
                 <input type="text" 
                        class="form-control answer-input" 
                        name="answers[]" 
-                       placeholder="留空表示解答题，ABCDE为选择题，其他为填空题">
+                       placeholder="留空表示解答题，ABCDE为选择题，其他为填空题"
+                       maxlength="1">
                 <div class="form-text">留空表示解答题，ABCDE为选择题，其他为填空题</div>
             </div>
         `;
@@ -708,26 +701,39 @@ function handleExplanationDrop(files) {
 
 // 添加表单提交事件监听
 document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('questionForm');
-    if (form) {
-        form.addEventListener('submit', function(e) {
-            const answers = Array.from(form.querySelectorAll('input[name="answers[]"]'));
-            if (answers.length === 0) {
+    const forms = ['questionForm', 'individualQuestionForm'];
+    
+    forms.forEach(formId => {
+        const form = document.getElementById(formId);
+        if (form) {
+            form.addEventListener('submit', function(e) {
                 e.preventDefault();
-                alert('请先生成答案输入框');
-                return;
-            }
-            
-            // 验证答案格式
-            for (let i = 0; i < answers.length; i++) {
-                const answer = answers[i].value.trim().toUpperCase();
-                if (answer && !['A', 'B', 'C', 'D', 'E'].includes(answer) && answer !== '证明题') {
-                    // 如果不是空的（证明题），也不是选择题答案，就是填空题
-                    continue;
+                
+                const answers = Array.from(form.querySelectorAll('input[name="answers[]"]'));
+                if (answers.length === 0) {
+                    alert('请先生成答案输入框');
+                    return;
                 }
-            }
-        });
-    }
+                
+                // 验证答案格式
+                let isValid = true;
+                answers.forEach((input, index) => {
+                    const answer = input.value.trim().toUpperCase();
+                    if (answer && !['A', 'B', 'C', 'D', 'E'].includes(answer) && answer !== '证明题') {
+                        // 如果不是空的（证明题），也不是选择题答案，就是填空题
+                        if (answer.length > 1) {
+                            alert(`第${index + 1}题答案格式不正确。\n选择题请输入A-E，证明题留空，填空题请输入单个字符。`);
+                            isValid = false;
+                        }
+                    }
+                });
+                
+                if (isValid) {
+                    form.submit();
+                }
+            });
+        }
+    });
 });
 </script>
 {% endblock %} 
