@@ -1481,44 +1481,52 @@ def serve_upload(filename):
 def serve_static(filename):
     """静态文件服务"""
     try:
-        print(f"请求访问文件: {filename}")  # 添加调试日志
+        print(f"请求访问文件: {filename}")
         
-        # 移除路径中的重复 'static' 前缀
-        if filename.startswith('static/'):
-            filename = filename[7:]
-            print(f"移除static前缀后的路径: {filename}")  # 添加调试日志
-            
-        # 如果路径包含 uploads，确保使用正确的目录结构
-        if 'uploads' in filename:
-            # 分离路径组件
-            parts = filename.split('/')
-            if 'uploads' in parts:
-                # 重构路径，确保格式正确
-                uploads_index = parts.index('uploads')
-                filename = '/'.join(parts[uploads_index:])
-                print(f"重构后的路径: {filename}")  # 添加调试日志
+        # 标准化文件路径
+        normalized_path = filename
         
-        # 检查文件是否存在于静态目录
-        static_path = os.path.join(app.static_folder, filename)
-        print(f"尝试静态目录路径: {static_path}")  # 添加调试日志
-        if os.path.exists(static_path):
-            return send_from_directory(app.static_folder, filename)
-            
-        # 如果文件不在静态目录，检查是否在上传目录
-        uploads_path = os.path.join(app.static_folder, 'uploads', filename.replace('uploads/', ''))
-        print(f"尝试上传目录路径: {uploads_path}")  # 添加调试日志
-        if os.path.exists(uploads_path):
-            dir_path = os.path.dirname(uploads_path)
-            base_name = os.path.basename(uploads_path)
-            return send_from_directory(dir_path, base_name)
-            
-        # 文件不存在
-        print(f"文件不存在: 尝试路径1: {static_path}, 路径2: {uploads_path}")
-        return f"文件不存在: 尝试路径1: {static_path}, 路径2: {uploads_path}", 404
+        # 1. 移除重复的static前缀
+        if normalized_path.startswith('static/'):
+            normalized_path = normalized_path[7:]
+        
+        # 2. 处理uploads路径
+        if 'uploads/uploads/' in normalized_path:
+            normalized_path = normalized_path.replace('uploads/uploads/', 'uploads/')
+        
+        # 3. 构建可能的文件路径
+        paths_to_try = [
+            os.path.join(app.static_folder, normalized_path),  # 标准路径
+            os.path.join(app.static_folder, 'uploads', os.path.basename(normalized_path)),  # 仅文件名在uploads目录
+            os.path.join(app.static_folder, normalized_path.replace('uploads/', '')),  # 不带uploads前缀
+        ]
+        
+        # 4. 尝试所有可能的路径
+        for path in paths_to_try:
+            print(f"尝试访问路径: {path}")
+            if os.path.exists(path) and os.path.isfile(path):
+                dir_path = os.path.dirname(path)
+                base_name = os.path.basename(path)
+                print(f"找到文件: {path}")
+                return send_from_directory(dir_path, base_name)
+        
+        # 5. 如果所有路径都不存在，返回详细的错误信息
+        error_msg = {
+            "error": "文件不存在",
+            "requested_path": filename,
+            "normalized_path": normalized_path,
+            "tried_paths": paths_to_try
+        }
+        print(f"文件访问失败: {error_msg}")
+        return jsonify(error_msg), 404
         
     except Exception as e:
-        print(f"访问文件出错: {str(e)}")
-        return f"访问文件出错: {str(e)}", 500
+        error_msg = {
+            "error": str(e),
+            "requested_path": filename
+        }
+        print(f"文件访问错误: {error_msg}")
+        return jsonify(error_msg), 500
 
 @app.route('/admin/lesson/<int:lesson_id>/add_questions', methods=['POST'])
 @admin_required
@@ -1636,32 +1644,32 @@ def upload_individual_exam_files(lesson_id):
         # 获取当前最大页码
         max_page = db.session.query(func.max(ExamFile.page_number)).filter_by(lesson_id=lesson_id).scalar() or 0
         
-        # 生成带毫秒的时间戳
+        # 生成文件名
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
-        
-        # 生成文件名（添加随机数以确保唯一性）
         random_suffix = random.randint(1000, 9999)
         filename = f"{lesson_id}_{timestamp}_{random_suffix}.png"
         
-        # 设置文件路径
-        relative_path = f'uploads/exams/{filename}'  # 修改这里：移除多余的路径拼接
-        absolute_path = os.path.join('static', relative_path)
+        # 设置文件路径（确保路径一致性）
+        relative_path = f'uploads/exams/{filename}'  # 数据库中存储的相对路径
+        absolute_path = os.path.join('static', relative_path)  # 文件系统中的绝对路径
         
         # 确保目录存在
         os.makedirs(os.path.dirname(absolute_path), exist_ok=True)
         
         # 保存图片
         image.save(absolute_path, 'PNG')
+        print(f"试题图片已保存到: {absolute_path}")
         
         # 创建试卷文件记录
         exam_file = ExamFile(
             filename=filename,
-            path=relative_path,  # 保持一致的相对路径
+            path=relative_path,  # 存储标准化的相对路径
             lesson_id=lesson_id,
             page_number=max_page + 1
         )
         db.session.add(exam_file)
         db.session.commit()
+        print(f"试题记录已保存到数据库: {relative_path}")
         
         flash('试题上传成功', 'success')
         
@@ -1694,30 +1702,32 @@ def upload_individual_explanation_files(lesson_id):
         # 获取当前最大页码
         max_page = db.session.query(func.max(ExplanationFile.page_number)).filter_by(lesson_id=lesson_id).scalar() or 0
         
-        # 生成带毫秒的时间戳
+        # 生成文件名
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
-        
-        # 生成文件名（添加随机数以确保唯一性）
         random_suffix = random.randint(1000, 9999)
         filename = f"{lesson_id}_{timestamp}_{random_suffix}.png"
-        relative_path = f'uploads/explanations/{filename}'
-        absolute_path = os.path.join('static', relative_path)
+        
+        # 设置文件路径（确保路径一致性）
+        relative_path = f'uploads/explanations/{filename}'  # 数据库中存储的相对路径
+        absolute_path = os.path.join('static', relative_path)  # 文件系统中的绝对路径
         
         # 确保目录存在
         os.makedirs(os.path.dirname(absolute_path), exist_ok=True)
         
         # 保存图片
         image.save(absolute_path, 'PNG')
+        print(f"解析图片已保存到: {absolute_path}")
         
         # 创建解析文件记录
         explanation_file = ExplanationFile(
             filename=filename,
-            path=relative_path,
+            path=relative_path,  # 存储标准化的相对路径
             lesson_id=lesson_id,
             page_number=max_page + 1
         )
         db.session.add(explanation_file)
         db.session.commit()
+        print(f"解析记录已保存到数据库: {relative_path}")
         
         flash('解析上传成功', 'success')
         
@@ -2057,6 +2067,134 @@ def fix_db_paths():
     except Exception as e:
         flash(f'修复文件路径时出错：{str(e)}', 'error')
         return redirect(url_for('admin_lessons'))
+
+@app.route('/debug/check_file/<path:filename>')
+def debug_check_file(filename):
+    """检查特定文件的访问情况"""
+    try:
+        # 构建所有可能的路径
+        possible_paths = [
+            os.path.join(app.static_folder, 'uploads', 'exams', filename),
+            os.path.join(app.static_folder, 'uploads', filename),
+            os.path.join(app.static_folder, filename),
+            filename
+        ]
+        
+        results = []
+        for path in possible_paths:
+            result = {
+                'path': path,
+                'exists': os.path.exists(path),
+                'is_file': os.path.isfile(path) if os.path.exists(path) else False,
+                'size': os.path.getsize(path) if os.path.exists(path) else None,
+                'absolute_path': os.path.abspath(path)
+            }
+            results.append(result)
+            
+        # 检查数据库中的记录
+        exam_file = ExamFile.query.filter(
+            ExamFile.path.like(f'%{filename}')
+        ).first()
+        
+        db_info = None
+        if exam_file:
+            db_info = {
+                'id': exam_file.id,
+                'filename': exam_file.filename,
+                'path': exam_file.path,
+                'lesson_id': exam_file.lesson_id
+            }
+        
+        return {
+            'filename': filename,
+            'static_folder': app.static_folder,
+            'paths_checked': results,
+            'database_record': db_info
+        }
+        
+    except Exception as e:
+        return {
+            'error': str(e),
+            'filename': filename
+        }
+
+@app.route('/debug/file_paths')
+def debug_file_paths():
+    """调试文件路径问题"""
+    try:
+        # 获取所有试卷和解析文件记录
+        exam_files = ExamFile.query.all()
+        explanation_files = ExplanationFile.query.all()
+        
+        results = {
+            'exam_files': [],
+            'explanation_files': [],
+            'static_folder': app.static_folder,
+            'upload_folder': UPLOAD_FOLDER
+        }
+        
+        # 检查试卷文件
+        for file in exam_files:
+            file_info = {
+                'id': file.id,
+                'filename': file.filename,
+                'stored_path': file.path,
+                'lesson_id': file.lesson_id,
+                'page_number': file.page_number
+            }
+            
+            # 检查不同的可能路径
+            possible_paths = [
+                os.path.join(app.static_folder, file.path),
+                os.path.join(app.static_folder, 'uploads', file.filename),
+                os.path.join('static', file.path)
+            ]
+            
+            file_info['path_checks'] = [
+                {
+                    'path': path,
+                    'exists': os.path.exists(path),
+                    'is_file': os.path.isfile(path) if os.path.exists(path) else False
+                }
+                for path in possible_paths
+            ]
+            
+            results['exam_files'].append(file_info)
+        
+        # 检查解析文件
+        for file in explanation_files:
+            file_info = {
+                'id': file.id,
+                'filename': file.filename,
+                'stored_path': file.path,
+                'lesson_id': file.lesson_id,
+                'page_number': file.page_number
+            }
+            
+            # 检查不同的可能路径
+            possible_paths = [
+                os.path.join(app.static_folder, file.path),
+                os.path.join(app.static_folder, 'uploads', file.filename),
+                os.path.join('static', file.path)
+            ]
+            
+            file_info['path_checks'] = [
+                {
+                    'path': path,
+                    'exists': os.path.exists(path),
+                    'is_file': os.path.isfile(path) if os.path.exists(path) else False
+                }
+                for path in possible_paths
+            ]
+            
+            results['explanation_files'].append(file_info)
+        
+        return jsonify(results)
+        
+    except Exception as e:
+        return jsonify({
+            'error': str(e)
+        }), 500
 
 if __name__ == '__main__':
     init_db()  # 初始化数据库
