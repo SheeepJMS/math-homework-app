@@ -450,8 +450,7 @@ function generateQuestionFields() {
                 <input type="text" 
                        class="form-control answer-input" 
                        name="answers[]" 
-                       placeholder="答案"
-                       maxlength="1">
+                       placeholder="答案">
                 <div class="form-text">留空表示证明题，ABCDE为选择题，其他为填空题</div>
             </div>
         `;
@@ -482,8 +481,7 @@ function generateIndividualQuestionFields() {
                 <input type="text" 
                        class="form-control answer-input" 
                        name="answers[]" 
-                       placeholder="留空表示解答题，ABCDE为选择题，其他为填空题"
-                       maxlength="1">
+                       placeholder="留空表示解答题，ABCDE为选择题，其他为填空题">
                 <div class="form-text">留空表示解答题，ABCDE为选择题，其他为填空题</div>
             </div>
         `;
@@ -719,11 +717,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 let isValid = true;
                 answers.forEach((input, index) => {
                     const answer = input.value.trim().toUpperCase();
-                    if (answer && !['A', 'B', 'C', 'D', 'E'].includes(answer) && answer !== '证明题') {
-                        // 如果不是空的（证明题），也不是选择题答案，就是填空题
-                        if (answer.length > 1) {
-                            alert(`第${index + 1}题答案格式不正确。\n选择题请输入A-E，证明题留空，填空题请输入单个字符。`);
-                            isValid = false;
+                    if (answer) {
+                        if (['A', 'B', 'C', 'D', 'E'].includes(answer)) {
+                            // 选择题答案格式正确
+                        } else if (answer === '证明题') {
+                            // 证明题答案格式正确
+                        } else {
+                            // 填空题答案，不需要长度限制
                         }
                     }
                 });

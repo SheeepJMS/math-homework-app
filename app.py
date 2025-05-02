@@ -1515,11 +1515,6 @@ def add_questions(lesson_id):
                 answer = answer.strip().upper() if answer else ''  # 转换为大写并去除空白
                 print(f"处理第{question_number}题答案: {answer}")  # 调试日志
                 
-                # 验证答案格式
-                if answer and len(answer) > 1 and answer != '证明题':
-                    error_messages.append(f"第{question_number}题答案格式不正确")
-                    continue
-                
                 # 根据答案判断题目类型
                 if not answer:  # 空答案表示证明题
                     question_type = 'proof'
