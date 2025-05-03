@@ -2166,6 +2166,15 @@ def debug_file_paths():
             'error': str(e)
         }), 500
 
+@app.route('/admin/courses')
+@login_required
+@admin_required
+def admin_courses():
+    """管理员课程管理页面"""
+    # 获取所有课程，按创建时间倒序排列
+    courses = Course.query.order_by(Course.created_at.desc()).all()
+    return render_template('admin/courses.html', courses=courses)
+
 if __name__ == '__main__':
     init_db()  # 初始化数据库
     app.run(debug=True, host='0.0.0.0', port=5000) 
