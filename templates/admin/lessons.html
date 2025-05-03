@@ -17,10 +17,10 @@
                         <tr>
                             <th>课程名称</th>
                             <th>描述</th>
-                            <th>班级</th>
+                            <th style="min-width: 220px;">班级</th>
                             <th>状态</th>
                             <th>创建时间</th>
-                            <th>操作</th>
+                            <th style="min-width: 370px;">操作</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -296,6 +296,19 @@
     flex-wrap: wrap;
     gap: 0.5rem;
     align-items: center;
+}
+
+.d-flex.flex-row,
+.btn-group {
+    flex-wrap: nowrap !important;
+    gap: 0.3rem;
+    align-items: center;
+}
+.table th:nth-child(3), .table td:nth-child(3) {
+    min-width: 220px;
+}
+.table th:last-child, .table td:last-child {
+    min-width: 370px;
 }
 </style>
 
