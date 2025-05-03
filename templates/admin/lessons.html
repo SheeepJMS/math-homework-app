@@ -42,8 +42,7 @@
                             </td>
                             <td>{{ lesson.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
                             <td>
-                                <div class="btn-group" role="group">
-                                    <!-- 激活/停用按钮 -->
+                                <div class="d-flex flex-row flex-wrap gap-1 align-items-center">
                                     <form action="{{ url_for('toggle_lesson_status', lesson_id=lesson.id) }}" method="POST" style="display: inline;">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                         <button type="submit" class="btn {% if lesson.is_active %}btn-warning{% else %}btn-success{% endif %} btn-sm">
@@ -51,23 +50,16 @@
                                             {{ '停用' if lesson.is_active else '激活' }}
                                         </button>
                                     </form>
-                                    
-                                    <!-- 其他按钮 -->
-                                    <button type="button" class="btn btn-primary btn-sm ms-2" 
-                                            onclick="window.location.href='{{ url_for('manage_questions', lesson_id=lesson.id) }}'">
+                                    <a href="{{ url_for('manage_questions', lesson_id=lesson.id) }}" class="btn btn-primary btn-sm">
                                         <i class="fas fa-bee"></i> 管理题目
-                                    </button>
-                                    <button type="button" class="btn btn-info btn-sm ms-2" 
-                                            onclick="uploadVideo('{{ lesson.id }}')">
+                                    </a>
+                                    <button type="button" class="btn btn-info btn-sm" onclick="uploadVideo('{{ lesson.id }}')">
                                         <i class="fas fa-video"></i> 上传回放
                                     </button>
-                                    <button type="button" class="btn btn-warning btn-sm ms-2" 
-                                            data-bs-toggle="modal" 
-                                            data-bs-target="#editLessonModal{{ lesson.id }}">
+                                    <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#editLessonModal{{ lesson.id }}">
                                         <i class="fas fa-edit"></i> 编辑
                                     </button>
-                                    <button type="button" class="btn btn-danger btn-sm ms-2" 
-                                            onclick="deleteLesson('{{ lesson.id }}')">
+                                    <button type="button" class="btn btn-danger btn-sm" style="min-width:60px;" onclick="deleteLesson('{{ lesson.id }}')">
                                         <i class="fas fa-trash"></i> 删除
                                     </button>
                                 </div>
