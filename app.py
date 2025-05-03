@@ -584,7 +584,7 @@ def edit_class(class_id):
 @app.route('/admin/lessons')
 @admin_required
 def admin_lessons():
-    lessons = Lesson.query.all()
+    lessons = Lesson.query.order_by(Lesson.created_at.desc()).all()
     classes = Class.query.all()
     return render_template('admin/lessons.html', lessons=lessons, classes=classes)
 
@@ -2165,15 +2165,6 @@ def debug_file_paths():
         return jsonify({
             'error': str(e)
         }), 500
-
-@app.route('/admin/courses')
-@login_required
-@admin_required
-def admin_courses():
-    """管理员课程管理页面"""
-    # 获取所有课程，按创建时间倒序排列
-    courses = Course.query.order_by(Course.created_at.desc()).all()
-    return render_template('admin/courses.html', courses=courses)
 
 if __name__ == '__main__':
     init_db()  # 初始化数据库
