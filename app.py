@@ -855,39 +855,39 @@ def start_quiz(lesson_id):
     user = current_user
     lesson = Lesson.query.get_or_404(lesson_id)
     print(f"开始答题 - 课程ID: {lesson_id}, 课程名称: {lesson.title}")
-    
+
     # 验证课程是否属于用户班级且已激活
     user_class = Class.query.get(user.class_id)
     if user_class not in lesson.classes or not lesson.is_active:
         flash('无法访问该课程')
         return redirect(url_for('student_dashboard'))
-    
-    # 检查是否已经完成过这个课程的答题
+
+    # 检查是否已经完成过这个课程的答题（只允许一次）
     existing_quiz = QuizHistory.query.filter_by(
         user_id=user.id,
         lesson_id=lesson_id
-    ).first()
-    
+    ).order_by(QuizHistory.completed_at.asc()).first()
+
     if existing_quiz:
         flash('你已经完成过这个课程的答题，不能重复答题', 'warning')
         return redirect(url_for('view_history', lesson_id=lesson_id))
-    
+
     # 检查课程是否有题目
     questions = Question.query.filter_by(lesson_id=lesson_id).order_by(Question.question_number).all()
     print(f"题目数量: {len(questions)}")
     for q in questions:
         print(f"题号: {q.question_number}, 类型: {q.type}, 答案: {q.answer}")
-    
+
     if not questions:
         flash('该课程还没有题目，请等待教师上传题目')
         return redirect(url_for('student_dashboard'))
-    
+
     # 获取试题文件
     exam_files = ExamFile.query.filter_by(lesson_id=lesson_id).order_by(ExamFile.page_number).all()
     print(f"试题文件数量: {len(exam_files)}")
     for f in exam_files:
         print(f"文件ID: {f.id}, 页码: {f.page_number}, 路径: {f.path}")
-    
+
     if not exam_files:
         flash('该课程还没有上传试卷，请等待教师上传试卷')
         return redirect(url_for('student_dashboard'))
@@ -898,7 +898,7 @@ def start_quiz(lesson_id):
 
     # 创建一个空的表单用于CSRF保护
     form = FlaskForm()
-    
+
     return render_template('student/quiz.html',
                          lesson=lesson,
                          questions=questions,
@@ -910,6 +910,16 @@ def start_quiz(lesson_id):
 @login_required
 def submit_quiz(lesson_id):
     try:
+        # 检查是否已经完成过这个课程的答题（只允许一次）
+        existing_quiz = QuizHistory.query.filter_by(
+            user_id=current_user.id,
+            lesson_id=lesson_id
+        ).order_by(QuizHistory.completed_at.asc()).first()
+
+        if existing_quiz:
+            flash('你已经完成过这个课程的答题，不能重复提交', 'warning')
+            return redirect(url_for('view_history', lesson_id=lesson_id))
+
         # 获取所有题目
         questions = Question.query.filter_by(lesson_id=lesson_id).order_by(Question.question_number).all()
         if not questions:
@@ -2176,6 +2186,24 @@ def debug_file_paths():
         return jsonify({
             'error': str(e)
         }), 500
+
+# 清理历史数据：只保留每个学生每门课的第一次答题记录，其余全部删除
+def clean_duplicate_quiz_history():
+    from sqlalchemy import and_
+    all_histories = QuizHistory.query.order_by(QuizHistory.user_id, QuizHistory.lesson_id, QuizHistory.completed_at.asc()).all()
+    seen = set()
+    to_delete = []
+    for qh in all_histories:
+        key = (qh.user_id, qh.lesson_id)
+        if key in seen:
+            to_delete.append(qh)
+        else:
+            seen.add(key)
+    for qh in to_delete:
+        # 删除相关的 UserAnswer
+        UserAnswer.query.filter_by(quiz_history_id=qh.id).delete()
+        db.session.delete(qh)
+    db.session.commit()
 
 if __name__ == '__main__':
     init_db()  # 初始化数据库
