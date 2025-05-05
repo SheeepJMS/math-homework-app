@@ -33,7 +33,7 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav">
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('student_dashboard') }}">主页</a>
+                        <a class="nav-link" href="{% if is_admin_view %}{{ url_for('admin_dashboard') }}{% else %}{{ url_for('student_dashboard') }}{% endif %}">主页</a>
                     </li>
                 </ul>
                 <ul class="navbar-nav ms-auto">

@@ -6,11 +6,14 @@
 <div class="container">
     {% if is_admin_view %}
     <div class="admin-controls mb-4">
-        <a href="{{ url_for('admin_users') }}" class="btn btn-primary">
-            <i class="fas fa-arrow-left"></i> 返回用户管理
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-primary">
+            <i class="fas fa-arrow-left"></i> 返回管理员首页
         </a>
-        <div class="alert alert-info">
-            <i class="fas fa-eye"></i> 正在以管理员身份查看 {{ current_user.name }} 的仪表盘
+        <a href="{{ url_for('admin_users') }}" class="btn btn-secondary ms-2">
+            <i class="fas fa-users"></i> 用户管理
+        </a>
+        <div class="alert alert-info mt-2">
+            <i class="fas fa-eye"></i> 正在以管理员身份查看 {{ current_user.name if current_user.name else current_user.username }} 的仪表盘
         </div>
     </div>
     {% endif %}
@@ -155,7 +158,7 @@
                                     </button>
                                     {% endif %}
                                     
-                                    <a href="{{ url_for('view_history', lesson_id=lesson.id) }}" class="btn btn-warning btn-sm ms-2">
+                                    <a href="{{ url_for('view_history', lesson_id=lesson.id) }}{% if is_admin_view %}?user_id={{ current_user.id }}{% endif %}" class="btn btn-warning btn-sm ms-2">
                                         <i class="fas fa-history"></i> 查看历史
                                     </a>
                                 </div>

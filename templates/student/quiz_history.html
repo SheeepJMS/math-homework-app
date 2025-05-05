@@ -8,6 +8,17 @@
         <div class="col-12">
             <h2 class="mb-4">{{ lesson.title }} - 答题历史</h2>
             
+            {% if is_admin_view %}
+            <div class="admin-controls mb-4">
+                <a href="{{ url_for('admin_dashboard') }}" class="btn btn-primary">
+                    <i class="fas fa-arrow-left"></i> 返回管理员首页
+                </a>
+                <a href="{{ url_for('admin_users') }}" class="btn btn-secondary ms-2">
+                    <i class="fas fa-users"></i> 用户管理
+                </a>
+            </div>
+            {% endif %}
+
             {% if not quiz_history %}
             <div class="alert alert-info">
                 <h4 class="alert-heading">还没有答题记录！</h4>

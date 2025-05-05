@@ -398,10 +398,19 @@ def admin_dashboard():
     total_students = User.query.filter_by(is_admin=False).count()
     total_lessons = Lesson.query.count()
     total_classes = Class.query.count()
-    
-    # 获取最近活动（最近的测验记录）
+
+    # 分页参数
+    page = request.args.get('page', 1, type=int)
+    per_page = 50
+
+    # 查询总数
+    total_activities = db.session.query(QuizHistory).count()
+    total_pages = (total_activities + per_page - 1) // per_page
+
+    # 获取最近活动（分页）
     recent_activities = db.session.query(
         QuizHistory,
+        User.id.label('student_id'),
         User.username.label('student_name'),
         Lesson.title.label('lesson_title')
     ).join(
@@ -410,23 +419,26 @@ def admin_dashboard():
         Lesson, QuizHistory.lesson_id == Lesson.id
     ).order_by(
         QuizHistory.completed_at.desc()
-    ).limit(10).all()
-    
+    ).offset((page - 1) * per_page).limit(per_page).all()
+
     # 处理活动数据
     activities = []
     for activity in recent_activities:
         activities.append({
             'completed_at': activity.QuizHistory.completed_at,
+            'student_id': activity.student_id,
             'student_name': activity.student_name,
             'lesson_title': activity.lesson_title,
             'correct_rate': round(activity.QuizHistory.correct_answers * 100 / activity.QuizHistory.total_questions, 1)
         })
-    
+
     return render_template('admin/dashboard.html',
                          total_students=total_students,
                          total_lessons=total_lessons,
                          total_classes=total_classes,
-                         recent_activities=activities)
+                         recent_activities=activities,
+                         page=page,
+                         total_pages=total_pages)
 
 @app.route('/admin/users')
 @app.route('/admin/users/<int:class_id>')
@@ -1140,41 +1152,40 @@ def import_questions(lesson_id):
 
 @app.route('/student/lesson/<int:lesson_id>/history')
 def view_history(lesson_id):
-    # 检查课程是否存在
+    from flask_login import current_user
+    user_id = request.args.get('user_id', type=int)
+    # 如果是管理员且传了user_id参数，则查指定学生，否则查当前用户
+    is_admin_view = hasattr(current_user, 'is_admin') and current_user.is_admin and user_id
+    if hasattr(current_user, 'is_admin') and current_user.is_admin and user_id:
+        target_user_id = user_id
+    else:
+        target_user_id = current_user.id
+
     lesson = Lesson.query.get_or_404(lesson_id)
-    
-    # 获取当前用户的所有答题记录
     quiz_history = QuizHistory.query.filter_by(
-        user_id=current_user.id,
+        user_id=target_user_id,
         lesson_id=lesson_id
     ).order_by(QuizHistory.completed_at.desc()).all()
-    
-    # 如果用户有答题记录，允许查看历史，即使课程当前未激活
     if quiz_history:
-        # 获取最近一次答题的详细信息
         latest_quiz = quiz_history[0]
         latest_answers = UserAnswer.query.filter_by(quiz_history_id=latest_quiz.id).all()
         latest_questions = [answer.question for answer in latest_answers]
-        
-        # 获取试题图片
         exam_files = ExamFile.query.filter_by(lesson_id=lesson_id).order_by(ExamFile.page_number).all()
         explanation_files = ExplanationFile.query.filter_by(lesson_id=lesson_id).order_by(ExplanationFile.page_number).all()
-        
         return render_template('student/quiz_history.html',
                              lesson=lesson,
                              quiz_history=quiz_history,
                              latest_questions=latest_questions,
                              latest_answers=latest_answers,
                              exam_files=exam_files,
-                             explanation_files=explanation_files)
+                             explanation_files=explanation_files,
+                             is_admin_view=is_admin_view)
     else:
-        # 如果没有答题记录，且课程未激活，则不允许访问
         if not lesson.is_active:
             flash('该课程当前未激活，且您没有历史答题记录。', 'warning')
             return redirect(url_for('student_dashboard'))
-            
         flash('还没有答题记录', 'info')
-        return render_template('student/quiz_history.html', lesson=lesson, quiz_history=None)
+        return render_template('student/quiz_history.html', lesson=lesson, quiz_history=None, is_admin_view=is_admin_view)
 
 @app.route('/student/quiz/detail/<int:history_id>')
 @login_required
