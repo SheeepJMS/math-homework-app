@@ -2221,6 +2221,38 @@ def mark_answer(user_answer_id):
     flash('判定已修改', 'success')
     return redirect(request.referrer or url_for('admin_dashboard'))
 
+class CoursewareFile(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    lesson_id = db.Column(db.Integer, db.ForeignKey('lesson.id'), nullable=False)
+    filename = db.Column(db.String(255), nullable=False)
+    path = db.Column(db.String(255), nullable=False)
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    lesson = db.relationship('Lesson', backref=db.backref('courseware_files', lazy=True))
+
+@app.route('/admin/lesson/<int:lesson_id>/upload_courseware', methods=['POST'])
+@admin_required
+def upload_courseware(lesson_id):
+    lesson = Lesson.query.get_or_404(lesson_id)
+    file = request.files.get('courseware')
+    if not file or not (file.filename.endswith('.ppt') or file.filename.endswith('.pptx')):
+        flash('请上传PPT文件', 'error')
+        return redirect(url_for('admin_lessons'))
+    filename = secure_filename(file.filename)
+    save_path = os.path.join('static', 'uploads', 'courseware', f"{lesson_id}_{filename}")
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    file.save(save_path)
+    courseware = CoursewareFile(lesson_id=lesson_id, filename=filename, path=save_path.replace('static/', ''))
+    db.session.add(courseware)
+    db.session.commit()
+    flash('课件上传成功', 'success')
+    return redirect(url_for('admin_lessons'))
+
+@app.route('/courseware/<int:courseware_id>/download')
+@login_required
+def download_courseware(courseware_id):
+    courseware = CoursewareFile.query.get_or_404(courseware_id)
+    return send_from_directory('static', courseware.path, as_attachment=True, download_name=courseware.filename)
+
 if __name__ == '__main__':
     init_db()  # 初始化数据库
     with app.app_context():
