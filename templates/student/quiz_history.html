@@ -91,6 +91,7 @@
                         {{ '正确' if answer.answer == answer.question.answer else '错误' }}
                         {% if is_admin_view %}
                         <form action="{{ url_for('mark_answer', user_answer_id=answer.id) }}" method="post" style="display:inline; margin-left:10px;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="is_correct" value="{{ not answer.is_correct }}">
                             <button type="submit" class="btn btn-sm {% if answer.is_correct %}btn-danger{% else %}btn-success{% endif %}">
                                 {% if answer.is_correct %}改为错{% else %}改为对{% endif %}
