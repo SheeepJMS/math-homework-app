@@ -2205,6 +2205,22 @@ def clean_duplicate_quiz_history():
         db.session.delete(qh)
     db.session.commit()
 
+@app.route('/admin/mark_answer/<int:user_answer_id>', methods=['POST'])
+@admin_required
+def mark_answer(user_answer_id):
+    user_answer = UserAnswer.query.get_or_404(user_answer_id)
+    is_correct = request.form.get('is_correct') == 'true'
+    user_answer.is_correct = is_correct
+
+    # 重新统计该次作业的正确题数
+    quiz_history = QuizHistory.query.get(user_answer.quiz_history_id)
+    quiz_history.correct_answers = UserAnswer.query.filter_by(
+        quiz_history_id=quiz_history.id, is_correct=True
+    ).count()
+    db.session.commit()
+    flash('判定已修改', 'success')
+    return redirect(request.referrer or url_for('admin_dashboard'))
+
 if __name__ == '__main__':
     init_db()  # 初始化数据库
     with app.app_context():
