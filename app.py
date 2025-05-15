@@ -2238,10 +2238,17 @@ def upload_courseware(lesson_id):
         flash('请上传PPT文件', 'error')
         return redirect(url_for('admin_lessons'))
     filename = secure_filename(file.filename)
-    save_path = os.path.join('static', 'uploads', 'courseware', f"{lesson_id}_{filename}")
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    file.save(save_path)
-    courseware = CoursewareFile(lesson_id=lesson_id, filename=filename, path=save_path.replace('static/', ''))
+    # 上传到 Cloudinary
+    result = cloudinary.uploader.upload(
+        file,
+        resource_type='raw',
+        folder=f"courseware/{lesson_id}/"
+    )
+    courseware = CoursewareFile(
+        lesson_id=lesson_id,
+        filename=filename,
+        path=result['secure_url']
+    )
     db.session.add(courseware)
     db.session.commit()
     flash('课件上传成功', 'success')
@@ -2251,7 +2258,7 @@ def upload_courseware(lesson_id):
 @login_required
 def download_courseware(courseware_id):
     courseware = CoursewareFile.query.get_or_404(courseware_id)
-    return send_from_directory('static', courseware.path, as_attachment=True, download_name=courseware.filename)
+    return redirect(courseware.path)
 
 if __name__ == '__main__':
     init_db()  # 初始化数据库
