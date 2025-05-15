@@ -964,7 +964,7 @@ def submit_quiz(lesson_id):
             # 根据题目类型判断答案正确性
             is_correct = False
             if question.type == 'proof':  # 解答题
-                is_correct = True if user_answer else False  # 只要提交了答案就算正确
+                is_correct = True  # 无论填写什么都判定为正确
             elif question.type == 'choice':  # 选择题
                 is_correct = user_answer.upper() == question.answer.upper()
             else:  # 填空题
@@ -2207,4 +2207,6 @@ def clean_duplicate_quiz_history():
 
 if __name__ == '__main__':
     init_db()  # 初始化数据库
+    with app.app_context():
+        clean_duplicate_quiz_history()  # 自动清理重复答题记录
     app.run(debug=True, host='0.0.0.0', port=5000) 
