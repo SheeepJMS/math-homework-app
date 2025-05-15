@@ -56,6 +56,9 @@
                                     <button type="button" class="btn btn-info btn-sm" onclick="uploadVideo('{{ lesson.id }}')">
                                         <i class="fas fa-video"></i> 上传回放
                                     </button>
+                                    <button type="button" class="btn btn-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#uploadCoursewareModal{{ lesson.id }}">
+                                        <i class="fas fa-upload"></i> 上传课件
+                                    </button>
                                     <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#editLessonModal{{ lesson.id }}">
                                         <i class="fas fa-edit"></i> 编辑
                                     </button>
@@ -187,6 +190,27 @@
     </div>
 </div>
 {% endfor %}
+
+<!-- 上传课件模态框 -->
+<div class="modal fade" id="uploadCoursewareModal{{ lesson.id }}" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="{{ url_for('upload_courseware', lesson_id=lesson.id) }}" method="post" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-header">
+          <h5 class="modal-title">上传课件</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="file" name="courseware" accept=".ppt,.pptx" required>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">上传</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 
 <style>
 .card {
