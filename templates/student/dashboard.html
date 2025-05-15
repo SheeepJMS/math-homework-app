@@ -91,6 +91,11 @@
             <div class="lesson-card active">
                 <div class="lesson-header">
                     <h3>{{ lesson.title }}</h3>
+                    {% if lesson.courseware_files %}
+                    <a href="{{ url_for('download_courseware', courseware_id=lesson.courseware_files[0].id) }}" class="btn btn-outline-secondary btn-sm" title="下载课件" style="margin-left:8px;">
+                        <i class="fas fa-download"></i>
+                    </a>
+                    {% endif %}
                     <div class="lesson-status">
                         {% set completed = quiz_history|selectattr('lesson_id', 'equalto', lesson.id)|list|length > 0 %}
                         <span class="status-badge {% if completed %}completed{% else %}pending{% endif %}">
