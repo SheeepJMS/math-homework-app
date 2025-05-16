@@ -4,6 +4,21 @@
 
 {% block content %}
 <div class="container mt-4">
+    <!-- 添加说明卡片 -->
+    <div class="card mb-3">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0">答题说明</h5>
+        </div>
+        <div class="card-body">
+            <p class="mb-0">数学符号输入说明：</p>
+            <ul class="mb-0">
+                <li>指数用^，例如：2的五次方写作 2^5</li>
+                <li>根号用sqrt()，例如：根号2写作 sqrt(2)</li>
+                <li>所有括号和标点符号请使用英文输入，如 (), 不要使用中文输入如：（）</li>
+            </ul>
+        </div>
+    </div>
+
     <div class="card mb-3">
         <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
             <h5 class="mb-0">{{ lesson.title }} - 答题</h5>
