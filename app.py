@@ -216,6 +216,7 @@ class User(UserMixin, db.Model):
     
     # 一对多关系
     answers = db.relationship('UserAnswer', backref='user', lazy=True)
+    quiz_history = db.relationship('QuizHistory', backref='user', lazy=True, cascade="all, delete-orphan")
 
     def get_id(self):
         return str(self.id)
