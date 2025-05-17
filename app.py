@@ -216,7 +216,7 @@ class User(UserMixin, db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # 一对多关系
-    answers = db.relationship('UserAnswer', backref='user', lazy=True)
+    answers = db.relationship('UserAnswer', backref='user', lazy=True, cascade="all, delete-orphan")
     quiz_history = db.relationship('QuizHistory', backref='user', lazy=True, cascade="all, delete-orphan")
 
     def get_id(self):
