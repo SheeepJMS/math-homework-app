@@ -21,6 +21,7 @@ from sqlalchemy.exc import IntegrityError
 import cloudinary
 import cloudinary.uploader
 from cloudinary_config import *  # 导入 Cloudinary 配置
+from collections import defaultdict
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'  # 用于 flash 消息和 session
@@ -295,8 +296,7 @@ class QuizHistory(db.Model):
     time_spent = db.Column(db.Integer, nullable=False)  # 答题用时（秒）
     completed_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # 添加关系
-    user = db.relationship('User', backref='quiz_history', lazy=True)
+    # 移除 user = db.relationship('User', backref='quiz_history', lazy=True)
     lesson = db.relationship('Lesson', backref='quiz_history', lazy=True)
     
     @property
@@ -468,11 +468,24 @@ def admin_users(class_id=None):
             ).all()
             class_users[class_] = students
     
+    # 统计每个学生未完成作业数
+    unfinished_count = defaultdict(int)
+    lessons = Lesson.query.filter_by(is_active=True).all()
+    for class_, students in class_users.items():
+        for user in students:
+            # 该学生所在班级的所有课程
+            user_lessons = [lesson for lesson in lessons if class_ in lesson.classes]
+            # 该学生已完成的课程id
+            finished_ids = set(qh.lesson_id for qh in user.quiz_history)
+            # 未完成课程数
+            unfinished_count[user.id] = len([l for l in user_lessons if l.id not in finished_ids])
+    
     return render_template('admin/users.html', 
                          admin_users=admin_users,
                          class_users=class_users,
                          classes=classes,
-                         current_class_id=class_id)
+                         current_class_id=class_id,
+                         unfinished_count=unfinished_count)
 
 @app.route('/admin/user/<int:user_id>/toggle', methods=['POST'])
 @admin_required
@@ -2260,6 +2273,23 @@ def upload_courseware(lesson_id):
 def download_courseware(courseware_id):
     courseware = CoursewareFile.query.get_or_404(courseware_id)
     return redirect(courseware.path)
+
+@app.route('/admin/user/<int:user_id>/edit', methods=['POST'])
+@admin_required
+def edit_user(user_id):
+    user = User.query.get_or_404(user_id)
+    new_username = request.form.get('username')
+    if not new_username:
+        flash('用户名不能为空', 'error')
+        return redirect(url_for('admin_users'))
+    # 检查用户名唯一性
+    if User.query.filter(User.username == new_username, User.id != user_id).first():
+        flash('用户名已存在', 'error')
+        return redirect(url_for('admin_users'))
+    user.username = new_username
+    db.session.commit()
+    flash('用户名修改成功', 'success')
+    return redirect(url_for('admin_users'))
 
 if __name__ == '__main__':
     init_db()  # 初始化数据库
