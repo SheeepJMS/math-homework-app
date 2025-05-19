@@ -279,7 +279,7 @@ class UserAnswer(db.Model):
     lesson_id = db.Column(db.Integer, db.ForeignKey('lesson.id'), nullable=False)
     question_id = db.Column(db.Integer, db.ForeignKey('question.id'), nullable=False)
     quiz_history_id = db.Column(db.Integer, db.ForeignKey('quiz_history.id'), nullable=False)
-    answer = db.Column(db.String(255), nullable=True)  # 允许为空，表示未作答
+    answer = db.Column(db.Text, nullable=True)  # 使用Text类型支持更长的答案
     is_correct = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.now)
 
