@@ -100,18 +100,28 @@
                                 </div>
                             {% elif question.type == 'proof' %}
                                 <div class="form-group">
-                                    <textarea class="form-control" 
+                                    <textarea class="form-control answer-input" 
                                               name="answer_{{ question.id }}"
                                               rows="3"
-                                              placeholder="请在此处书写解答过程"></textarea>
+                                              placeholder="请在此处书写解答过程"
+                                              data-word-limit="{{ question.word_limit }}"
+                                              oninput="limitInput(this)"></textarea>
+                                    <div class="word-limit-tip text-muted" style="font-size:0.9em;">
+                                        字数限制：{{ question.word_limit }}字，已输入<span class="current-count">0</span>/{{ question.word_limit }}字
+                                    </div>
                                 </div>
                             {% else %}
                                 <div class="form-group">
                                     <input type="text" 
-                                           class="form-control" 
+                                           class="form-control answer-input" 
                                            name="answer_{{ question.id }}"
                                            placeholder="请输入答案"
-                                           required>
+                                           required
+                                           data-word-limit="{{ question.word_limit }}"
+                                           oninput="limitInput(this)">
+                                    <div class="word-limit-tip text-muted" style="font-size:0.9em;">
+                                        字数限制：{{ question.word_limit }}字，已输入<span class="current-count">0</span>/{{ question.word_limit }}字
+                                    </div>
                                 </div>
                             {% endif %}
                         </div>
@@ -420,6 +430,26 @@ document.addEventListener('DOMContentLoaded', function() {
 // 提交表单时停止计时器
 document.getElementById('quizForm').addEventListener('submit', function() {
     clearInterval(timerInterval);
+});
+
+function limitInput(input) {
+    const limit = parseInt(input.getAttribute('data-word-limit'));
+    const tip = input.parentElement.querySelector('.word-limit-tip');
+    const countSpan = tip.querySelector('.current-count');
+    let val = input.value;
+    let len = val.length;
+    if (len > limit) {
+        input.value = val.slice(0, limit);
+        len = limit;
+    }
+    countSpan.textContent = len;
+}
+
+// 页面加载时初始化字数统计
+window.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.answer-input').forEach(function(input) {
+        limitInput(input);
+    });
 });
 </script>
 {% endblock %} 
