@@ -892,6 +892,11 @@ def start_quiz(lesson_id):
     for q in questions:
         print(f"题号: {q.question_number}, 类型: {q.type}, 答案: {q.answer}")
 
+    # 给每个题目加默认字数限制（如200字）
+    for q in questions:
+        if not hasattr(q, 'word_limit') or q.word_limit is None:
+            q.word_limit = 200
+
     if not questions:
         flash('该课程还没有题目，请等待教师上传题目')
         return redirect(url_for('student_dashboard'))
