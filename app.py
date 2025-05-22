@@ -28,8 +28,8 @@ app.secret_key = 'your_secret_key'  # 用于 flash 消息和 session
 
 # 配置 CSRF 保护
 csrf = CSRFProtect(app)
-app.config['WTF_CSRF_TIME_LIMIT'] = 3600  # CSRF 令牌有效期设置为1小时
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=1)  # 会话有效期设置为1小时
+app.config['WTF_CSRF_TIME_LIMIT'] = 10800  # CSRF 令牌有效期设置为3小时
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=3)  # 会话有效期设置为3小时
 
 # 配置会话为永久性的，这样可以延长会话的有效期
 @app.before_request
