@@ -430,16 +430,30 @@ document.getElementById('quizForm').addEventListener('submit', function() {
 function limitInput(input) {
     // 只对解答题textarea生效
     if (input.tagName !== 'TEXTAREA' || !input.hasAttribute('data-word-limit')) return;
+    
     const limit = parseInt(input.getAttribute('data-word-limit'));
     const tip = input.parentElement.querySelector('.word-limit-tip');
     const countSpan = tip.querySelector('.current-count');
+    
+    // 获取当前输入值并计算长度
     let val = input.value;
     let len = val.length;
+    
+    // 如果超过限制，截取文本
     if (len > limit) {
         input.value = val.slice(0, limit);
         len = limit;
     }
+    
+    // 更新字数统计
     countSpan.textContent = len;
+    
+    // 如果接近限制，添加警告样式
+    if (len >= limit * 0.9) {
+        tip.style.color = '#dc3545';
+    } else {
+        tip.style.color = '#6c757d';
+    }
 }
 
 // 页面加载时初始化字数统计

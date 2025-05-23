@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_from_directory, send_file
 import os
 import pandas as pd
 from werkzeug.utils import secure_filename
@@ -22,6 +22,8 @@ import cloudinary
 import cloudinary.uploader
 from cloudinary_config import *  # 导入 Cloudinary 配置
 from collections import defaultdict
+import requests
+from io import BytesIO
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'  # 用于 flash 消息和 session
@@ -2277,7 +2279,15 @@ def upload_courseware(lesson_id):
 @login_required
 def download_courseware(courseware_id):
     courseware = CoursewareFile.query.get_or_404(courseware_id)
-    return redirect(courseware.path)
+    # 从 Cloudinary 拉取文件内容
+    response = requests.get(courseware.path)
+    file_stream = BytesIO(response.content)
+    # 用 send_file 返回，自动带上原始文件名
+    return send_file(
+        file_stream,
+        as_attachment=True,
+        download_name=courseware.filename  # Flask 2.0+ 推荐用 download_name
+    )
 
 @app.route('/admin/user/<int:user_id>/edit', methods=['POST'])
 @admin_required
