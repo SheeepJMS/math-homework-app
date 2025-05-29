@@ -19,9 +19,14 @@
             <input type="text" id="username" name="username" required>
         </div>
         <div class="form-group">
+            <label for="email">邮箱</label>
+            <input type="email" id="email" name="email" required>
+            <small class="email-hint">请输入有效的邮箱地址，用于接收验证码</small>
+        </div>
+        <div class="form-group">
             <label for="password">密码</label>
             <input type="password" id="password" name="password" required>
-            <small class="password-hint">密码长度至少6位</small>
+            <small class="password-hint">密码长度至少8位，必须包含大小写字母和数字</small>
         </div>
         <div class="form-group">
             <label for="confirm_password">确认密码</label>
@@ -36,6 +41,14 @@
                 <option value="{{ class.id }}">{{ class.name }}</option>
                 {% endfor %}
             </select>
+        </div>
+        <div class="form-group">
+            <label for="captcha">验证码</label>
+            <div class="captcha-container">
+                <input type="text" id="captcha" name="captcha" required>
+                <img src="data:image/png;base64,{{ captcha_image }}" alt="验证码" class="captcha-image">
+                <button type="button" class="btn-refresh" onclick="refreshCaptcha()">刷新</button>
+            </div>
         </div>
         <button type="submit" class="btn-register" id="submitBtn">注册</button>
     </form>
@@ -146,7 +159,7 @@ input:focus, select:focus {
     border: 1px solid #c3e6cb;
 }
 
-.password-hint {
+.password-hint, .email-hint {
     font-size: 12px;
     color: #666;
 }
@@ -155,6 +168,32 @@ input:focus, select:focus {
     font-size: 12px;
     color: #dc3545;
     margin-top: 4px;
+}
+
+.captcha-container {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.captcha-image {
+    height: 40px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.btn-refresh {
+    padding: 8px 12px;
+    background-color: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    color: #666;
+}
+
+.btn-refresh:hover {
+    background-color: #e9ecef;
 }
 
 small {
@@ -196,5 +235,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+function refreshCaptcha() {
+    fetch('/refresh-captcha')
+        .then(response => response.json())
+        .then(data => {
+            document.querySelector('.captcha-image').src = 'data:image/png;base64,' + data.captcha_image;
+        });
+}
 </script>
 {% endblock %} 

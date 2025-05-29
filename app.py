@@ -24,14 +24,59 @@ from cloudinary_config import *  # 导入 Cloudinary 配置
 from collections import defaultdict
 import requests
 from io import BytesIO
+from werkzeug.security import generate_password_hash, check_password_hash
+import re
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+import redis
+from captcha.image import ImageCaptcha
+import string
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'  # 用于 flash 消息和 session
+
+# 配置 Redis
+redis_client = redis.Redis(host='localhost', port=6379, db=0)
+
+# 配置限速器
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"]
+)
 
 # 配置 CSRF 保护
 csrf = CSRFProtect(app)
 app.config['WTF_CSRF_TIME_LIMIT'] = 10800  # CSRF 令牌有效期设置为3小时
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=3)  # 会话有效期设置为3小时
+
+# 验证码配置
+def generate_captcha():
+    image = ImageCaptcha()
+    captcha_text = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+    captcha_image = image.generate(captcha_text)
+    return captcha_text, captcha_image
+
+# 检查IP是否被封禁
+def is_ip_banned(ip):
+    return redis_client.get(f'banned_ip:{ip}') is not None
+
+# 检查邮箱是否已验证
+def is_email_verified(email):
+    return redis_client.get(f'verified_email:{email}') is not None
+
+# 检查注册频率
+def check_registration_rate(ip):
+    key = f'registration_attempts:{ip}'
+    attempts = redis_client.get(key)
+    if attempts is None:
+        redis_client.setex(key, 3600, 1)  # 1小时内最多3次尝试
+        return True
+    attempts = int(attempts)
+    if attempts >= 3:
+        return False
+    redis_client.incr(key)
+    return True
 
 # 配置会话为永久性的，这样可以延长会话的有效期
 @app.before_request
@@ -353,12 +398,39 @@ def login():
     return render_template('login.html')
 
 @app.route('/register', methods=['GET', 'POST'])
+@limiter.limit("3 per hour")  # 限制每小时最多3次注册尝试
 def register():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
         confirm_password = request.form['confirm_password']
         class_id = request.form['class_id']
+        email = request.form['email']
+        captcha = request.form['captcha']
+        
+        # 获取客户端IP
+        ip = request.remote_addr
+        
+        # 检查IP是否被封禁
+        if is_ip_banned(ip):
+            flash('您的IP已被封禁，请稍后再试')
+            return redirect(url_for('register'))
+        
+        # 检查注册频率
+        if not check_registration_rate(ip):
+            flash('注册尝试次数过多，请稍后再试')
+            return redirect(url_for('register'))
+        
+        # 验证验证码
+        stored_captcha = session.get('captcha')
+        if not stored_captcha or captcha.upper() != stored_captcha:
+            flash('验证码错误')
+            return redirect(url_for('register'))
+        
+        # 验证密码强度
+        if len(password) < 8 or not re.search(r'[A-Z]', password) or not re.search(r'[a-z]', password) or not re.search(r'\d', password):
+            flash('密码必须至少8位，包含大小写字母和数字')
+            return redirect(url_for('register'))
         
         if password != confirm_password:
             flash('两次输入的密码不一致')
@@ -368,24 +440,45 @@ def register():
             flash('用户名已存在')
             return redirect(url_for('register'))
         
-        # 为email生成一个默认值
-        default_email = f"{username}@example.com"
+        if User.query.filter_by(email=email).first():
+            flash('邮箱已被注册')
+            return redirect(url_for('register'))
+        
+        # 生成验证码并发送邮件
+        verification_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+        redis_client.setex(f'email_verification:{email}', 1800, verification_code)  # 30分钟有效期
+        
+        # TODO: 实现发送验证邮件的功能
         
         new_user = User(
             username=username,
-            email=default_email,  # 使用默认email
-            password=password,
+            email=email,
+            password=generate_password_hash(password),  # 加密密码
             class_id=class_id,
-            is_active=True  # 默认设置为激活状态
+            is_active=False  # 默认设置为未激活状态
         )
-        db.session.add(new_user)
-        db.session.commit()
         
-        flash('注册成功！请登录')
-        return redirect(url_for('login'))
+        try:
+            db.session.add(new_user)
+            db.session.commit()
+            flash('注册成功！请查收邮件完成验证')
+            return redirect(url_for('login'))
+        except Exception as e:
+            db.session.rollback()
+            flash('注册失败，请稍后重试')
+            return redirect(url_for('register'))
+    
+    # 生成新的验证码
+    captcha_text, captcha_image = generate_captcha()
+    session['captcha'] = captcha_text
+    
+    # 将验证码图片转换为base64
+    buffered = BytesIO()
+    captcha_image.save(buffered, format="PNG")
+    captcha_base64 = base64.b64encode(buffered.getvalue()).decode()
     
     classes = Class.query.filter_by(is_active=True).all()
-    return render_template('register.html', classes=classes)
+    return render_template('register.html', classes=classes, captcha_image=captcha_base64)
 
 @app.route('/logout')
 @login_required
@@ -2305,6 +2398,43 @@ def edit_user(user_id):
     db.session.commit()
     flash('用户名修改成功', 'success')
     return redirect(url_for('admin_users'))
+
+@app.route('/refresh-captcha')
+def refresh_captcha():
+    captcha_text, captcha_image = generate_captcha()
+    session['captcha'] = captcha_text
+    
+    # 将验证码图片转换为base64
+    buffered = BytesIO()
+    captcha_image.save(buffered, format="PNG")
+    captcha_base64 = base64.b64encode(buffered.getvalue()).decode()
+    
+    return jsonify({'captcha_image': captcha_base64})
+
+@app.route('/verify-email/<email>/<code>')
+def verify_email(email, code):
+    stored_code = redis_client.get(f'email_verification:{email}')
+    if not stored_code or stored_code.decode() != code:
+        flash('验证码无效或已过期')
+        return redirect(url_for('login'))
+    
+    # 验证成功，激活用户
+    user = User.query.filter_by(email=email).first()
+    if user:
+        user.is_active = True
+        db.session.commit()
+        redis_client.delete(f'email_verification:{email}')
+        flash('邮箱验证成功！请登录')
+    else:
+        flash('用户不存在')
+    
+    return redirect(url_for('login'))
+
+def send_verification_email(email, code):
+    # TODO: 实现发送邮件的功能
+    # 这里可以使用 Flask-Mail 或其他邮件发送库
+    # 为了演示，我们暂时打印验证码
+    print(f"验证码已发送到 {email}: {code}")
 
 if __name__ == '__main__':
     init_db()  # 初始化数据库
