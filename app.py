@@ -54,7 +54,7 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=3)  # 会话有效期
 def generate_captcha():
     image = ImageCaptcha()
     captcha_text = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
-    captcha_image = image.generate(captcha_text)
+    captcha_image = image.generate_image(captcha_text)
     return captcha_text, captcha_image
 
 # 检查IP是否被封禁
