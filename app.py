@@ -58,25 +58,44 @@ def generate_captcha():
     captcha_image = image.generate_image(captcha_text)
     return captcha_text, captcha_image
 
-# 检查IP是否被封禁
+# Upstash REST API 兼容
+UPSTASH_REST_URL = os.environ.get("UPSTASH_REST_URL")
+UPSTASH_REST_TOKEN = os.environ.get("UPSTASH_REST_TOKEN")
+
+def redis_get(key):
+    if UPSTASH_REST_URL and UPSTASH_REST_TOKEN:
+        url = f"{UPSTASH_REST_URL}/get/{key}"
+        headers = {"Authorization": UPSTASH_REST_TOKEN}
+        res = requests.get(url, headers=headers)
+        return res.json().get("result")
+    else:
+        return redis_client.get(key)
+
+def redis_set(key, value):
+    if UPSTASH_REST_URL and UPSTASH_REST_TOKEN:
+        url = f"{UPSTASH_REST_URL}/set/{key}/{value}"
+        headers = {"Authorization": UPSTASH_REST_TOKEN}
+        requests.post(url, headers=headers)
+    else:
+        redis_client.set(key, value)
+
 def is_ip_banned(ip):
-    return redis_client.get(f'banned_ip:{ip}') is not None
+    return redis_get(f'banned_ip:{ip}') is not None
 
-# 检查邮箱是否已验证
 def is_email_verified(email):
-    return redis_client.get(f'verified_email:{email}') is not None
+    return redis_get(f'verified_email:{email}') is not None
 
-# 检查注册频率
 def check_registration_rate(ip):
     key = f'registration_attempts:{ip}'
-    attempts = redis_client.get(key)
+    attempts = redis_get(key)
     if attempts is None:
-        redis_client.setex(key, 3600, 1)  # 1小时内最多3次尝试
+        redis_set(key, 1)
+        # Upstash REST API 不支持 setex，建议用 set+定时任务清理，或用本地 redis 时 setex
         return True
     attempts = int(attempts)
     if attempts >= 3:
         return False
-    redis_client.incr(key)
+    redis_set(key, attempts + 1)
     return True
 
 # 配置会话为永久性的，这样可以延长会话的有效期
