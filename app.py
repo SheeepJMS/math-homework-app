@@ -79,6 +79,14 @@ def redis_set(key, value):
     else:
         redis_client.set(key, value)
 
+def redis_setex(key, value, expire):
+    if UPSTASH_REST_URL and UPSTASH_REST_TOKEN:
+        url = f"{UPSTASH_REST_URL}/set/{key}/{value}?EX={expire}"
+        headers = {"Authorization": UPSTASH_REST_TOKEN}
+        requests.post(url, headers=headers)
+    else:
+        redis_client.setex(key, expire, value)
+
 def is_ip_banned(ip):
     return redis_get(f'banned_ip:{ip}') is not None
 
@@ -466,7 +474,7 @@ def register():
         
         # 生成验证码并发送邮件
         verification_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-        redis_client.setex(f'email_verification:{email}', 1800, verification_code)  # 30分钟有效期
+        redis_setex(f'email_verification:{email}', verification_code, 1800)  # 30分钟有效期
         
         # TODO: 实现发送验证邮件的功能
         
