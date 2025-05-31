@@ -36,7 +36,8 @@ app = Flask(__name__)
 app.secret_key = 'your_secret_key'  # 用于 flash 消息和 session
 
 # 配置 Redis
-redis_client = redis.Redis(host='localhost', port=6379, db=0)
+redis_url = os.environ.get('REDIS_URL')
+redis_client = redis.from_url(redis_url) if redis_url else redis.Redis(host='localhost', port=6379, db=0)
 
 # 配置限速器
 limiter = Limiter(
