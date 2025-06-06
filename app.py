@@ -493,13 +493,15 @@ def admin_users(class_id=None):
 @admin_required
 def toggle_user_status(user_id):
     user = User.query.get_or_404(user_id)
-    
     # 防止管理员被禁用
     if user.is_admin:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'msg': '不能禁用管理员'})
         return redirect(url_for('admin_users'))
-    
     user.is_active = not user.is_active
     db.session.commit()
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({'success': True, 'is_active': user.is_active})
     return redirect(url_for('admin_users'))
 
 @app.route('/admin/user/<int:user_id>/delete', methods=['POST'])

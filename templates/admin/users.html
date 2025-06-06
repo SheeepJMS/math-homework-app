@@ -83,13 +83,10 @@
                                     <td>{{ unfinished_count[user.id] }}</td>
                                     <td>
                                         <div class="btn-group" role="group">
-                                            <form action="{{ url_for('toggle_user_status', user_id=user.id) }}" method="post" style="display: inline;">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <button type="submit" class="btn {% if user.is_active %}btn-warning{% else %}btn-success{% endif %} btn-sm">
-                                                    <i class="fas {% if user.is_active %}fa-ban{% else %}fa-check{% endif %}"></i>
-                                                    {{ '停用' if user.is_active else '激活' }}
-                                                </button>
-                                            </form>
+                                            <button type="button" class="btn {% if user.is_active %}btn-warning{% else %}btn-success{% endif %} btn-sm" onclick="toggleUserStatus({{ user.id }}, this)">
+                                                <i class="fas {% if user.is_active %}fa-ban{% else %}fa-check{% endif %}"></i>
+                                                {{ '停用' if user.is_active else '激活' }}
+                                            </button>
                                             {% if not user.is_admin %}
                                             <a href="{{ url_for('student_dashboard_admin', user_id=user.id) }}" class="btn btn-info btn-sm ms-2">
                                                 <i class="fas fa-user"></i> 查看主页
@@ -302,6 +299,38 @@ function deleteUser(id) {
         document.body.appendChild(form);
         form.submit();
     }
+}
+
+function toggleUserStatus(userId, btn) {
+    fetch(`/admin/user/${userId}/toggle`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token() }}',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // 更新按钮和状态
+            const badge = btn.closest('tr').querySelector('.badge');
+            if (data.is_active) {
+                btn.classList.remove('btn-success');
+                btn.classList.add('btn-warning');
+                btn.innerHTML = '<i class="fas fa-ban"></i> 停用';
+                badge.innerText = '已激活';
+                badge.className = 'badge bg-success';
+            } else {
+                btn.classList.remove('btn-warning');
+                btn.classList.add('btn-success');
+                btn.innerHTML = '<i class="fas fa-check"></i> 激活';
+                badge.innerText = '未激活';
+                badge.className = 'badge bg-secondary';
+            }
+        } else {
+            alert(data.msg || '操作失败');
+        }
+    });
 }
 </script>
 {% endblock %} 
