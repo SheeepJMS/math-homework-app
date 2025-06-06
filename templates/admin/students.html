@@ -1,0 +1,31 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">{{ lesson.title }} - 学生完成情况</h2>
+    <div class="row">
+        <div class="col-md-6">
+            <h4>已完成</h4>
+            <ul>
+                {% for student in completed %}
+                <li>
+                    <a href="{{ url_for('student_dashboard_admin', user_id=student.id) }}">{{ student.username }}</a>
+                </li>
+                {% empty %}
+                <li>暂无学生完成</li>
+                {% endfor %}
+            </ul>
+        </div>
+        <div class="col-md-6">
+            <h4>未完成</h4>
+            <ul>
+                {% for student in not_completed %}
+                <li>{{ student.username }}</li>
+                {% empty %}
+                <li>所有学生都已完成</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -68,6 +68,9 @@
                                     <button type="button" class="btn btn-danger btn-sm" style="min-width:60px;" onclick="deleteLesson('{{ lesson.id }}')">
                                         <i class="fas fa-trash"></i> 删除
                                     </button>
+                                    <a href="{{ url_for('lesson_students', lesson_id=lesson.id) }}" class="btn btn-info btn-sm">
+                                        <i class="fas fa-users"></i> 查看学生
+                                    </a>
                                 </div>
                                 <!-- 上传课件模态框 -->
                                 <div class="modal fade" id="uploadCoursewareModal{{ lesson.id }}" tabindex="-1">

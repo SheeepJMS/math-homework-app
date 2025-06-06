@@ -2306,6 +2306,23 @@ def edit_user(user_id):
     flash('用户名修改成功', 'success')
     return redirect(url_for('admin_users'))
 
+@app.route('/admin/lesson/<int:lesson_id>/students')
+@admin_required
+def lesson_students(lesson_id):
+    lesson = Lesson.query.get_or_404(lesson_id)
+    # 获取所有班级的学生
+    students = []
+    for c in lesson.classes:
+        students.extend(c.users)
+    students = list(set(students))  # 去重
+    # 查询已完成该课程的学生
+    from models import QuizHistory  # 如果有单独models文件
+    completed_histories = QuizHistory.query.filter_by(lesson_id=lesson_id).all()
+    completed_students = set(h.user for h in completed_histories)
+    completed = [s for s in students if s in completed_students]
+    not_completed = [s for s in students if s not in completed_students]
+    return render_template('admin/students.html', lesson=lesson, completed=completed, not_completed=not_completed)
+
 if __name__ == '__main__':
     init_db()  # 初始化数据库
     with app.app_context():
