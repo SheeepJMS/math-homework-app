@@ -11,7 +11,7 @@
                 <li>
                     <a href="{{ url_for('student_dashboard_admin', user_id=student.id) }}">{{ student.username }}</a>
                 </li>
-                {% empty %}
+                {% else %}
                 <li>暂无学生完成</li>
                 {% endfor %}
             </ul>
@@ -21,7 +21,7 @@
             <ul>
                 {% for student in not_completed %}
                 <li>{{ student.username }}</li>
-                {% empty %}
+                {% else %}
                 <li>所有学生都已完成</li>
                 {% endfor %}
             </ul>
