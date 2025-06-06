@@ -2316,7 +2316,7 @@ def lesson_students(lesson_id):
         students.extend(c.users)
     students = list(set(students))  # 去重
     # 查询已完成该课程的学生
-    from models import QuizHistory  # 如果有单独models文件
+    # from models import QuizHistory  # 如果有单独models文件
     completed_histories = QuizHistory.query.filter_by(lesson_id=lesson_id).all()
     completed_students = set(h.user for h in completed_histories)
     completed = [s for s in students if s in completed_students]
