@@ -213,6 +213,9 @@
 {% block extra_js %}
 <script>
 function filterByLesson(lessonId) {
+    // 阻止默认行为，保持页面位置
+    event.preventDefault();
+    
     // 更新按钮状态
     document.querySelectorAll('.btn-outline-primary').forEach(btn => {
         btn.classList.remove('active');
