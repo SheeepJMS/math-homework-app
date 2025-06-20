@@ -99,33 +99,9 @@
                                                 </button>
                                             </form>
                                             <!-- 编辑用户名按钮 -->
-                                            <button type="button" class="btn btn-warning btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#editUserModal{{ user.id }}">
-                                                <i class="fas fa-edit"></i> 编辑用户名
+                                            <button type="button" class="btn btn-warning btn-sm ms-2" onclick="openEditUserModal('{{ user.id }}', '{{ user.username }}', '{{ user.class_id }}')">
+                                                <i class="fas fa-edit"></i> 编辑
                                             </button>
-                                            <!-- 编辑用户名模态框 -->
-                                            <div class="modal fade" id="editUserModal{{ user.id }}" tabindex="-1">
-                                                <div class="modal-dialog">
-                                                    <div class="modal-content">
-                                                        <form action="{{ url_for('edit_user', user_id=user.id) }}" method="post">
-                                                            <div class="modal-header">
-                                                                <h5 class="modal-title">编辑用户名</h5>
-                                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                                            </div>
-                                                            <div class="modal-body">
-                                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                                <div class="mb-3">
-                                                                    <label for="username{{ user.id }}" class="form-label">新用户名</label>
-                                                                    <input type="text" class="form-control" id="username{{ user.id }}" name="username" value="{{ user.username }}" required>
-                                                                </div>
-                                                            </div>
-                                                            <div class="modal-footer">
-                                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                                                                <button type="submit" class="btn btn-primary">保存</button>
-                                                            </div>
-                                                        </form>
-                                                    </div>
-                                                </div>
-                                            </div>
                                             {% endif %}
                                         </div>
                                     </td>
@@ -187,6 +163,39 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
                     <button type="submit" class="btn btn-primary">添加</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑用户模态框 -->
+<div class="modal fade" id="editUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">编辑用户</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editUserForm" method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="editUsername" class="form-label">用户名</label>
+                        <input type="text" class="form-control" id="editUsername" name="username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editClass" class="form-label">所属班级</label>
+                        <select class="form-select" id="editClass" name="class_id" required>
+                            {% for c in classes %}
+                            <option value="{{ c.id }}">{{ c.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
                 </div>
             </form>
         </div>
@@ -282,6 +291,14 @@ document.addEventListener('DOMContentLoaded', function() {
     roleSelect.addEventListener('change', toggleClassSelection);
     toggleClassSelection();
 });
+
+function openEditUserModal(userId, username, classId) {
+    const form = document.getElementById('editUserForm');
+    form.action = `/admin/user/${userId}/edit`;
+    document.getElementById('editUsername').value = username;
+    document.getElementById('editClass').value = classId;
+    new bootstrap.Modal(document.getElementById('editUserModal')).show();
+}
 
 function deleteUser(id) {
     if (confirm('确定要删除这个用户吗？这将同时删除所有相关的答题记录。')) {

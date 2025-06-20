@@ -260,7 +260,7 @@ class User(UserMixin, db.Model):
             7: {"name": "Mini Monster", "icon": "👾", "next_level": 14},
             8: {"name": "Big Monster", "icon": "👹", "next_level": 16},
             9: {"name": "Beast", "icon": "🦖", "next_level": 18},
-            10: {"name": "Godzilla", "icon": "🐉", "next_level": None}
+            10: {"name": "Dragon", "icon": "🐉", "next_level": None}
         }
         current_badge = badges.get(self.badge_level, badges[1])
         next_achievements_needed = current_badge["next_level"] - self.achievement_count if current_badge["next_level"] else 0
@@ -1023,14 +1023,20 @@ def submit_quiz(lesson_id):
         elif current_user.badge_level < 3:
             if correct_rate >= 60:
                 current_user.achievement_count += 1
-                if current_user.achievement_count >= current_user.badge_level + 1:
-                    current_user.badge_level += 1
+                # Level 1 升 Level 2 需要2次达标
+                if current_user.badge_level == 1 and current_user.achievement_count >= 2:
+                    current_user.badge_level = 2
+                    flash(f'恭喜！你已经升级到 {current_user.badge_info["name"]} 级别！', 'success')
+                # Level 2 升 Level 3 需要3次达标
+                elif current_user.badge_level == 2 and current_user.achievement_count >= 5:
+                    current_user.badge_level = 3
                     flash(f'恭喜！你已经升级到 {current_user.badge_info["name"]} 级别！', 'success')
         # Level 3 到 Level 8：每级需要两次80%
         elif 3 <= current_user.badge_level < 8:
             if correct_rate >= 80:
                 current_user.achievement_count += 1
-                if current_user.achievement_count >= (current_user.badge_level - 2) * 2:
+                achievements_needed = (current_user.badge_level - 2) * 2
+                if current_user.achievement_count >= achievements_needed:
                     current_user.badge_level += 1
                     flash(f'恭喜！你已经升级到 {current_user.badge_info["name"]} 级别！', 'success')
         # Level 8以上：每级需要五次80%
@@ -2295,17 +2301,33 @@ def download_courseware(courseware_id):
 @admin_required
 def edit_user(user_id):
     user = User.query.get_or_404(user_id)
-    new_username = request.form.get('username')
-    if not new_username:
-        flash('用户名不能为空', 'error')
+    if user.is_admin:
+        flash('不能编辑管理员账户', 'error')
         return redirect(url_for('admin_users'))
-    # 检查用户名唯一性
-    if User.query.filter(User.username == new_username, User.id != user_id).first():
+
+    username = request.form.get('username')
+    class_id = request.form.get('class_id')
+
+    if not username or not class_id:
+        flash('用户名和班级不能为空', 'error')
+        return redirect(url_for('admin_users'))
+
+    # 检查用户名是否已存在（排除当前用户）
+    existing_user = User.query.filter(User.username == username, User.id != user_id).first()
+    if existing_user:
         flash('用户名已存在', 'error')
         return redirect(url_for('admin_users'))
-    user.username = new_username
-    db.session.commit()
-    flash('用户名修改成功', 'success')
+
+    user.username = username
+    user.class_id = class_id
+    
+    try:
+        db.session.commit()
+        flash('用户信息更新成功', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'更新失败: {e}', 'error')
+
     return redirect(url_for('admin_users'))
 
 @app.route('/admin/lesson/<int:lesson_id>/students')
