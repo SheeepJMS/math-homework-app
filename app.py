@@ -991,7 +991,7 @@ def submit_quiz(lesson_id):
             elif question.type == 'choice':  # 选择题
                 is_correct = user_answer.upper() == question.answer.upper()
             else:  # 填空题
-                is_correct = user_answer.strip() == question.answer.strip()
+                is_correct = user_answer.strip().lower() == question.answer.strip().lower()
 
             # 创建用户答案记录
             answer_record = UserAnswer(
@@ -1264,7 +1264,12 @@ def quiz_detail(history_id):
     for answer in user_answers:
         question = Question.query.get(answer.question_id)
         if question:
-            is_correct = True if question.type == 'proof' else (answer.answer == question.answer)
+            if question.type == 'proof':
+                is_correct = True
+            elif question.type == 'choice':
+                is_correct = (answer.answer or '').upper() == (question.answer or '').upper()
+            else:
+                is_correct = (answer.answer or '').strip().lower() == (question.answer or '').strip().lower()
             question_answers[question] = {
                 'selected_answer': answer.answer,
                 'is_correct': is_correct
@@ -2238,7 +2243,8 @@ def clean_duplicate_quiz_history():
 @admin_required
 def mark_answer(user_answer_id):
     user_answer = UserAnswer.query.get_or_404(user_answer_id)
-    is_correct = request.form.get('is_correct') == 'true'
+    is_correct_str = request.form.get('is_correct', 'false')
+    is_correct = str(is_correct_str).lower() == 'true'
     user_answer.is_correct = is_correct
 
     # 重新统计该次作业的正确题数
