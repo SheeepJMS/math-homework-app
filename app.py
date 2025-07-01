@@ -2417,12 +2417,32 @@ def lesson_students(lesson_id):
         students.extend(c.users)
     students = list(set(students))  # 去重
     # 查询已完成该课程的学生
-    # from models import QuizHistory  # 如果有单独models文件
     completed_histories = QuizHistory.query.filter_by(lesson_id=lesson_id).all()
     completed_students = set(h.user for h in completed_histories)
     completed = [s for s in students if s in completed_students]
     not_completed = [s for s in students if s not in completed_students]
-    return render_template('admin/students.html', lesson=lesson, completed=completed, not_completed=not_completed)
+
+    # 统计题目得分率
+    questions = Question.query.filter_by(lesson_id=lesson_id).order_by(Question.question_number).all()
+    question_stats = []
+    for question in questions:
+        user_answers = UserAnswer.query.filter_by(
+            lesson_id=lesson_id,
+            question_id=question.id
+        ).all()
+        total_attempts = len(user_answers)
+        correct_attempts = len([ua for ua in user_answers if ua.is_correct])
+        success_rate = (correct_attempts / total_attempts * 100) if total_attempts > 0 else 0
+        question_stats.append({
+            'question_number': question.question_number,
+            'type': question.type,
+            'total_attempts': total_attempts,
+            'correct_attempts': correct_attempts,
+            'success_rate': round(success_rate, 2),
+            'answer': question.answer
+        })
+
+    return render_template('admin/students.html', lesson=lesson, completed=completed, not_completed=not_completed, question_stats=question_stats)
 
 if __name__ == '__main__':
     init_db()  # 初始化数据库
