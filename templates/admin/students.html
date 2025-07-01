@@ -32,9 +32,9 @@
 <!-- 题目得分率统计 -->
 <div class="mt-5">
     <h3>题目得分率统计</h3>
-    <div class="chart-container mb-4">
+    <div class="chart-container mb-4" style="max-width:800px; height:400px; margin:0 auto;">
         <h5 class="chart-title">题目得分率走势图</h5>
-        <canvas id="successRateChart" width="400" height="200"></canvas>
+        <canvas id="successRateChart"></canvas>
     </div>
     <div class="question-stats-table">
         <div class="table-responsive">
@@ -146,6 +146,13 @@
 .type-proof {
     background-color: #fff3e0;
     color: #f57c00;
+}
+#successRateChart {
+    width: 100% !important;
+    height: 340px !important;
+    max-width: 800px;
+    display: block;
+    margin: 0 auto;
 }
 </style>
 
