@@ -6,25 +6,36 @@
     <div class="row">
         <div class="col-md-6">
             <h4>已完成</h4>
-            <ul>
-                {% for student in completed %}
-                <li>
-                    <a href="{{ url_for('student_dashboard_admin', user_id=student.id) }}">{{ student.username }}</a>
-                </li>
+            <div class="list-group">
+                {% for item in completed_scores %}
+                <div class="list-group-item d-flex justify-content-between align-items-center student-card">
+                    <div class="d-flex align-items-center">
+                        <span class="rank-badge me-3">
+                            {% if loop.index == 1 %}🏅{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}{{ loop.index }}{% endif %}
+                        </span>
+                        <a href="{{ url_for('student_dashboard_admin', user_id=item.student.id) }}" class="student-name">{{ item.student.username }}</a>
+                    </div>
+                    <span class="score-badge {% if item.score >= 90 %}score-high{% elif item.score >= 60 %}score-mid{% else %}score-low{% endif %}">
+                        {{ item.score }}%
+                    </span>
+                </div>
                 {% else %}
-                <li>暂无学生完成</li>
+                <div class="list-group-item">暂无学生完成</div>
                 {% endfor %}
-            </ul>
+            </div>
         </div>
         <div class="col-md-6">
             <h4>未完成</h4>
-            <ul>
+            <div class="list-group">
                 {% for student in not_completed %}
-                <li>{{ student.username }}</li>
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <span>{{ student.username }}</span>
+                    <span class="unhappy-face">😢</span>
+                </div>
                 {% else %}
-                <li>所有学生都已完成</li>
+                <div class="list-group-item">所有学生都已完成</div>
                 {% endfor %}
-            </ul>
+            </div>
         </div>
     </div>
 </div>
@@ -153,6 +164,51 @@
     max-width: 800px;
     display: block;
     margin: 0 auto;
+}
+.student-card {
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    transition: box-shadow 0.2s;
+}
+.student-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.10);
+}
+.rank-badge {
+    font-size: 1.5rem;
+    width: 2.5rem;
+    display: inline-block;
+    text-align: center;
+}
+.student-name {
+    font-weight: 600;
+    color: #333;
+    text-decoration: none;
+}
+.score-badge {
+    font-size: 1.1rem;
+    font-weight: 600;
+    padding: 6px 16px;
+    border-radius: 20px;
+    background: #e9ecef;
+    color: #333;
+}
+.score-high {
+    background: #d4edda;
+    color: #155724;
+}
+.score-mid {
+    background: #fff3cd;
+    color: #856404;
+}
+.score-low {
+    background: #f8d7da;
+    color: #721c24;
+}
+.unhappy-face {
+    font-size: 1.5rem;
+    margin-left: 8px;
 }
 </style>
 

@@ -2422,6 +2422,20 @@ def lesson_students(lesson_id):
     completed = [s for s in students if s in completed_students]
     not_completed = [s for s in students if s not in completed_students]
 
+    # 统计每个已完成学生的得分
+    completed_scores = []
+    for student in completed:
+        # 只取该生第一次完成该课程的记录
+        quiz = QuizHistory.query.filter_by(user_id=student.id, lesson_id=lesson_id).order_by(QuizHistory.completed_at.asc()).first()
+        if quiz:
+            score = round(quiz.correct_answers / quiz.total_questions * 100, 1) if quiz.total_questions > 0 else 0
+            completed_scores.append({
+                'student': student,
+                'score': score
+            })
+    # 按得分降序排序
+    completed_scores.sort(key=lambda x: x['score'], reverse=True)
+
     # 统计题目得分率
     questions = Question.query.filter_by(lesson_id=lesson_id).order_by(Question.question_number).all()
     question_stats = []
@@ -2442,7 +2456,7 @@ def lesson_students(lesson_id):
             'answer': question.answer
         })
 
-    return render_template('admin/students.html', lesson=lesson, completed=completed, not_completed=not_completed, question_stats=question_stats)
+    return render_template('admin/students.html', lesson=lesson, completed_scores=completed_scores, not_completed=not_completed, question_stats=question_stats)
 
 if __name__ == '__main__':
     init_db()  # 初始化数据库
