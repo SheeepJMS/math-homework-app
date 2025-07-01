@@ -1312,6 +1312,77 @@ def manage_exam(lesson_id):
                          questions=questions,
                          explanation_files=explanation_files)
 
+@app.route('/admin/lesson/<int:lesson_id>/question_stats')
+@admin_required
+def question_stats(lesson_id):
+    """题目得分率统计页面"""
+    lesson = Lesson.query.get_or_404(lesson_id)
+    questions = Question.query.filter_by(lesson_id=lesson_id).order_by(Question.question_number).all()
+    
+    # 获取所有答题记录
+    quiz_histories = QuizHistory.query.filter_by(lesson_id=lesson_id).all()
+    
+    # 统计每道题的得分率
+    question_stats = []
+    for question in questions:
+        # 获取这道题的所有答题记录
+        user_answers = UserAnswer.query.filter_by(
+            lesson_id=lesson_id,
+            question_id=question.id
+        ).all()
+        
+        total_attempts = len(user_answers)
+        correct_attempts = len([ua for ua in user_answers if ua.is_correct])
+        
+        # 计算得分率
+        success_rate = (correct_attempts / total_attempts * 100) if total_attempts > 0 else 0
+        
+        question_stats.append({
+            'question_number': question.question_number,
+            'type': question.type,
+            'total_attempts': total_attempts,
+            'correct_attempts': correct_attempts,
+            'success_rate': round(success_rate, 2),
+            'answer': question.answer
+        })
+    
+    return render_template('admin/question_stats.html', 
+                         lesson=lesson, 
+                         question_stats=question_stats)
+
+@app.route('/admin/lesson/<int:lesson_id>/question_stats_data')
+@admin_required
+def question_stats_data(lesson_id):
+    """返回题目得分率数据的JSON接口"""
+    lesson = Lesson.query.get_or_404(lesson_id)
+    questions = Question.query.filter_by(lesson_id=lesson_id).order_by(Question.question_number).all()
+    
+    # 统计每道题的得分率
+    question_stats = []
+    for question in questions:
+        # 获取这道题的所有答题记录
+        user_answers = UserAnswer.query.filter_by(
+            lesson_id=lesson_id,
+            question_id=question.id
+        ).all()
+        
+        total_attempts = len(user_answers)
+        correct_attempts = len([ua for ua in user_answers if ua.is_correct])
+        
+        # 计算得分率
+        success_rate = (correct_attempts / total_attempts * 100) if total_attempts > 0 else 0
+        
+        question_stats.append({
+            'question_number': question.question_number,
+            'type': question.type,
+            'total_attempts': total_attempts,
+            'correct_attempts': correct_attempts,
+            'success_rate': round(success_rate, 2),
+            'answer': question.answer
+        })
+    
+    return jsonify(question_stats)
+
 def upload_to_cloudinary(file_data, resource_type='image'):
     """上传文件到 Cloudinary 并返回 URL"""
     try:

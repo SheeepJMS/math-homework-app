@@ -2,7 +2,12 @@
 
 {% block content %}
 <div class="container mt-4">
-    <h2>试卷管理 - {{ lesson.title }}</h2>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>试卷管理 - {{ lesson.title }}</h2>
+        <a href="{{ url_for('question_stats', lesson_id=lesson.id) }}" class="btn btn-info">
+            <i class="fas fa-chart-line me-2"></i>查看得分率统计
+        </a>
+    </div>
     
     <!-- 第一部分：试卷文件上传和管理 -->
     <div class="card mb-4">

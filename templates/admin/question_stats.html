@@ -1,0 +1,333 @@
+{% extends "admin/base.html" %}
+
+{% block extra_css %}
+<style>
+.stats-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.stats-number {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.stats-label {
+    font-size: 1rem;
+    opacity: 0.9;
+}
+
+.question-stats-table {
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+.table th {
+    background: #f8f9fa;
+    border: none;
+    font-weight: 600;
+    color: #495057;
+}
+
+.table td {
+    border: none;
+    border-bottom: 1px solid #e9ecef;
+    vertical-align: middle;
+}
+
+.success-rate-badge {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+.success-rate-high {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.success-rate-medium {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.success-rate-low {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.chart-container {
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.chart-title {
+    color: #495057;
+    margin-bottom: 20px;
+    font-weight: 600;
+}
+
+.btn-filter {
+    border-radius: 20px;
+    padding: 8px 16px;
+    margin: 0 5px;
+    transition: all 0.3s ease;
+}
+
+.btn-filter:hover,
+.btn-filter.active {
+    transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.question-type-badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.type-choice {
+    background-color: #e3f2fd;
+    color: #1976d2;
+}
+
+.type-fill {
+    background-color: #f3e5f5;
+    color: #7b1fa2;
+}
+
+.type-proof {
+    background-color: #fff3e0;
+    color: #f57c00;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>题目得分率统计 - {{ lesson.title }}</h2>
+        <a href="{{ url_for('manage_exam', lesson_id=lesson.id) }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left me-2"></i>返回试卷管理
+        </a>
+    </div>
+
+    <!-- 统计概览 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-number">{{ question_stats|length }}</div>
+                <div class="stats-label">总题目数</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-number">
+                    {% set total_attempts = question_stats|sum(attribute='total_attempts') %}
+                    {{ total_attempts }}
+                </div>
+                <div class="stats-label">总答题次数</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-number">
+                    {% set avg_rate = (question_stats|sum(attribute='success_rate') / question_stats|length) if question_stats else 0 %}
+                    {{ "%.1f"|format(avg_rate) }}%
+                </div>
+                <div class="stats-label">平均得分率</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-number">
+                    {% set low_rate_count = question_stats|selectattr('success_rate', '<', 50)|list|length %}
+                    {{ low_rate_count }}
+                </div>
+                <div class="stats-label">低分率题目</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 筛选按钮 -->
+    <div class="mb-4">
+        <h5>题目类型筛选：</h5>
+        <button class="btn btn-outline-primary btn-filter active" onclick="filterByType('all')">全部</button>
+        <button class="btn btn-outline-primary btn-filter" onclick="filterByType('choice')">选择题</button>
+        <button class="btn btn-outline-primary btn-filter" onclick="filterByType('fill')">填空题</button>
+        <button class="btn btn-outline-primary btn-filter" onclick="filterByType('proof')">证明题</button>
+    </div>
+
+    <!-- 得分率图表 -->
+    <div class="chart-container">
+        <h5 class="chart-title">题目得分率走势图</h5>
+        <canvas id="successRateChart" width="400" height="200"></canvas>
+    </div>
+
+    <!-- 题目得分率表格 -->
+    <div class="question-stats-table">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>题号</th>
+                        <th>类型</th>
+                        <th>答题次数</th>
+                        <th>正确次数</th>
+                        <th>得分率</th>
+                        <th>标准答案</th>
+                        <th>状态</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for stat in question_stats %}
+                    <tr class="question-row" data-type="{{ stat.type }}">
+                        <td><strong>第{{ stat.question_number }}题</strong></td>
+                        <td>
+                            <span class="question-type-badge type-{{ stat.type }}">
+                                {% if stat.type == 'choice' %}选择题
+                                {% elif stat.type == 'fill' %}填空题
+                                {% else %}证明题{% endif %}
+                            </span>
+                        </td>
+                        <td>{{ stat.total_attempts }}</td>
+                        <td>{{ stat.correct_attempts }}</td>
+                        <td>
+                            <span class="success-rate-badge 
+                                {% if stat.success_rate >= 80 %}success-rate-high
+                                {% elif stat.success_rate >= 50 %}success-rate-medium
+                                {% else %}success-rate-low{% endif %}">
+                                {{ stat.success_rate }}%
+                            </span>
+                        </td>
+                        <td><code>{{ stat.answer }}</code></td>
+                        <td>
+                            {% if stat.success_rate >= 80 %}
+                                <span class="badge bg-success">优秀</span>
+                            {% elif stat.success_rate >= 50 %}
+                                <span class="badge bg-warning">一般</span>
+                            {% else %}
+                                <span class="badge bg-danger">需关注</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- 引入Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+{% block extra_js %}
+<script>
+// 筛选功能
+function filterByType(type) {
+    // 更新按钮状态
+    document.querySelectorAll('.btn-filter').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.target.classList.add('active');
+
+    // 筛选表格行
+    document.querySelectorAll('.question-row').forEach(row => {
+        if (type === 'all' || row.dataset.type === type) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+
+    // 重新绘制图表
+    updateChart(type);
+}
+
+// 图表数据
+const chartLabels = {{ question_stats|map(attribute='question_number')|list|tojson }};
+const chartRates = {{ question_stats|map(attribute='success_rate')|list|tojson }};
+const questionStats = {{ question_stats|tojson }};
+const chartData = {
+    labels: chartLabels,
+    datasets: [{
+        label: '得分率 (%)',
+        data: chartRates,
+        borderColor: 'rgb(75, 192, 192)',
+        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+        tension: 0.1,
+        fill: true
+    }]
+};
+
+// 创建图表
+let successRateChart = new Chart(document.getElementById('successRateChart'), {
+    type: 'line',
+    data: chartData,
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: true,
+                position: 'top'
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return `第${context.label}题: ${context.parsed.y}%`;
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                max: 100,
+                ticks: {
+                    callback: function(value) {
+                        return value + '%';
+                    }
+                }
+            },
+            x: {
+                title: {
+                    display: true,
+                    text: '题号'
+                }
+            }
+        }
+    }
+});
+
+// 更新图表函数
+function updateChart(type) {
+    let filteredData = questionStats;
+    if (type !== 'all') {
+        filteredData = questionStats.filter(stat => stat.type === type);
+    }
+    successRateChart.data.labels = filteredData.map(stat => stat.question_number);
+    successRateChart.data.datasets[0].data = filteredData.map(stat => stat.success_rate);
+    successRateChart.update();
+}
+
+// 页面加载完成后的初始化
+document.addEventListener('DOMContentLoaded', function() {
+    // 可以在这里添加其他初始化代码
+    console.log('题目得分率统计页面加载完成');
+});
+</script>
+{% endblock %}
+
+{% endblock %} 
