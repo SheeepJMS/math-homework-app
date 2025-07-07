@@ -815,7 +815,6 @@ def student_dashboard():
             'class_avg': round(class_avg),  # 取整
             'lesson_title': lesson.title if lesson else 'Unknown'
         })
-    trend_data.reverse()  # 按时间顺序排列
     
     return render_template('student/dashboard.html',
                          total_quizzes=total_quizzes,
@@ -1895,7 +1894,6 @@ def student_dashboard_admin(user_id):
             'class_avg': round(class_avg),  # 取整
             'lesson_title': lesson.title if lesson else 'Unknown'
         })
-    trend_data.reverse()  # 按时间顺序排列
     
     return render_template('student/dashboard.html',
                          current_user=student,  # 使用学生用户信息
