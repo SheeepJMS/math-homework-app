@@ -758,6 +758,12 @@ def student_dashboard():
     # 获取用户的所有测验历史记录
     quiz_history = QuizHistory.query.filter_by(user_id=current_user.id).all()
     
+    # 新增：定义 correct_rate，防止未定义报错
+    if quiz_history:
+        correct_rate = quiz_history[-1].correct_rate  # 最近一次测验的正确率
+    else:
+        correct_rate = 0
+    
     # 如果用户还没有完成任何测验，将徽章等级设置为0
     if not quiz_history:
         current_user.badge_level = 0
