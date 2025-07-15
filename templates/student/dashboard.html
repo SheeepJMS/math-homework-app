@@ -81,6 +81,11 @@
         <div class="chart-container">
             <canvas id="trendChart"></canvas>
         </div>
+        <div class="d-flex justify-content-between align-items-center mt-2">
+            <button class="btn btn-outline-secondary btn-sm" id="prevBtn">← 上一页</button>
+            <span id="trendPageInfo"></span>
+            <button class="btn btn-outline-secondary btn-sm" id="nextBtn">下一页 →</button>
+        </div>
     </div>
 
     <!-- 可用课程 -->
@@ -551,92 +556,106 @@
 <script>
     // 趋势图数据处理
     const trendData = JSON.parse('{{ trend_data | safe }}');
-    const dates = trendData.map(item => item.date);
-    const correctRates = trendData.map(item => Math.round(item.correct_rate));
-    const classAvgs = trendData.map(item => Math.round(item.class_avg));
-    const lessonTitles = trendData.map(item => item.lesson_title);
+    const pageSize = 8;
+    let pageIndex = 0;
 
-    // 创建趋势图
-    const ctx = document.getElementById('trendChart').getContext('2d');
-    new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: lessonTitles,
-            datasets: [
-                {
-                    label: '你的正确率',
-                    data: correctRates,
-                    borderColor: 'rgb(75, 192, 192)',
-                    tension: 0.1,
-                    fill: false
-                },
-                {
-                    label: '班级平均',
-                    data: classAvgs,
-                    borderColor: 'rgba(255, 99, 132, 0.8)',
-                    borderDash: [5, 5],
-                    tension: 0.1,
-                    fill: false
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const datasetLabel = context.dataset.label;
-                            const value = Math.round(context.parsed.y);
-                            const date = dates[context.dataIndex];
-                            return `${datasetLabel}: ${value}% (${date})`;
-                        }
+    function getPagedData() {
+        // 默认显示最新的8节课
+        const total = trendData.length;
+        const start = Math.max(0, total - (pageIndex + 1) * pageSize);
+        const end = total - pageIndex * pageSize;
+        return trendData.slice(start, end);
+    }
+
+    function renderTrendChart() {
+        const paged = getPagedData();
+        const lessonTitles = paged.map(item => item.lesson_title);
+        const correctRates = paged.map(item => Math.round(item.correct_rate));
+        const classAvgs = paged.map(item => Math.round(item.class_avg));
+        const dates = paged.map(item => item.date);
+
+        const ctx = document.getElementById('trendChart').getContext('2d');
+        if(window.trendChartInstance) window.trendChartInstance.destroy();
+        window.trendChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: lessonTitles,
+                datasets: [
+                    {
+                        label: '你的正确率',
+                        data: correctRates,
+                        borderColor: 'rgb(75, 192, 192)',
+                        tension: 0.1,
+                        fill: false
+                    },
+                    {
+                        label: '班级平均',
+                        data: classAvgs,
+                        borderColor: 'rgba(255, 99, 132, 0.8)',
+                        borderDash: [5, 5],
+                        tension: 0.1,
+                        fill: false
                     }
-                },
-                legend: {
-                    display: true,
-                    position: 'top'
-                }
+                ]
             },
-            scales: {
-                x: {
-                    ticks: {
-                        maxRotation: 45,
-                        minRotation: 45,
-                        autoSkip: false,
-                        callback: function(value, index) {
-                            const title = this.getLabelForValue(value);
-                            const words = title.split(' ');
-                            const lines = [];
-                            let currentLine = '';
-                            
-                            for (let word of words) {
-                                if (currentLine.length + word.length > 10) {
-                                    lines.push(currentLine);
-                                    currentLine = word;
-                                } else {
-                                    currentLine = currentLine ? currentLine + ' ' + word : word;
-                                }
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const datasetLabel = context.dataset.label;
+                                const value = Math.round(context.parsed.y);
+                                const date = dates[context.dataIndex];
+                                return `${datasetLabel}: ${value}% (${date})`;
                             }
-                            if (currentLine) {
-                                lines.push(currentLine);
-                            }
-                            return lines;
                         }
+                    },
+                    legend: {
+                        display: true,
+                        position: 'top'
                     }
                 },
-                y: {
-                    beginAtZero: true,
-                    max: 100,
-                    ticks: {
-                        callback: function(value) {
-                            return Math.round(value) + '%';
+                scales: {
+                    x: {
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45,
+                            autoSkip: false
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: {
+                            callback: function(value) {
+                                return Math.round(value) + '%';
+                            }
                         }
                     }
                 }
             }
-        }
+        });
+        // 更新页码信息
+        const total = trendData.length;
+        const totalPages = Math.ceil(total / pageSize);
+        document.getElementById('trendPageInfo').textContent = `第${total - (pageIndex * pageSize) > 0 ? total - (pageIndex * pageSize) : 1}-${total - (pageIndex * pageSize) + paged.length - 1}节课 / 共${total}节课`;
+        document.getElementById('prevBtn').disabled = (pageIndex >= totalPages - 1);
+        document.getElementById('nextBtn').disabled = (pageIndex <= 0);
+    }
+
+    document.getElementById('prevBtn').onclick = function() {
+        pageIndex++;
+        renderTrendChart();
+    };
+    document.getElementById('nextBtn').onclick = function() {
+        if(pageIndex > 0) pageIndex--;
+        renderTrendChart();
+    };
+
+    document.addEventListener('DOMContentLoaded', function() {
+        renderTrendChart();
     });
 </script>
 {% endblock %} 
