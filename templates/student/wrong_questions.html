@@ -113,6 +113,19 @@
 <div class="container mt-4">
     <h2 class="mb-4">我的错题本</h2>
 
+    <!-- 正确率趋势图 -->
+    <div class="card trend-card mb-4">
+        <h4>正确率趋势</h4>
+        <div class="chart-container" style="height: 250px;">
+            <canvas id="trendChart"></canvas>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mt-2">
+            <button class="btn btn-outline-secondary btn-sm" id="prevBtn">← 上一页</button>
+            <span id="trendPageInfo"></span>
+            <button class="btn btn-outline-secondary btn-sm" id="nextBtn">下一页 →</button>
+        </div>
+    </div>
+
     <!-- 课程选择 -->
     <div class="card mb-4">
         <div class="card-body">
@@ -211,6 +224,112 @@
 </div>
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// 假设后端传递 trend_data 变量，格式与 dashboard 一致
+const trendData = JSON.parse('{{ trend_data | safe }}');
+const pageSize = 8;
+let pageIndex = 0;
+
+function getPagedData() {
+    // 默认显示最新的8节课
+    const total = trendData.length;
+    const start = Math.max(0, total - (pageIndex + 1) * pageSize);
+    const end = total - pageIndex * pageSize;
+    return trendData.slice(start, end);
+}
+
+function renderTrendChart() {
+    const paged = getPagedData();
+    const lessonTitles = paged.map(item => item.lesson_title);
+    const correctRates = paged.map(item => Math.round(item.correct_rate));
+    const classAvgs = paged.map(item => Math.round(item.class_avg));
+    const dates = paged.map(item => item.date);
+
+    const ctx = document.getElementById('trendChart').getContext('2d');
+    if(window.trendChartInstance) window.trendChartInstance.destroy();
+    window.trendChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: lessonTitles,
+            datasets: [
+                {
+                    label: '你的正确率',
+                    data: correctRates,
+                    borderColor: 'rgb(75, 192, 192)',
+                    tension: 0.1,
+                    fill: false
+                },
+                {
+                    label: '班级平均',
+                    data: classAvgs,
+                    borderColor: 'rgba(255, 99, 132, 0.8)',
+                    borderDash: [5, 5],
+                    tension: 0.1,
+                    fill: false
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const datasetLabel = context.dataset.label;
+                            const value = Math.round(context.parsed.y);
+                            const date = dates[context.dataIndex];
+                            return `${datasetLabel}: ${value}% (${date})`;
+                        }
+                    }
+                },
+                legend: {
+                    display: true,
+                    position: 'top'
+                }
+            },
+            scales: {
+                x: {
+                    ticks: {
+                        maxRotation: 45,
+                        minRotation: 45,
+                        autoSkip: false
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        callback: function(value) {
+                            return Math.round(value) + '%';
+                        }
+                    }
+                }
+            }
+        }
+    });
+    // 更新页码信息
+    const total = trendData.length;
+    const totalPages = Math.ceil(total / pageSize);
+    document.getElementById('trendPageInfo').textContent = `第${total - (pageIndex * pageSize) > 0 ? total - (pageIndex * pageSize) : 1}-${total - (pageIndex * pageSize) + paged.length - 1}节课 / 共${total}节课`;
+    document.getElementById('prevBtn').disabled = (pageIndex >= totalPages - 1);
+    document.getElementById('nextBtn').disabled = (pageIndex <= 0);
+}
+
+document.getElementById('prevBtn').onclick = function() {
+    pageIndex++;
+    renderTrendChart();
+};
+document.getElementById('nextBtn').onclick = function() {
+    if(pageIndex > 0) pageIndex--;
+    renderTrendChart();
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+    renderTrendChart();
+});
+</script>
 <script>
 function filterByLesson(lessonId) {
     // 阻止默认行为，保持页面位置

@@ -71,7 +71,7 @@
                             </thead>
                             <tbody>
                                 {% for user in students %}
-                                <tr>
+                                <tr data-user-id="{{ user.id }}">
                                     <td>{{ user.username }}</td>
                                     <td>{{ user.email }}</td>
                                     <td>
@@ -319,6 +319,9 @@ function deleteUser(id) {
 }
 
 function toggleUserStatus(userId, btn) {
+    // 保存当前页面位置
+    const scrollPosition = window.scrollY;
+    
     fetch(`/admin/user/${userId}/toggle`, {
         method: 'POST',
         headers: {
@@ -344,10 +347,66 @@ function toggleUserStatus(userId, btn) {
                 badge.innerText = '未激活';
                 badge.className = 'badge bg-secondary';
             }
+            // 恢复页面位置
+            window.scrollTo(0, scrollPosition);
         } else {
             alert(data.msg || '操作失败');
         }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('操作失败，请重试');
     });
 }
+
+// 添加编辑用户表单的AJAX处理
+document.addEventListener('DOMContentLoaded', function() {
+    const editUserForm = document.getElementById('editUserForm');
+    if (editUserForm) {
+        editUserForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // 保存当前页面位置
+            const scrollPosition = window.scrollY;
+            
+            const formData = new FormData(this);
+            
+            fetch(this.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // 关闭模态框
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('editUserModal'));
+                    modal.hide();
+                    
+                    // 更新页面上的用户名显示
+                    const userId = this.action.split('/').pop();
+                    const usernameCell = document.querySelector(`tr[data-user-id="${userId}"] td:first-child`);
+                    if (usernameCell) {
+                        usernameCell.textContent = formData.get('username');
+                    }
+                    
+                    // 显示成功消息
+                    alert('用户信息更新成功！');
+                    
+                    // 恢复页面位置
+                    window.scrollTo(0, scrollPosition);
+                } else {
+                    alert(data.msg || '更新失败');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('更新失败，请重试');
+            });
+        });
+    }
+});
 </script>
 {% endblock %} 

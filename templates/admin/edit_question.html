@@ -73,7 +73,7 @@
         </div>
         
         <div class="edit-form">
-            <form action="{{ url_for('edit_question', question_id=question.id) }}" method="POST">
+            <form id="editQuestionForm" action="{{ url_for('edit_question', question_id=question.id) }}" method="POST">
                 <div class="form-group">
                     <label for="content">题目内容：</label>
                     <textarea id="content" name="content" required>{{ question.content }}</textarea>
@@ -98,5 +98,45 @@
             </form>
         </div>
     </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const editQuestionForm = document.getElementById('editQuestionForm');
+        if (editQuestionForm) {
+            editQuestionForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                // 保存当前页面位置
+                const scrollPosition = window.scrollY;
+                
+                const formData = new FormData(this);
+                
+                fetch(this.action, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // 显示成功消息
+                        alert('题目更新成功！');
+                        
+                        // 恢复页面位置
+                        window.scrollTo(0, scrollPosition);
+                    } else {
+                        alert(data.msg || '更新失败');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('更新失败，请重试');
+                });
+            });
+        }
+    });
+    </script>
 </body>
 </html> 

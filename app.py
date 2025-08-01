@@ -589,12 +589,16 @@ def edit_class(class_id):
     description = request.form.get('description')
     
     if not name:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'msg': '班级名称不能为空'})
         flash('班级名称不能为空')
         return redirect(url_for('admin_classes'))
     
     # 检查名称是否已存在（排除当前班级）
     existing_class = Class.query.filter(Class.name == name, Class.id != class_id).first()
     if existing_class:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'msg': '班级名称已存在'})
         flash('班级名称已存在')
         return redirect(url_for('admin_classes'))
     
@@ -604,9 +608,13 @@ def edit_class(class_id):
     
     try:
         db.session.commit()
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': True, 'msg': '班级更新成功'})
         flash('班级更新成功')
     except Exception as e:
         db.session.rollback()
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'msg': f'更新失败：{str(e)}'})
         flash(f'更新失败：{str(e)}')
     
     return redirect(url_for('admin_classes'))
@@ -660,6 +668,14 @@ def toggle_lesson_status(lesson_id):
     # 直接切换当前课程的状态
     lesson.is_active = not lesson.is_active
     db.session.commit()
+    
+    # 检查是否是AJAX请求
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({
+            'success': True,
+            'is_active': lesson.is_active,
+            'message': f'课程 {lesson.title} {{ "已激活" if lesson.is_active else "已停用" }}'
+        })
     
     flash(f'课程 {lesson.title} {{ "已激活" if lesson.is_active else "已停用" }}')
     return redirect(url_for('admin_lessons'))
@@ -1143,22 +1159,42 @@ def add_question(lesson_id):
 @app.route('/admin/question/<int:question_id>/edit', methods=['POST'])
 @admin_required
 def edit_question(question_id):
+    question = Question.query.get_or_404(question_id)
+    
+    # 获取表单数据
+    content = request.form.get('content')
+    answer = request.form.get('answer')
+    explanation = request.form.get('explanation')
+    
+    if not content or not answer:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'msg': '题目内容和答案不能为空'})
+        flash('题目内容和答案不能为空')
+        return redirect(url_for('manage_questions', lesson_id=question.lesson_id))
+    
+    # 验证答案格式
+    if question.type == 'choice' and answer not in ['A', 'B', 'C', 'D']:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'msg': '选择题答案必须是A、B、C或D'})
+        flash('选择题答案必须是A、B、C或D')
+        return redirect(url_for('manage_questions', lesson_id=question.lesson_id))
+    
     try:
-        data = request.get_json()
-        question = Question.query.get_or_404(question_id)
-        
-        # 验证答案格式
-        answer = data.get('answer', '').strip().upper()
-        if question.type == 'choice' and answer not in ['A', 'B', 'C', 'D']:
-            return jsonify({'error': '选择题答案必须是A、B、C或D'}), 400
-        
+        question.content = content
         question.answer = answer
-        question.points = int(data.get('points', 1))
+        question.explanation = explanation
         db.session.commit()
         
-        return jsonify({'message': '更新成功'}), 200
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': True, 'msg': '题目更新成功'})
+        flash('题目更新成功')
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        db.session.rollback()
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'msg': f'更新失败：{str(e)}'})
+        flash(f'更新失败：{str(e)}')
+    
+    return redirect(url_for('manage_questions', lesson_id=question.lesson_id))
 
 @app.route('/admin/question/<int:question_id>/delete', methods=['POST'])
 @admin_required
@@ -2432,6 +2468,8 @@ def download_courseware(courseware_id):
 def edit_user(user_id):
     user = User.query.get_or_404(user_id)
     if user.is_admin:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'msg': '不能编辑管理员账户'})
         flash('不能编辑管理员账户', 'error')
         return redirect(url_for('admin_users'))
 
@@ -2439,12 +2477,16 @@ def edit_user(user_id):
     class_id = request.form.get('class_id')
 
     if not username or not class_id:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'msg': '用户名和班级不能为空'})
         flash('用户名和班级不能为空', 'error')
         return redirect(url_for('admin_users'))
 
     # 检查用户名是否已存在（排除当前用户）
     existing_user = User.query.filter(User.username == username, User.id != user_id).first()
     if existing_user:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'msg': '用户名已存在'})
         flash('用户名已存在', 'error')
         return redirect(url_for('admin_users'))
 
@@ -2453,9 +2495,13 @@ def edit_user(user_id):
     
     try:
         db.session.commit()
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': True, 'msg': '用户信息更新成功'})
         flash('用户信息更新成功', 'success')
     except Exception as e:
         db.session.rollback()
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'msg': f'更新失败: {e}'})
         flash(f'更新失败: {e}', 'error')
 
     return redirect(url_for('admin_users'))

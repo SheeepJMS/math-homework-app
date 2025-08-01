@@ -24,7 +24,7 @@
                     </thead>
                     <tbody>
                         {% for class in classes %}
-                        <tr>
+                        <tr data-class-id="{{ class.id }}">
                             <td>{{ class.name }}</td>
                             <td>{{ class.description }}</td>
                             <td>
@@ -197,5 +197,59 @@ function deleteClass(id) {
         form.submit();
     }
 }
+
+// 添加编辑班级表单的AJAX处理
+document.addEventListener('DOMContentLoaded', function() {
+    const editClassForm = document.getElementById('editClassForm');
+    if (editClassForm) {
+        editClassForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // 保存当前页面位置
+            const scrollPosition = window.scrollY;
+            
+            const formData = new FormData(this);
+            
+            fetch(this.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // 关闭模态框
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('editClassModal'));
+                    modal.hide();
+                    
+                    // 更新页面上的班级信息显示
+                    const classId = this.action.split('/').pop();
+                    const classNameCell = document.querySelector(`tr[data-class-id="${classId}"] td:first-child`);
+                    const descriptionCell = document.querySelector(`tr[data-class-id="${classId}"] td:nth-child(2)`);
+                    if (classNameCell) {
+                        classNameCell.textContent = formData.get('name');
+                    }
+                    if (descriptionCell) {
+                        descriptionCell.textContent = formData.get('description');
+                    }
+                    
+                    // 显示成功消息
+                    alert('班级信息更新成功！');
+                    
+                    // 恢复页面位置
+                    window.scrollTo(0, scrollPosition);
+                } else {
+                    alert(data.msg || '更新失败');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('更新失败，请重试');
+            });
+        });
+    }
+});
 </script>
 {% endblock %} 

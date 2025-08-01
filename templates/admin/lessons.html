@@ -43,13 +43,10 @@
                             <td>{{ lesson.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
                             <td>
                                 <div class="d-flex flex-row flex-wrap gap-1 align-items-center">
-                                    <form action="{{ url_for('toggle_lesson_status', lesson_id=lesson.id) }}" method="POST" style="display: inline;">
-                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                        <button type="submit" class="btn {% if lesson.is_active %}btn-warning{% else %}btn-success{% endif %} btn-sm">
-                                            <i class="fas {% if lesson.is_active %}fa-pause{% else %}fa-play{% endif %}"></i>
-                                            {{ '停用' if lesson.is_active else '激活' }}
-                                        </button>
-                                    </form>
+                                    <button type="button" class="btn {% if lesson.is_active %}btn-warning{% else %}btn-success{% endif %} btn-sm" onclick="toggleLessonStatus('{{ lesson.id }}', this)">
+                                        <i class="fas {% if lesson.is_active %}fa-pause{% else %}fa-play{% endif %}"></i>
+                                        {{ '停用' if lesson.is_active else '激活' }}
+                                    </button>
                                     <a href="{{ url_for('manage_questions', lesson_id=lesson.id) }}" class="btn btn-primary btn-sm">
                                         <i class="fas fa-bee"></i> 管理题目
                                     </a>
@@ -351,6 +348,46 @@
 function uploadVideo(lessonId) {
     document.getElementById('uploadVideoForm').action = `/admin/lesson/${lessonId}/upload_video`;
     new bootstrap.Modal(document.getElementById('uploadVideoModal')).show();
+}
+
+function toggleLessonStatus(lessonId, button) {
+    // 保存当前页面位置
+    const scrollPosition = window.scrollY;
+    
+    fetch(`/admin/lesson/${lessonId}/toggle`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token() }}',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // 更新按钮状态
+            if (data.is_active) {
+                button.classList.remove('btn-success');
+                button.classList.add('btn-warning');
+                button.innerHTML = '<i class="fas fa-pause"></i> 停用';
+            } else {
+                button.classList.remove('btn-warning');
+                button.classList.add('btn-success');
+                button.innerHTML = '<i class="fas fa-play"></i> 激活';
+            }
+            
+            // 显示成功消息
+            alert(data.message);
+            
+            // 恢复页面位置
+            window.scrollTo(0, scrollPosition);
+        } else {
+            alert('操作失败：' + (data.message || '未知错误'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('操作失败，请重试');
+    });
 }
 
 function deleteLesson(id) {
