@@ -181,21 +181,19 @@ function editClass(id, name, description) {
 }
 
 function deleteClass(id) {
-    if (confirm('确定要删除这个班级吗？')) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = `/admin/class/${id}/delete`;
-        
-        // 添加CSRF令牌
-        const csrfInput = document.createElement('input');
-        csrfInput.type = 'hidden';
-        csrfInput.name = 'csrf_token';
-        csrfInput.value = '{{ csrf_token() }}';
-        form.appendChild(csrfInput);
-        
-        document.body.appendChild(form);
-        form.submit();
-    }
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/admin/class/${id}/delete`;
+    
+    // 添加CSRF令牌
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrf_token';
+    csrfInput.value = '{{ csrf_token() }}';
+    form.appendChild(csrfInput);
+    
+    document.body.appendChild(form);
+    form.submit();
 }
 
 // 添加编辑班级表单的AJAX处理
@@ -235,18 +233,14 @@ document.addEventListener('DOMContentLoaded', function() {
                         descriptionCell.textContent = formData.get('description');
                     }
                     
-                    // 显示成功消息
-                    alert('班级信息更新成功！');
-                    
                     // 恢复页面位置
                     window.scrollTo(0, scrollPosition);
                 } else {
-                    alert(data.msg || '更新失败');
+                    console.error('更新失败：' + (data.msg || '未知错误'));
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('更新失败，请重试');
             });
         });
     }

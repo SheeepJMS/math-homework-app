@@ -634,7 +634,6 @@ def add_lesson():
     class_ids = request.form.getlist('class_ids')  # 修改这里
     
     if not title or not class_ids:
-        flash('课程标题和所属班级不能为空')
         return redirect(url_for('admin_lessons'))
     
     # 创建新课程
@@ -653,10 +652,8 @@ def add_lesson():
     try:
         db.session.add(new_lesson)
         db.session.commit()
-        flash('课程添加成功')
     except Exception as e:
         db.session.rollback()
-        flash(f'添加失败：{str(e)}')
     
     return redirect(url_for('admin_lessons'))
 
@@ -677,7 +674,6 @@ def toggle_lesson_status(lesson_id):
             'message': f'课程 {lesson.title} {{ "已激活" if lesson.is_active else "已停用" }}'
         })
     
-    flash(f'课程 {lesson.title} {{ "已激活" if lesson.is_active else "已停用" }}')
     return redirect(url_for('admin_lessons'))
 
 @app.route('/admin/lesson/<int:lesson_id>/delete', methods=['POST'])
@@ -745,14 +741,12 @@ def delete_lesson(lesson_id):
         db.session.commit()
         print("成功删除课程")  # 调试日志
         
-        flash('课程已成功删除', 'success')
         return redirect(url_for('admin_lessons'))
         
     except Exception as e:
         db.session.rollback()
         error_msg = str(e)
         print(f"删除课程时出错: {error_msg}")  # 调试日志
-        flash(f'删除课程时出错: {error_msg}', 'error')
         return redirect(url_for('admin_lessons'))
 
 @app.route('/admin/lesson/<int:lesson_id>/questions')
@@ -894,7 +888,6 @@ def edit_lesson(lesson_id):
     class_ids = request.form.getlist('class_ids')  # 注意这里使用class_ids而不是class_id
     
     if not title or not class_ids:
-        flash('课程标题和所属班级不能为空')
         return redirect(url_for('admin_lessons'))
     
     # 更新课程信息
@@ -910,10 +903,8 @@ def edit_lesson(lesson_id):
     
     try:
         db.session.commit()
-        flash('课程更新成功')
     except Exception as e:
         db.session.rollback()
-        flash(f'更新失败：{str(e)}')
     
     return redirect(url_for('admin_lessons'))
 

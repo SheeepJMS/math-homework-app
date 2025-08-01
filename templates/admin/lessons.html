@@ -375,37 +375,50 @@ function toggleLessonStatus(lessonId, button) {
                 button.innerHTML = '<i class="fas fa-play"></i> 激活';
             }
             
-            // 显示成功消息
-            alert(data.message);
-            
             // 恢复页面位置
             window.scrollTo(0, scrollPosition);
         } else {
-            alert('操作失败：' + (data.message || '未知错误'));
+            console.error('操作失败：' + (data.message || '未知错误'));
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('操作失败，请重试');
     });
 }
 
-function deleteLesson(id) {
-    if (confirm('确定要删除这个课程吗？这将同时删除所有相关的题目和学生答题记录。')) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = `/admin/lesson/${id}/delete`;
-        
-        // 添加CSRF令牌
-        const csrfInput = document.createElement('input');
-        csrfInput.type = 'hidden';
-        csrfInput.name = 'csrf_token';
-        csrfInput.value = '{{ csrf_token() }}';
-        form.appendChild(csrfInput);
-        
-        document.body.appendChild(form);
-        form.submit();
+// 确保模态框正常工作
+document.addEventListener('DOMContentLoaded', function() {
+    // 初始化所有模态框
+    var modals = document.querySelectorAll('.modal');
+    modals.forEach(function(modal) {
+        new bootstrap.Modal(modal);
+    });
+    
+    // 确保添加课程按钮正常工作
+    var addButton = document.querySelector('[data-bs-target="#addLessonModal"]');
+    if (addButton) {
+        addButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            var modal = new bootstrap.Modal(document.getElementById('addLessonModal'));
+            modal.show();
+        });
     }
+});
+
+function deleteLesson(id) {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/admin/lesson/${id}/delete`;
+    
+    // 添加CSRF令牌
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrf_token';
+    csrfInput.value = '{{ csrf_token() }}';
+    form.appendChild(csrfInput);
+    
+    document.body.appendChild(form);
+    form.submit();
 }
 </script>
 {% endblock %} 
