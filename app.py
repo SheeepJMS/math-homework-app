@@ -107,6 +107,9 @@ def init_db():
     with app.app_context():
         try:
             print("开始数据库初始化...")
+            
+            # 先尝试删除所有表，然后重新创建
+            db.drop_all()
             db.create_all()
             print("数据库表创建成功")
             
@@ -139,8 +142,36 @@ def init_db():
                 print("管理员账号已存在，跳过创建默认数据。")
         except Exception as e:
             print(f"数据库初始化出错: {str(e)}")
-            db.session.rollback()
-            raise
+            # 如果出错，强制重新创建数据库
+            print("强制重新创建数据库...")
+            db.drop_all()
+            db.create_all()
+            print("数据库重新创建成功")
+            
+            # 重新创建默认数据
+            try:
+                default_class = Class(
+                    name='默认班级',
+                    description='系统默认班级',
+                    is_active=True
+                )
+                db.session.add(default_class)
+                db.session.flush()
+                
+                admin = User(
+                    username='admin',
+                    email='admin@example.com',
+                    password='admin123',
+                    is_active=True,
+                    is_admin=True,
+                    class_id=default_class.id
+                )
+                db.session.add(admin)
+                db.session.commit()
+                print("默认数据重新创建成功！")
+            except Exception as e2:
+                print(f"重新创建默认数据失败: {str(e2)}")
+                db.session.rollback()
 
 # 课程和班级的多对多关联表
 lesson_class_association = db.Table('lesson_class_association',
@@ -215,6 +246,7 @@ class User(UserMixin, db.Model):
     class_id = db.Column(db.Integer, db.ForeignKey('class.id'))
     achievement_count = db.Column(db.Integer, default=0)  # 达标次数（80%以上正确率）
     badge_level = db.Column(db.Integer, default=0)  # 徽章等级，默认为0（无徽章）
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # 一对多关系
@@ -263,14 +295,31 @@ class User(UserMixin, db.Model):
             10: {"name": "Dragon", "icon": "🐉", "next_level": None}
         }
         current_badge = badges.get(self.badge_level, badges[1])
-        next_achievements_needed = current_badge["next_level"] - self.achievement_count if current_badge["next_level"] else 0
+        
+        # 简化的徽章升级计算逻辑
+        if current_badge["next_level"]:
+            if self.badge_level < 3:
+                # Level 1-2: 需要60%以上正确率
+                if self.badge_level == 1:
+                    next_achievements_needed = 2 - (self.achievement_count % 2)
+                else:  # Level 2
+                    next_achievements_needed = 3 - (self.achievement_count % 3)
+            elif self.badge_level < 8:
+                # Level 3-7: 需要80%以上正确率，每次2次达标
+                next_achievements_needed = 2 - (self.achievement_count % 2)
+            else:
+                # Level 8+: 需要80%以上正确率，每次5次达标
+                next_achievements_needed = 5 - (self.achievement_count % 5)
+        else:
+            next_achievements_needed = 0
+            
         return {
             "current_level": self.badge_level,
             "name": current_badge["name"],
             "icon": current_badge["icon"],
             "achievements": self.achievement_count,
             "next_level_at": current_badge["next_level"],
-            "next_achievements_needed": next_achievements_needed,
+            "next_achievements_needed": max(0, next_achievements_needed),
             "encouragement": encouragements.get(self.badge_level, "Amazing progress!")
         }
 
@@ -783,43 +832,29 @@ def student_dashboard():
         if current_user.badge_level == 0:
             current_user.badge_level = 1
             current_user.achievement_count = 1
-            current_user.level_achievements = 0  # 新增：当前等级达标数
+
             flash('恭喜！你获得了第一个徽章：小毛毛虫！🐛', 'success')
         # Level 1 到 Level 3：需要达到60%
         elif current_user.badge_level < 3:
             if correct_rate >= 60:
-                if not hasattr(current_user, 'level_achievements'):
-                    current_user.level_achievements = 0
-                current_user.level_achievements += 1
                 # Level 1 升 Level 2 需要2次达标
-                if current_user.badge_level == 1 and current_user.level_achievements >= 2:
+                if current_user.badge_level == 1 and current_user.achievement_count % 2 == 0:
                     current_user.badge_level = 2
-                    current_user.level_achievements = 0
                     flash(f'恭喜！你已经升级到 {current_user.badge_info["name"]} 级别！', 'success')
                 # Level 2 升 Level 3 需要3次达标
-                elif current_user.badge_level == 2 and current_user.level_achievements >= 3:
+                elif current_user.badge_level == 2 and current_user.achievement_count % 3 == 0:
                     current_user.badge_level = 3
-                    current_user.level_achievements = 0
                     flash(f'恭喜！你已经升级到 {current_user.badge_info["name"]} 级别！', 'success')
         # Level 3 到 Level 8：每级需要两次80%
         elif 3 <= current_user.badge_level < 8:
-            if correct_rate >= 80:
-                if not hasattr(current_user, 'level_achievements'):
-                    current_user.level_achievements = 0
-                current_user.level_achievements += 1
-                if current_user.level_achievements >= 2:
-                    current_user.badge_level += 1
-                    current_user.level_achievements = 0
-                    flash(f'恭喜！你已经升级到 {current_user.badge_info["name"]} 级别！', 'success')
+            if correct_rate >= 80 and current_user.achievement_count % 2 == 0:
+                current_user.badge_level += 1
+                flash(f'恭喜！你已经升级到 {current_user.badge_info["name"]} 级别！', 'success')
         # Level 8以上：每级需要五次80%
         else:
             if correct_rate >= 80:
-                if not hasattr(current_user, 'level_achievements'):
-                    current_user.level_achievements = 0
-                current_user.level_achievements += 1
-                if current_user.level_achievements >= 5:
+                if current_user.achievement_count % 5 == 0:
                     current_user.badge_level += 1
-                    current_user.level_achievements = 0
                     flash(f'太厉害了！你已经升级到 {current_user.badge_info["name"]} 级别！', 'success')
         # 总成就数依然累计
         current_user.achievement_count += 1
@@ -1064,50 +1099,33 @@ def submit_quiz(lesson_id):
         correct_rate = (correct_count / len(questions)) * 100
 
         # 更新成就计数和徽章等级
+        # 总成就数累计
+        current_user.achievement_count += 1
+        
+        # 简化的徽章升级逻辑
         # Level 0 到 Level 1：只要提交作业就升级
         if current_user.badge_level == 0:
             current_user.badge_level = 1
-            current_user.achievement_count = 1
-            current_user.level_achievements = 0  # 新增：当前等级达标数
             flash('恭喜！你获得了第一个徽章：小毛毛虫！🐛', 'success')
-        # Level 1 到 Level 3：需要达到60%
+        # Level 1 到 Level 3：需要达到60%，基于总成就数
         elif current_user.badge_level < 3:
             if correct_rate >= 60:
-                if not hasattr(current_user, 'level_achievements'):
-                    current_user.level_achievements = 0
-                current_user.level_achievements += 1
-                # Level 1 升 Level 2 需要2次达标
-                if current_user.badge_level == 1 and current_user.level_achievements >= 2:
+                if current_user.badge_level == 1 and current_user.achievement_count % 2 == 0:
                     current_user.badge_level = 2
-                    current_user.level_achievements = 0
                     flash(f'恭喜！你已经升级到 {current_user.badge_info["name"]} 级别！', 'success')
-                # Level 2 升 Level 3 需要3次达标
-                elif current_user.badge_level == 2 and current_user.level_achievements >= 3:
+                elif current_user.badge_level == 2 and current_user.achievement_count % 3 == 0:
                     current_user.badge_level = 3
-                    current_user.level_achievements = 0
                     flash(f'恭喜！你已经升级到 {current_user.badge_info["name"]} 级别！', 'success')
         # Level 3 到 Level 8：每级需要两次80%
         elif 3 <= current_user.badge_level < 8:
-            if correct_rate >= 80:
-                if not hasattr(current_user, 'level_achievements'):
-                    current_user.level_achievements = 0
-                current_user.level_achievements += 1
-                if current_user.level_achievements >= 2:
-                    current_user.badge_level += 1
-                    current_user.level_achievements = 0
-                    flash(f'恭喜！你已经升级到 {current_user.badge_info["name"]} 级别！', 'success')
+            if correct_rate >= 80 and current_user.achievement_count % 2 == 0:
+                current_user.badge_level += 1
+                flash(f'恭喜！你已经升级到 {current_user.badge_info["name"]} 级别！', 'success')
         # Level 8以上：每级需要五次80%
         else:
-            if correct_rate >= 80:
-                if not hasattr(current_user, 'level_achievements'):
-                    current_user.level_achievements = 0
-                current_user.level_achievements += 1
-                if current_user.level_achievements >= 5:
-                    current_user.badge_level += 1
-                    current_user.level_achievements = 0
-                    flash(f'太厉害了！你已经升级到 {current_user.badge_info["name"]} 级别！', 'success')
-        # 总成就数依然累计
-        current_user.achievement_count += 1
+            if correct_rate >= 80 and current_user.achievement_count % 5 == 0:
+                current_user.badge_level += 1
+                flash(f'太厉害了！你已经升级到 {current_user.badge_info["name"]} 级别！', 'success')
         
         db.session.commit()
 
