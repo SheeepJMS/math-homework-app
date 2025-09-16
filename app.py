@@ -2567,7 +2567,7 @@ def lesson_students(lesson_id):
     return render_template('admin/students.html', lesson=lesson, completed_scores=completed_scores, not_completed=not_completed, question_stats=question_stats)
 
 if __name__ == '__main__':
-    init_db()  # 初始化数据库
+    # init_db()  # 注释掉自动初始化，避免每次启动都清空数据
     with app.app_context():
         clean_duplicate_quiz_history()  # 自动清理重复答题记录
     app.run(debug=True, host='0.0.0.0', port=5000) 
