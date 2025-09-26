@@ -2,6 +2,9 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import os
+import sys
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from app import User, Class, Lesson, Question, QuizHistory, UserAnswer, ExamFile, CoursewareFile
 
 app = Flask(__name__)
 # 配置数据库

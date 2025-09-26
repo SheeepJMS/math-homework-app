@@ -1,0 +1,41 @@
+[33ma664411[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m, [m[1;31morigin/master[m[33m, [m[1;31morigin/HEAD[m[33m)[m 移除所有弹窗功能：删除确认弹窗、Flash消息提示、操作成功提示等，让操作直接执行
+[33m7b1dfad[m 优化页面操作体验：添加AJAX支持保持页面位置不改变
+[33m42b186a[m feat: dashboard页面正确率趋势图支持分页显示8节课
+[33m81beeda[m 修复 student_dashboard 视图中 correct_rate 未定义导致的 NameError 问题
+[33m5f1ecd7[m fix: 徽章升级逻辑改为每级达标次数清零，升级更合理
+[33m81a75e9[m fix: 曲线图时间顺序为旧的在左边，新的在右边
+[33meda7153[m feat: 学员完成情况页面显示得分、排名、奖牌，UI美化，未完成加表情
+[33mcb2320d[m fix: 修复题目得分率走势图拉长，固定宽高并居中显示
+[33m414d1e3[m feat: 查看学生页面集成题目得分率统计与可视化
+[33mae7d0e1[m feat: 管理端支持题目得分率统计与可视化
+[33ma8e1316[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m, [m[1;31morigin/master[m[33m, [m[1;31morigin/HEAD[m[33m)[m 修复徽章升级逻辑：将self.badge_level改为current_user.badge_level
+app.py
+[33ma664411[m 移除所有弹窗功能：删除确认弹窗、Flash消息提示、操作成功提示等，让操作直接执行
+app.py
+templates/admin/classes.html
+templates/admin/lessons.html
+templates/admin/users.html
+templates/base.html
+[33m7b1dfad[m 优化页面操作体验：添加AJAX支持保持页面位置不改变
+app.py
+templates/admin/classes.html
+templates/admin/edit_question.html
+templates/admin/lessons.html
+templates/admin/users.html
+templates/student/wrong_questions.html
+[33m42b186a[m feat: dashboard页面正确率趋势图支持分页显示8节课
+templates/student/dashboard.html
+[33m81beeda[m 修复 student_dashboard 视图中 correct_rate 未定义导致的 NameError 问题
+app.py
+[33m5f1ecd7[m fix: 徽章升级逻辑改为每级达标次数清零，升级更合理
+app.py
+[33m81a75e9[m fix: 曲线图时间顺序为旧的在左边，新的在右边
+app.py
+[33meda7153[m feat: 学员完成情况页面显示得分、排名、奖牌，UI美化，未完成加表情
+app.py
+templates/admin/students.html
+[33mcb2320d[m fix: 修复题目得分率走势图拉长，固定宽高并居中显示
+templates/admin/students.html
+[33m414d1e3[m feat: 查看学生页面集成题目得分率统计与可视化
+app.py
+templates/admin/students.html
