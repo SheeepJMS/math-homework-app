@@ -545,27 +545,31 @@ async function uploadExamImages() {
     const form = document.getElementById('examUploadForm');
     const lessonId = window.location.pathname.split('/')[3];
     
-    for (let imageData of examImages) {
-        try {
-            const formData = new FormData();
-            formData.append('csrf_token', form.querySelector('[name="csrf_token"]').value);
-            formData.append('file', imageData);
-            
-            const response = await fetch(`/admin/lesson/${lessonId}/upload_individual_exam_files`, {
-                method: 'POST',
-                body: formData
-            });
-            
-            if (!response.ok) {
-                throw new Error('上传失败');
-            }
-        } catch (error) {
-            console.error('上传出错:', error);
+    try {
+        // 一次性发送所有图片
+        const formData = new FormData();
+        formData.append('csrf_token', form.querySelector('[name="csrf_token"]').value);
+        
+        // 将所有图片添加到FormData中
+        examImages.forEach((imageData, index) => {
+            formData.append('files[]', imageData);
+        });
+        
+        const response = await fetch(`/admin/lesson/${lessonId}/upload_batch_exam_files`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            throw new Error('上传失败');
         }
+        
+        // 刷新页面以显示新上传的图片
+        window.location.reload();
+    } catch (error) {
+        console.error('上传出错:', error);
+        alert('上传失败，请重试');
     }
-    
-    // 刷新页面以显示新上传的图片
-    window.location.reload();
 }
 
 // 解析上传相关函数
@@ -618,27 +622,31 @@ async function uploadExplanationImages() {
     const form = document.getElementById('explanationUploadForm');
     const lessonId = window.location.pathname.split('/')[3];
     
-    for (let imageData of explanationImages) {
-        try {
-            const formData = new FormData();
-            formData.append('csrf_token', form.querySelector('[name="csrf_token"]').value);
-            formData.append('file', imageData);
-            
-            const response = await fetch(`/admin/lesson/${lessonId}/upload_individual_explanation_files`, {
-                method: 'POST',
-                body: formData
-            });
-            
-            if (!response.ok) {
-                throw new Error('上传失败');
-            }
-        } catch (error) {
-            console.error('上传出错:', error);
+    try {
+        // 一次性发送所有图片
+        const formData = new FormData();
+        formData.append('csrf_token', form.querySelector('[name="csrf_token"]').value);
+        
+        // 将所有图片添加到FormData中
+        explanationImages.forEach((imageData, index) => {
+            formData.append('files[]', imageData);
+        });
+        
+        const response = await fetch(`/admin/lesson/${lessonId}/upload_batch_explanation_files`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            throw new Error('上传失败');
         }
+        
+        // 刷新页面以显示新上传的图片
+        window.location.reload();
+    } catch (error) {
+        console.error('上传出错:', error);
+        alert('上传失败，请重试');
     }
-    
-    // 刷新页面以显示新上传的图片
-    window.location.reload();
 }
 
 // 初始化粘贴区域事件监听

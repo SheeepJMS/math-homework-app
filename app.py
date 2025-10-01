@@ -1933,6 +1933,152 @@ def upload_individual_explanation_files(lesson_id):
     
     return redirect(url_for('manage_questions', lesson_id=lesson_id))
 
+@app.route('/admin/lesson/<int:lesson_id>/upload_batch_exam_files', methods=['POST'])
+@admin_required
+def upload_batch_exam_files(lesson_id):
+    """批量上传试题图片，避免并发导致的page_number重复问题"""
+    lesson = Lesson.query.get_or_404(lesson_id)
+    
+    try:
+        # 获取所有Base64图片数据
+        image_files = request.form.getlist('files[]')
+        if not image_files:
+            return jsonify({'success': False, 'message': '没有接收到图片数据'}), 400
+        
+        # 获取当前最大页码（只查询一次）
+        max_page = db.session.query(func.max(ExamFile.page_number)).filter_by(lesson_id=lesson_id).scalar() or 0
+        
+        success_count = 0
+        failed_count = 0
+        
+        # 按顺序处理所有图片
+        for index, image_data in enumerate(image_files):
+            try:
+                if not image_data or not image_data.startswith('data:image'):
+                    print(f"跳过无效的图片数据，索引: {index}")
+                    failed_count += 1
+                    continue
+                
+                # 生成文件名
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+                random_suffix = random.randint(1000, 9999)
+                filename = f"{lesson_id}_{timestamp}_{random_suffix}.png"
+                
+                # 上传到 Cloudinary
+                cloudinary_url = upload_to_cloudinary(image_data)
+                if not cloudinary_url:
+                    print(f"Cloudinary 上传失败，索引: {index}")
+                    failed_count += 1
+                    continue
+                
+                # 创建试卷文件记录，使用递增的页码
+                exam_file = ExamFile(
+                    filename=filename,
+                    path=cloudinary_url,
+                    lesson_id=lesson_id,
+                    page_number=max_page + index + 1  # 确保页码连续且唯一
+                )
+                db.session.add(exam_file)
+                success_count += 1
+                
+            except Exception as e:
+                print(f"处理图片失败，索引 {index}: {str(e)}")
+                failed_count += 1
+                continue
+        
+        # 一次性提交所有成功的记录
+        if success_count > 0:
+            db.session.commit()
+            print(f"批量上传成功: {success_count} 张图片")
+        
+        if failed_count > 0:
+            print(f"部分上传失败: {failed_count} 张图片")
+        
+        return jsonify({
+            'success': True,
+            'message': f'成功上传 {success_count} 张图片' + (f'，{failed_count} 张失败' if failed_count > 0 else ''),
+            'success_count': success_count,
+            'failed_count': failed_count
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"批量上传失败: {str(e)}")
+        return jsonify({'success': False, 'message': f'上传失败：{str(e)}'}), 500
+
+@app.route('/admin/lesson/<int:lesson_id>/upload_batch_explanation_files', methods=['POST'])
+@admin_required
+def upload_batch_explanation_files(lesson_id):
+    """批量上传解析图片，避免并发导致的page_number重复问题"""
+    lesson = Lesson.query.get_or_404(lesson_id)
+    
+    try:
+        # 获取所有Base64图片数据
+        image_files = request.form.getlist('files[]')
+        if not image_files:
+            return jsonify({'success': False, 'message': '没有接收到图片数据'}), 400
+        
+        # 获取当前最大页码（只查询一次）
+        max_page = db.session.query(func.max(ExplanationFile.page_number)).filter_by(lesson_id=lesson_id).scalar() or 0
+        
+        success_count = 0
+        failed_count = 0
+        
+        # 按顺序处理所有图片
+        for index, image_data in enumerate(image_files):
+            try:
+                if not image_data or not image_data.startswith('data:image'):
+                    print(f"跳过无效的图片数据，索引: {index}")
+                    failed_count += 1
+                    continue
+                
+                # 生成文件名
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+                random_suffix = random.randint(1000, 9999)
+                filename = f"{lesson_id}_{timestamp}_{random_suffix}.png"
+                
+                # 上传到 Cloudinary
+                cloudinary_url = upload_to_cloudinary(image_data)
+                if not cloudinary_url:
+                    print(f"Cloudinary 上传失败，索引: {index}")
+                    failed_count += 1
+                    continue
+                
+                # 创建解析文件记录，使用递增的页码
+                explanation_file = ExplanationFile(
+                    filename=filename,
+                    path=cloudinary_url,
+                    lesson_id=lesson_id,
+                    page_number=max_page + index + 1  # 确保页码连续且唯一
+                )
+                db.session.add(explanation_file)
+                success_count += 1
+                
+            except Exception as e:
+                print(f"处理图片失败，索引 {index}: {str(e)}")
+                failed_count += 1
+                continue
+        
+        # 一次性提交所有成功的记录
+        if success_count > 0:
+            db.session.commit()
+            print(f"批量上传成功: {success_count} 张图片")
+        
+        if failed_count > 0:
+            print(f"部分上传失败: {failed_count} 张图片")
+        
+        return jsonify({
+            'success': True,
+            'message': f'成功上传 {success_count} 张图片' + (f'，{failed_count} 张失败' if failed_count > 0 else ''),
+            'success_count': success_count,
+            'failed_count': failed_count
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"批量上传失败: {str(e)}")
+        return jsonify({'success': False, 'message': f'上传失败：{str(e)}'}), 500
+
 @app.route('/admin/badge_rules')
 @admin_required
 def badge_rules():
