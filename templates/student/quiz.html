@@ -127,7 +127,7 @@
         {% endfor %}
         
         <div class="text-center mb-4">
-            <button type="submit" class="btn btn-primary btn-lg">提交答案</button>
+            <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">提交答案</button>
         </div>
     </form>
 </div>
@@ -135,6 +135,17 @@
 <style>
 .container {
     max-width: 1200px;
+}
+
+/* 提交按钮样式 */
+#submitBtn {
+    min-width: 150px;
+    transition: all 0.3s ease;
+}
+
+#submitBtn:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
 }
 
 .question-container {
@@ -422,9 +433,127 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// 提交表单时停止计时器
-document.getElementById('quizForm').addEventListener('submit', function() {
+// 防止重复提交的标志
+let isSubmitting = false;
+
+// 提交表单时停止计时器并添加防重复提交逻辑
+document.getElementById('quizForm').addEventListener('submit', function(e) {
+    // 如果正在提交，阻止重复提交
+    if (isSubmitting) {
+        e.preventDefault();
+        return false;
+    }
+    
+    // 验证表单：检查是否有必填题未答
+    const allQuestions = document.querySelectorAll('.question-container');
+    let hasUnanswered = false;
+    let unansweredQuestions = [];
+    
+    allQuestions.forEach(function(questionDiv, index) {
+        const questionNumber = index + 1;
+        const idkCheckbox = questionDiv.querySelector('.idk-input');
+        const isIdkChecked = idkCheckbox && idkCheckbox.checked;
+        
+        // 如果没有选择IDK，检查是否有答案
+        if (!isIdkChecked) {
+            const radioInputs = questionDiv.querySelectorAll('input[type="radio"]');
+            const textInputs = questionDiv.querySelectorAll('input[type="text"]');
+            const textareaInputs = questionDiv.querySelectorAll('textarea');
+            
+            let hasAnswer = false;
+            
+            // 检查选择题
+            if (radioInputs.length > 0) {
+                radioInputs.forEach(function(radio) {
+                    if (radio.checked) hasAnswer = true;
+                });
+            }
+            
+            // 检查填空题
+            if (textInputs.length > 0) {
+                textInputs.forEach(function(input) {
+                    if (input.value.trim() !== '') hasAnswer = true;
+                });
+            }
+            
+            // 检查解答题（解答题可以为空）
+            if (textareaInputs.length > 0) {
+                hasAnswer = true; // 解答题允许空白提交
+            }
+            
+            if (!hasAnswer && (radioInputs.length > 0 || textInputs.length > 0)) {
+                hasUnanswered = true;
+                unansweredQuestions.push(questionNumber);
+            }
+        }
+    });
+    
+    // 如果有未答题且未选择IDK，提示用户
+    if (hasUnanswered) {
+        e.preventDefault();
+        const message = `以下题目尚未作答：第 ${unansweredQuestions.join('、')} 题\n\n如果确实不会做，请点击"IDK 不会做！"按钮\n或者填写答案后再提交。`;
+        alert(message);
+        return false;
+    }
+    
+    // 确认提交
+    if (!confirm('确定要提交答案吗？提交后将无法修改。')) {
+        e.preventDefault();
+        return false;
+    }
+    
+    // 获取提交按钮
+    const submitBtn = this.querySelector('button[type="submit"]');
+    
+    // 标记为正在提交
+    isSubmitting = true;
+    
+    // 停止计时器
     clearInterval(timerInterval);
+    
+    // 禁用提交按钮并显示加载状态
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>提交中...';
+    
+    // 添加页面遮罩，防止用户操作
+    const overlay = document.createElement('div');
+    overlay.id = 'submitOverlay';
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+    `;
+    overlay.innerHTML = `
+        <div style="background: white; padding: 30px; border-radius: 10px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <h5>正在提交答案...</h5>
+            <p class="text-muted mb-0">请稍候，不要关闭页面</p>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    
+    // 设置超时保护（30秒后恢复，防止网络问题导致永久锁定）
+    setTimeout(function() {
+        if (isSubmitting) {
+            isSubmitting = false;
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '提交答案';
+            const existingOverlay = document.getElementById('submitOverlay');
+            if (existingOverlay) {
+                existingOverlay.remove();
+            }
+            alert('提交超时，请检查网络连接后重试');
+        }
+    }, 30000);
 });
 
 function limitInput(input) {
