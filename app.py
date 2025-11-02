@@ -1289,6 +1289,7 @@ def import_questions(lesson_id):
     return redirect(url_for('manage_questions', lesson_id=lesson_id))
 
 @app.route('/student/lesson/<int:lesson_id>/history')
+@login_required
 def view_history(lesson_id):
     from flask_login import current_user
     user_id = request.args.get('user_id', type=int)
