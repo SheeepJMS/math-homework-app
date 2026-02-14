@@ -1,0 +1,12 @@
+{% extends "diagnostic/base.html" %}
+{% block title %}诊断系统 - 首页{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-body text-center py-5">
+        <h2 class="card-title">诊断测评</h2>
+        <p class="card-text text-muted">选择试卷进行答题，交卷后查看报告与练习推荐。</p>
+        <a href="{{ url_for('diagnostic.login') }}" class="btn btn-primary btn-lg me-2">登录</a>
+        <a href="{{ url_for('diagnostic.register') }}" class="btn btn-outline-primary btn-lg">注册</a>
+    </div>
+</div>
+{% endblock %}

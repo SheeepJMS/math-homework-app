@@ -1,0 +1,69 @@
+{% extends "admin/base.html" %}
+{% block admin_content %}
+<div class="container">
+    <h2 class="mb-4">诊断 CSV 导入</h2>
+    <div class="card mb-4">
+        <div class="card-body">
+            <form id="importCsvForm" method="post" action="{{ url_for('diagnostic_admin.import_csv') }}{% if request.args.get('from_exam') %}?from_exam={{ request.args.get('from_exam') }}{% endif %}" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {% if request.args.get('from_exam') %}<input type="hidden" name="from_exam" value="{{ request.args.get('from_exam') }}">{% endif %}
+                <input type="file" name="file" accept=".csv" id="importCsvFileInput" style="display:none;">
+                <div class="csv-drop-zone border border-2 border-dashed rounded p-4 text-center mb-3" id="importCsvDropZone" style="min-height:100px; cursor:pointer;">
+                    <span class="text-muted" id="importCsvPlaceholder">将 CSV 文件拖拽到此处，或点击选择文件（UTF-8）</span>
+                    <span class="d-none text-primary fw-bold" id="importCsvFileName"></span>
+                </div>
+                <button type="submit" class="btn btn-primary" id="importCsvSubmitBtn" disabled>导入</button>
+            </form>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header">CSV 列说明（仅用于知识点与练习题集）</div>
+        <div class="card-body small">
+            <p class="text-muted mb-2">题目内容请先在试卷详情页「第一步：逐个上传试题」中粘贴图片添加；本页 CSV 仅用于录入每题的知识点与错题练习题集。</p>
+            <p class="mb-2">
+                <a href="{{ url_for('diagnostic_admin.import_csv_sample') }}" class="btn btn-outline-primary btn-sm" download>下载示例 CSV</a>
+                <span class="text-muted ms-2">（UTF-8，可直接改表头与数据后导入）</span>
+            </p>
+            <p class="mb-1"><strong>从试卷详情页导入时：</strong>只需 <code>q_index</code>（题号从 0 开始：第1题=0）+ 下列列，无需填 competition / exam_title。</p>
+            <p class="mb-1"><strong>匹配试卷与题号（非从详情页时）：</strong> competition / competition_name / 竞赛，exam_title / 试卷标题，q_index / 题号（0 起）</p>
+            <p class="mb-1"><strong>知识点：</strong> kp_primary_id，kp_secondary_ids（逗号分隔，最多 2 个）</p>
+            <p class="mb-1"><strong>练习：</strong> practice_count_default（默认 3）</p>
+            <p class="mb-0"><strong>题库（每题最多 3 道）：</strong> bank_p1_stem, bank_p1_choices, bank_p1_answer，bank_p2_*，bank_p3_*</p>
+        </div>
+    </div>
+</div>
+<script>
+(function() {
+    var zone = document.getElementById('importCsvDropZone');
+    var input = document.getElementById('importCsvFileInput');
+    var placeholder = document.getElementById('importCsvPlaceholder');
+    var fileName = document.getElementById('importCsvFileName');
+    var submitBtn = document.getElementById('importCsvSubmitBtn');
+    if (!zone || !input) return;
+    function setFile(file) {
+        if (file && file.name && (file.name.toLowerCase().endsWith('.csv') || file.type === 'text/csv')) {
+            var dt = new DataTransfer();
+            dt.items.add(file);
+            input.files = dt.files;
+            placeholder.classList.add('d-none');
+            fileName.textContent = file.name;
+            fileName.classList.remove('d-none');
+            submitBtn.disabled = false;
+        }
+    }
+    zone.addEventListener('click', function() { input.click(); });
+    zone.addEventListener('dragover', function(e) { e.preventDefault(); e.stopPropagation(); zone.classList.add('bg-light'); });
+    zone.addEventListener('dragleave', function(e) { e.preventDefault(); zone.classList.remove('bg-light'); });
+    zone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        zone.classList.remove('bg-light');
+        var f = e.dataTransfer.files[0];
+        if (f) setFile(f);
+    });
+    input.addEventListener('change', function() {
+        if (input.files && input.files[0]) setFile(input.files[0]);
+    });
+})();
+</script>
+{% endblock %}

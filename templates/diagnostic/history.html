@@ -1,0 +1,27 @@
+{% extends "diagnostic/base.html" %}
+{% block title %}诊断系统 - 历史报告{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='diagnostic/dashboard.css') }}">
+{% endblock %}
+{% block content %}
+<div class="dashboard-page">
+  <h2 class="mb-4"><i class="fas fa-history me-2"></i>全部历史报告</h2>
+  {% if reports and reports|length > 0 %}
+  <ul class="dashboard-report-list" style="max-width: 640px;">
+    {% for r in reports %}
+    <li>
+      <span class="report-title">{{ r.exam_title }}</span>
+      <span class="report-meta">{{ r.submitted_at_str }} · {{ r.score }}/{{ r.score_max }} · {{ r.accuracy_percent }}%</span>
+      <a href="{{ url_for('diagnostic.report', attempt_id=r.attempt_id) }}" class="btn btn-sm btn-primary">查看报告</a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <div class="dashboard-empty" style="max-width: 480px;">
+    <div class="icon-empty"><i class="fas fa-file-alt"></i></div>
+    <p class="mb-0">暂无历史报告。完成试卷后即可在此查看。</p>
+  </div>
+  {% endif %}
+  <p class="mt-4"><a href="{{ url_for('diagnostic.index') }}" class="btn btn-outline-secondary">返回首页</a></p>
+</div>
+{% endblock %}

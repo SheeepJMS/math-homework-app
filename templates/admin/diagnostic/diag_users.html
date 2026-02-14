@@ -1,0 +1,47 @@
+{% extends "admin/base.html" %}
+{% block admin_content %}
+<div class="container">
+    <div class="card">
+        <div class="card-header">
+            <h2 class="mb-0"><i class="fas fa-users me-2"></i>测评用户管理</h2>
+        </div>
+        <div class="card-body">
+            <p class="text-muted">所有在诊断系统注册的学员。点击用户名可查看其试卷、报告等数据。</p>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>用户名</th>
+                            <th>注册时间</th>
+                            <th>完成报告数</th>
+                            <th>状态</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for u in users %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('diagnostic_admin.diag_user_detail', user_id=u.id) }}">{{ u.username }}</a>
+                            </td>
+                            <td>{{ u.created_at.strftime('%Y-%m-%d %H:%M') if u.created_at else 'N/A' }}</td>
+                            <td>{{ attempt_counts.get(u.id, 0) }}</td>
+                            <td>
+                                <span class="badge {% if u.is_active %}bg-success{% else %}bg-secondary{% endif %}">
+                                    {{ '正常' if u.is_active else '已停用' }}
+                                </span>
+                            </td>
+                            <td>
+                                <a href="{{ url_for('diagnostic_admin.diag_user_detail', user_id=u.id) }}" class="btn btn-sm btn-primary">查看</a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="5" class="text-muted text-center">暂无注册学员</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

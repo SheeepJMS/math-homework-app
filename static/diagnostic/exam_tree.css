@@ -1,0 +1,111 @@
+/**
+ * 试卷四级树结构样式
+ */
+.exam-tree-search {
+  max-width: 320px;
+  margin-bottom: var(--s-4, 16px);
+}
+
+.exam-tree-root {
+  font-size: var(--base, 14px);
+  color: var(--text, #111827);
+}
+
+.tree-node {
+  margin-bottom: 2px;
+}
+
+.tree-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2, 8px);
+  padding: var(--s-2) var(--s-3);
+  cursor: pointer;
+  border-radius: var(--r-sm, 10px);
+  transition: background 0.2s;
+}
+
+.tree-toggle:hover {
+  background: var(--surface-2, #fbfcff);
+}
+
+.tree-chevron {
+  font-size: 10px;
+  color: var(--muted, #6b7280);
+  transition: transform 0.2s;
+}
+
+.tree-node:not(.collapsed) > .tree-toggle .tree-chevron {
+  transform: rotate(0deg);
+}
+
+.tree-node.collapsed > .tree-toggle .tree-chevron {
+  transform: rotate(-90deg);
+}
+
+.tree-label {
+  font-weight: 600;
+  flex: 1;
+}
+
+.tree-badge {
+  font-size: 11px;
+  background: var(--brand-bg, #e8efff);
+  color: var(--brand, #2563eb);
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.tree-children {
+  transition: opacity 0.2s ease;
+}
+
+.tree-node.collapsed > .tree-children {
+  display: none;
+}
+
+.tree-level-1 > .tree-toggle { padding-left: 0; }
+.tree-level-1 > .tree-children { margin-left: 0; }
+
+.tree-level-2 { margin-left: var(--s-4, 16px); }
+.tree-level-2 > .tree-toggle { padding-left: var(--s-2); }
+.tree-level-2 > .tree-children { margin-left: var(--s-4); }
+
+.tree-level-3 { margin-left: var(--s-4, 16px); }
+.tree-level-3 > .tree-toggle { padding-left: var(--s-2); }
+.tree-level-3 > .tree-children { margin-left: var(--s-4); }
+
+.tree-level-4.tree-year-row {
+  margin-left: var(--s-6, 24px);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2) var(--s-4);
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--border, #e6e8f0);
+  border-radius: var(--r-sm, 10px);
+  margin-bottom: var(--s-2);
+  background: var(--surface, #fff);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tree-level-4.tree-year-row:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-1, 0 1px 2px rgba(16,24,40,.06));
+}
+
+.tree-year-row .year-main { flex: 1 1 200px; }
+.tree-year-row .year-label { font-weight: 500; display: block; }
+.tree-year-row .year-meta { font-size: var(--small, 12px); color: var(--muted, #6b7280); display: block; margin-top: 2px; }
+.tree-year-row .year-cooldown { font-size: 11px; color: var(--warning, #f59e0b); display: block; margin-top: 2px; }
+
+.tree-year-row .year-badges {
+  display: flex;
+  gap: var(--s-1);
+}
+
+.tree-year-row .year-actions {
+  display: flex;
+  gap: var(--s-2);
+  flex-shrink: 0;
+}

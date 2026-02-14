@@ -1,0 +1,87 @@
+{% extends "admin/base.html" %}
+{% block admin_content %}
+<div class="container">
+    <h2 class="mb-4">题目配置 - {{ question.stem_text[:40] }}...</h2>
+    <div class="card">
+        <div class="card-body">
+            <form method="post" action="{{ url_for('diagnostic_admin.question_config', id=question.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="mb-3">
+                    <label class="form-label">主知识点（可搜索）</label>
+                    <input type="text" class="form-control" name="kp_primary" list="kpListPrimary" value="{{ primary_kp }}" placeholder="输入或选择">
+                    <datalist id="kpListPrimary">
+                        {% for kp in kp_list %}<option value="{{ kp.kp_id }}">{{ kp.name_cn or kp.name_en or kp.kp_id }}</option>{% endfor %}
+                    </datalist>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">次知识点（最多 2 个，逗号分隔）</label>
+                    <input type="text" class="form-control" name="kp_secondary" list="kpListSecondary" value="{{ secondary_kps }}" placeholder="可选，最多2个逗号分隔">
+                    <datalist id="kpListSecondary">
+                        {% for kp in kp_list %}<option value="{{ kp.kp_id }}">{{ kp.name_cn or kp.name_en or kp.kp_id }}</option>{% endfor %}
+                    </datalist>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">练习来源</label>
+                    <select class="form-select" name="practice_mode">
+                        <option value="bank_by_kp" {{ 'selected' if config and config.practice_mode == 'bank_by_kp' else '' }}>按知识点从题库随机 (bank_by_kp)</option>
+                        <option value="bank_linked_3" {{ 'selected' if config and config.practice_mode == 'bank_linked_3' else '' }}>固定使用导入的 3 题 (bank_linked_3)</option>
+                        <option value="homework_assignment_random" {{ 'selected' if config and config.practice_mode == 'homework_assignment_random' else '' }}>从作业题集随机 (homework_assignment_random)</option>
+                        <option value="homework_curated_ids" {{ 'selected' if config and config.practice_mode == 'homework_curated_ids' else '' }}>指定作业题 ID 列表 (homework_curated_ids)</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">随机题数</label>
+                    <input type="number" class="form-control" name="random_count" value="{{ config.random_count if config else 3 }}" min="1" max="20">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">作业题集（当来源为 homework_assignment_random 时）</label>
+                    <input type="text" class="form-control" name="homework_assignment_id" list="lessonList" value="{{ config.homework_assignment_id if config and config.homework_assignment_id else '' }}" placeholder="选择课程/作业">
+                    <datalist id="lessonList">
+                        {% for les in lessons %}<option value="{{ les.id }}">{{ les.title }}</option>{% endfor %}
+                    </datalist>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">指定作业题 ID（当来源为 homework_curated_ids 时，逗号分隔）</label>
+                    <input type="text" class="form-control" name="curated_homework_question_ids" value="{{ config.curated_homework_question_ids if config else '' }}" placeholder="例如 101,102,103">
+                </div>
+                <div class="mb-3 form-check">
+                    <input type="checkbox" class="form-check-input" name="is_capstone" id="is_capstone" {{ 'checked' if config and config.is_capstone else '' }}>
+                    <label class="form-check-label" for="is_capstone">压轴题</label>
+                </div>
+                <button type="submit" class="btn btn-primary">保存</button>
+                <a href="{{ url_for('diagnostic_admin.exam_detail', id=exam_id) if exam_id else url_for('diagnostic_admin.exams') }}" class="btn btn-outline-secondary">返回</a>
+            </form>
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-header">已关联的错题/练习题内容</div>
+        <div class="card-body small">
+            {% if bank_items %}
+            <p class="text-muted mb-2">以下为 CSV 或「固定 3 题」模式导入的题库小题，作答错题后会推送给学生练习：</p>
+            <ol class="mb-0">
+                {% for order, bq in bank_items %}
+                <li class="mb-2">
+                    <span class="fw-bold">题干：</span>{{ bq.stem_text[:200] }}{% if bq.stem_text|length > 200 %}...{% endif %}
+                    {% if bq.answer_key %}<span class="ms-2">答案：{{ bq.answer_key }}</span>{% endif %}
+                </li>
+                {% endfor %}
+            </ol>
+            {% elif hw_curated_list %}
+            <p class="text-muted mb-2">指定作业题（homework_curated_ids）：</p>
+            <ul class="mb-0">
+                {% for sid, hwq in hw_curated_list %}
+                <li>ID {{ sid }}{% if hwq %}：{{ (hwq.content or '')[:80] or ('题目 ' ~ hwq.question_number) }}{% if (hwq.content or '')|length > 80 %}...{% endif %}{% else %}（未找到该题）{% endif %}</li>
+                {% endfor %}
+            </ul>
+            {% elif config and config.practice_mode == 'bank_by_kp' %}
+            <p class="text-muted mb-0">按主知识点从题库随机抽取，不固定题目。学生作答后根据主/次知识点从题库匹配错题练习。</p>
+            {% elif config and config.practice_mode == 'homework_assignment_random' %}
+            <p class="text-muted mb-0">从所选作业题集中随机抽取题目作为练习。未固定具体题号。</p>
+            {% else %}
+            <p class="text-muted mb-0">暂无关联的错题/练习题。可通过 CSV 导入 bank_p1_stem 等列，或选择「固定使用导入的 3 题」后重新导入。</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

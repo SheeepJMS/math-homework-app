@@ -1,0 +1,15 @@
+{% extends "diagnostic/base.html" %}
+{% block title %}开始 - {{ exam.title }}{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-body">
+        <h3>{{ exam.title }}</h3>
+        <p class="text-muted">确认开始后将创建新的答题记录，交卷后生成独立报告与练习包。历史报告永久保留，不覆盖。</p>
+        <form method="post" action="{{ url_for('diagnostic.start_exam', exam_id=exam.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-primary">开始答题</button>
+            <a href="{{ url_for('diagnostic.exams') }}" class="btn btn-outline-secondary">返回</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

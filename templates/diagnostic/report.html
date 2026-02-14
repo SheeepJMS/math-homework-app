@@ -1,0 +1,233 @@
+{% extends "diagnostic/base.html" %}
+{% block title %}报告 - {{ exam_title | default('N/A') }}{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='diagnostic/report.css') }}">
+{% endblock %}
+{% block content %}
+<div class="report-page py-4">
+  {% if admin_view | default(False) %}
+  <div class="container mb-2">
+    <a href="{{ url_for('diagnostic_admin.diag_users') }}" class="btn btn-sm btn-outline-secondary"><i class="fas fa-arrow-left me-1"></i>返回测评用户管理</a>
+  </div>
+  {% endif %}
+  <div class="report-container">
+    {# A) 顶部报告标题区 #}
+    <div class="report-header">
+      <div class="report-header-inner">
+        <h1 class="report-title">答题报告</h1>
+        <div class="report-meta">
+          <span class="report-meta-item"><i class="fas fa-file-alt"></i>{{ exam_title | default('N/A') }}</span>
+          {% if submitted_at_str %}<span class="report-meta-sep"></span><span class="report-meta-item"><i class="fas fa-calendar-alt"></i>{{ submitted_at_str }}</span>{% endif %}
+          {% if user_display_name %}<span class="report-meta-sep"></span><span class="report-meta-item"><i class="fas fa-user"></i>{{ user_display_name }}</span>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    {# C) 顶部指标卡：1 大卡(2列) + 4 小卡 #}
+    <div class="metrics-grid">
+      <div class="hero-card card">
+        {% if has_custom_score_scheme | default(False) %}
+        <div class="metric-value">{{ score | default(0) }} / {{ score_max | default(0) }} 分</div>
+        <div class="metric-sub">得分率 {{ score_percent | default(0) }}% · 正确率 {{ accuracy_percent | default(0) }}%</div>
+        {% else %}
+        <div class="metric-value">正确 {{ correct_count | default(0) }} / {{ total_questions | default(0) }} 题</div>
+        <div class="metric-sub">正确率 {{ accuracy_percent | default(0) }}%</div>
+        {% endif %}
+      </div>
+      <div class="mini-card">
+        <div class="icon-wrap success"><i class="fas fa-check"></i></div>
+        <div>
+          <div class="metric-value">{{ correct_count | default(0) }} / {{ total_questions | default(0) }}</div>
+          <div class="metric-label">正确 / 总题</div>
+        </div>
+      </div>
+      <div class="mini-card">
+        <div class="icon-wrap brand"><i class="fas fa-clock"></i></div>
+        <div>
+          <div class="metric-value">{{ total_time_sec | default(0) }} 秒</div>
+          <div class="metric-label">总耗时</div>
+        </div>
+      </div>
+      <div class="mini-card">
+        <div class="icon-wrap info"><i class="fas fa-hourglass-half"></i></div>
+        <div>
+          <div class="metric-value">{{ avg_time_sec | default(0) }} 秒</div>
+          <div class="metric-label">均题耗时</div>
+        </div>
+      </div>
+      <div class="mini-card">
+        <div class="icon-wrap warning"><i class="fas fa-minus-circle"></i></div>
+        <div>
+          <div class="metric-value">{{ blank_count | default(0) }}</div>
+          <div class="metric-label">空题数</div>
+        </div>
+      </div>
+    </div>
+
+    {# B) 诊断结论摘要卡 #}
+    <div class="card summary-card mb-4">
+      <div class="card-body">
+        <h6 class="fw-bold"><i class="fas fa-clipboard-list me-2" style="color: var(--brand);"></i>诊断结论摘要</h6>
+        <p><strong>表现：</strong>正确率 {{ accuracy_percent | default(0) }}%{% if has_custom_score_scheme | default(False) %}，得分 {{ score | default(0) }}/{{ score_max | default(0) }} 分{% else %}，正确 {{ correct_count | default(0) }}/{{ total_questions | default(0) }} 题{% endif %}。</p>
+        <p><strong>问题定位：</strong>{% if kp_has_data and kp_weak_top %}主要丢分知识点 Top2：{% for item in kp_weak_top[:2] %}{{ item.kp_name }}{% if not loop.last %}、{% endif %}{% endfor %}。{% else %}暂无知识点标签。请在后台为每题选择知识点后，即可生成掌握雷达与薄弱点榜单。{% endif %}</p>
+        <p><strong>时间管理：</strong>{% if slow_wrong %}存在「慢+错」题：第 {% for sw in slow_wrong[:5] %}{{ sw.qnum }}{% if not loop.last %}、{% endif %}{% endfor %} 题{% if slow_wrong|length > 5 %} 等{% endif %}。{% else %}无「慢+错」题。{% endif %}{% if fast_wrong %}「快+错」题：第 {% for fw in fast_wrong[:3] %}{{ fw.qnum }}{% if not loop.last %}、{% endif %}{% endfor %} 题。{% endif %}</p>
+        <p class="mb-0"><strong>下一步行动：</strong>{% if practice_summary and practice_summary.exists %}推荐练习包 {{ practice_summary.count | default(0) }} 题，预计 {{ practice_summary.est_minutes | default(5) }} 分钟。{% else %}暂无练习包。交卷后系统将根据错题自动生成。{% endif %}</p>
+      </div>
+    </div>
+
+    {# D) 图表区 #}
+    <div class="charts-grid">
+      <div class="card chart-card">
+        <div class="card-header"><i class="fas fa-chart-radar me-2"></i>知识点掌握</div>
+        <div class="card-body">
+          {% if kp_has_data %}
+            <div class="chart-container"><canvas id="radarChart"></canvas></div>
+          {% else %}
+            <div class="empty-state">
+              <div class="icon-empty"><i class="fas fa-chart-pie"></i></div>
+              <p class="mb-3">暂无知识点标签。请在后台为每题选择知识点后，即可生成掌握雷达与薄弱点榜单。</p>
+              <a href="#" class="btn btn-secondary no-print">去后台标注</a>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+      <div class="card chart-card">
+        <div class="card-header"><i class="fas fa-chart-line me-2"></i>{% if has_custom_score_scheme | default(False) %}每题的所有学生平均得分曲线图{% else %}每题的所有学生平均正确率曲线图{% endif %}</div>
+        <div class="card-body">
+          <div class="chart-container"><canvas id="lineChart"></canvas></div>
+          {% if chart_line_y | length > 0 %}<p class="panel-title mb-0 mt-2">末题平均{% if has_custom_score_scheme | default(False) %}得分率{% else %}正确率{% endif %} {{ chart_line_y[-1] }}%</p>{% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="charts-grid">
+      <div class="card chart-card">
+        <div class="card-header"><i class="fas fa-chart-bar me-2"></i>每题耗时（秒）</div>
+        <div class="card-body">
+          <div class="chart-scroll-wrap">
+            <div class="chart-container chart-container-time" style="height: 180px; min-width: 0;"><canvas id="barTimeChart"></canvas></div>
+          </div>
+        </div>
+      </div>
+      <div class="card chart-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="fas fa-tasks me-2"></i>答题正误分布</span>
+          <span class="correctness-legend-compact">
+            <span class="legend-item legend-correct"><span class="dot dot-correct dot-legend"></span><span class="legend-label">正确</span></span>
+            <span class="legend-item legend-wrong"><span class="dot dot-wrong dot-legend"></span><span class="legend-label">错误</span></span>
+            <span class="legend-item legend-blank"><span class="dot dot-blank dot-legend"></span><span class="legend-label">空题</span></span>
+          </span>
+        </div>
+        <div class="card-body">
+          <div class="correctness-dots">
+            {% for row in detail_rows %}
+            <a href="#q-{{ row.qnum }}" class="dot {% if row.is_correct %}dot-correct{% elif row.is_blank %}dot-blank{% else %}dot-wrong{% endif %}" title="第 {{ row.qnum }} 题{% if row.is_correct %}：正确{% elif row.is_blank %}：空题{% else %}：错误{% endif %}，点击跳转到解析">{{ row.qnum }}</a>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+    {% if kp_has_data and kp_weak_top %}
+    <div class="mb-4">
+      <div class="card chart-card">
+        <div class="card-header"><i class="fas fa-exclamation-triangle me-2"></i>Top 薄弱知识点</div>
+        <div class="card-body">
+          <div class="chart-container" style="height: 160px;"><canvas id="barWeakChart"></canvas></div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {# E) CTA #}
+    {% if practice_set %}
+    <div class="card mb-4 no-print">
+      <div class="card-body text-center" style="padding: var(--s-10);">
+        <p class="mb-4" style="color: var(--muted);">将推送 {{ practice_summary.count | default(0) }} 题，预计 {{ practice_summary.est_minutes | default(5) }} 分钟</p>
+        <a href="{{ url_for('diagnostic.practice', practice_set_id=practice_set.id) }}" class="btn btn-primary">
+          <i class="fas fa-play me-2"></i>开始错题练习包
+        </a>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="mb-4 no-print">
+      <button type="button" class="btn btn-secondary" onclick="window.print()"><i class="fas fa-print me-2"></i>打印报告</button>
+    </div>
+
+    {# F) 逐题详情 #}
+    <div class="card mb-4">
+      <div class="card-header"><i class="fas fa-list-ol me-2"></i>答题详情（含原题与解析）</div>
+      <div class="card-body p-0">
+        {% for row in detail_rows %}
+        <div id="q-{{ row.qnum }}" class="detail-row {% if row.is_correct %}correct{% elif row.is_blank %}blank{% else %}wrong{% endif %}">
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+            <span class="question-title">第 {{ row.qnum }} 题</span>
+            <span class="badge badge-neutral">本题 {{ row.points | default(1) }} 分</span>
+            {% if row.is_correct %}
+              <span class="badge badge-success"><i class="fas fa-check me-1"></i>正确</span>
+            {% elif row.is_blank %}
+              <span class="badge badge-neutral"><i class="fas fa-minus me-1"></i>未答</span>
+            {% else %}
+              <span class="badge badge-danger"><i class="fas fa-times me-1"></i>错误</span>
+            {% endif %}
+            {% if row.speed == '慢' %}<span class="badge badge-warning"><i class="fas fa-hourglass-half me-1"></i>慢</span>{% elif row.speed == '快' %}<span class="badge badge-info"><i class="fas fa-bolt me-1"></i>快</span>{% else %}<span class="badge badge-neutral"><i class="fas fa-clock me-1"></i>中</span>{% endif %}
+            {% if row.kp_primary_name and row.kp_primary_name != 'N/A' %}<span class="chip chip-primary">{{ row.kp_primary_name }}</span>{% endif %}
+            {% for kp in (row.kp_secondary_names or [])[:2] %}<span class="chip chip-neutral">{{ kp }}</span>{% endfor %}
+            {% if row.error_tag and row.error_tag != 'unknown' %}<span class="badge badge-neutral">{{ {'计算失误':'计算失误','概念不清':'概念不清','读题遗漏':'读题遗漏','策略不当':'策略不当'}[row.error_tag] or row.error_tag }}</span>{% endif %}
+          </div>
+          <div class="d-flex flex-wrap align-items-start gap-3 mb-3" style="font-size: var(--small);">
+            <span>你的答案：<strong>{{ row.user_answer or '—' }}</strong></span>
+            <span style="color: var(--success);">正确答案：{{ row.correct_answer or '—' }}</span>
+            <div class="time-compare">
+              <span class="d-block mb-1" style="color: var(--muted);">耗时对比</span>
+              {% set my_sec = row.time_sec | default(0) %}
+              {% set avg_sec = (row.avg_time_ms or 0) / 1000 %}
+              {% set scale_max = [60, my_sec, avg_sec] | max %}
+              <div class="time-bar-row"><span style="min-width: 28px;">本人</span><div class="time-bar-track"><div class="time-bar-fill brand" style="width: {{ (my_sec / scale_max * 100) if scale_max else 0 }}%;"></div></div><span>{{ my_sec }}s</span></div>
+              <div class="time-bar-row"><span style="min-width: 28px;">平均</span><div class="time-bar-track"><div class="time-bar-fill neutral" style="width: {{ (avg_sec / scale_max * 100) if scale_max else 0 }}%;"></div></div><span>{{ (avg_sec | round(1)) }}s</span></div>
+            </div>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6 question-panel">
+              <div class="panel-title"><i class="fas fa-file-alt me-1"></i>原题</div>
+              {% if row.stem_image_url %}<img src="{{ row.stem_image_url }}" class="img-fluid mb-2" alt="题干">{% endif %}
+              <div class="mb-2">{{ row.stem_text | default('') | safe }}</div>
+              {% if row.choices %}<div style="font-size: var(--small);">{% for opt in row.choices %}<div>{% set kv = opt.get('key', opt) %}{% set tv = opt.get('text', opt) %}<strong>{{ kv }}</strong> {{ tv }}</div>{% endfor %}</div>{% endif %}
+            </div>
+            <div class="col-md-6 solution-panel">
+              <div class="panel-title"><i class="fas fa-lightbulb me-1"></i>解析</div>
+              {% if row.solution_text or row.solution_image_url %}
+                {% if row.solution_text %}<div style="font-size: var(--small);">{{ row.solution_text | safe }}</div>{% endif %}
+                {% if row.solution_image_url %}<img src="{{ row.solution_image_url }}" class="img-fluid mt-2" alt="解析">{% endif %}
+              {% else %}
+                <span style="color: var(--muted);">暂无解析</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='diagnostic/report.js') }}"></script>
+<script>
+(function(){
+  var data = {
+    chart_radar_labels: {{ chart_radar_labels | default([]) | tojson }},
+    chart_radar_values: {{ chart_radar_values | default([]) | tojson }},
+    chart_line_x: {{ chart_line_x | default([]) | tojson }},
+    chart_line_y: {{ chart_line_y | default([]) | tojson }},
+    chart_bar_labels: {{ chart_bar_labels | default([]) | tojson }},
+    chart_bar_time: {{ chart_bar_time | default([]) | tojson }},
+    chart_bar_correct: {{ chart_bar_correct | default([]) | tojson }},
+    kp_weak_top: {{ kp_weak_top | default([]) | tojson }},
+    has_custom_score_scheme: {{ has_custom_score_scheme | default(False) | lower }}
+  };
+  if (typeof initDiagnosticReportCharts === 'function') initDiagnosticReportCharts(data);
+})();
+</script>
+{% endblock extra_js %}
+{% endblock %}

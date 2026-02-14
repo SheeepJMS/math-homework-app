@@ -1,0 +1,164 @@
+{% extends "diagnostic/base.html" %}
+{% block title %}报告中心 - 诊断系统{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='diagnostic/report_center.css') }}">
+{% endblock %}
+{% block content %}
+<div class="report-center-page">
+  <h2 class="mb-4"><i class="fas fa-folder-open me-2"></i>报告中心</h2>
+  <p class="text-muted small mb-3">同一试卷可多次完成，每次生成独立报告。可按试卷筛选查看该卷全部历史记录。</p>
+
+  {# A) Filter Bar #}
+  <form method="get" action="{{ url_for('diagnostic.reports') }}" class="rc-filter-bar">
+    <input type="hidden" name="page" value="1">
+    <div class="rc-filter-row">
+      <div class="rc-filter-group">
+        <label>搜索</label>
+        <input type="text" name="q" class="form-control form-control-sm rc-search-input" placeholder="试卷名/竞赛名"
+               value="{{ reports_view.filters.q or '' }}">
+      </div>
+      <div class="rc-filter-group">
+        <label>日期</label>
+        <input type="hidden" name="range" id="filterRange" value="{{ reports_view.filters.range or 'all' }}">
+        <div class="btn-group btn-group-sm rc-range-btns" role="group">
+          <button type="button" class="btn btn-outline-secondary {% if reports_view.filters.range == '7d' %}active{% endif %}" data-range="7d">最近7天</button>
+          <button type="button" class="btn btn-outline-secondary {% if reports_view.filters.range == '30d' %}active{% endif %}" data-range="30d">30天</button>
+          <button type="button" class="btn btn-outline-secondary {% if reports_view.filters.range == 'all' or not reports_view.filters.range %}active{% endif %}" data-range="all">全部</button>
+        </div>
+      </div>
+      <div class="rc-filter-group">
+        <label>竞赛</label>
+        <select name="competition" class="form-select form-select-sm" style="width:160px;" id="filterCompetition">
+          <option value="">全部</option>
+          {% for c in reports_view.competitions %}
+          <option value="{{ c.id }}" {% if reports_view.filters.competition == c.id %}selected{% endif %}>
+            {{ c.name or c.category or 'N/A' }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="rc-filter-group">
+        <label>试卷</label>
+        <select name="exam" class="form-select form-select-sm" style="width:180px;" id="filterExam">
+          <option value="">全部</option>
+          {% for c in reports_view.competitions %}
+            {% for ex in (reports_view.exams_by_comp.get(c.id) or []) %}
+            <option value="{{ ex.id }}" data-comp="{{ c.id }}" {% if reports_view.filters.exam == ex.id %}selected{% endif %}>
+              {{ ex.title }}
+            </option>
+            {% endfor %}
+          {% endfor %}
+        </select>
+      </div>
+      <div class="rc-filter-group">
+        <label class="form-check-label d-flex align-items-center gap-1">
+          <input type="checkbox" name="include_in_progress" value="1" class="form-check-input"
+                 {% if reports_view.filters.include_in_progress %}checked{% endif %}> 含进行中
+        </label>
+      </div>
+      <div class="rc-filter-group">
+        <label>排序</label>
+        <select name="sort" class="form-select form-select-sm rc-sort-select">
+          <option value="latest" {% if reports_view.filters.sort == 'latest' %}selected{% endif %}>最近</option>
+          <option value="best_accuracy" {% if reports_view.filters.sort == 'best_accuracy' %}selected{% endif %}>正确率最高</option>
+          <option value="fastest" {% if reports_view.filters.sort == 'fastest' %}selected{% endif %}>用时最短</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm">筛选</button>
+    </div>
+  </form>
+
+  {# B) Report List #}
+  <div class="rc-list">
+    {% if reports_view['items'] %}
+    {% for item in reports_view['items'] %}
+    <div class="rc-report-card" data-attempt-id="{{ item.attempt_id }}">
+      <div class="rc-report-header">
+        <div>
+          <span class="rc-report-title">{{ item.exam_title }}</span>
+          <span class="rc-report-meta ms-2">· {{ item.competition_name }}</span>
+        </div>
+        <span class="rc-report-meta">{{ item.submitted_at_str }}</span>
+      </div>
+      <div class="rc-report-metrics">
+        <span>{{ item.score }}/{{ item.total }}</span>
+        <span>正确率 {{ item.accuracy_percent }}%</span>
+        <span>耗时 {{ item.total_time_sec }}s</span>
+        {% if item.delta_vs_prev %}
+        <span class="{% if item.delta_vs_prev.accuracy_delta > 0 %}rc-delta-up{% elif item.delta_vs_prev.accuracy_delta < 0 %}rc-delta-down{% else %}rc-delta-neutral{% endif %}">
+          正确率 {% if item.delta_vs_prev.accuracy_delta > 0 %}↑{% elif item.delta_vs_prev.accuracy_delta < 0 %}↓{% endif %}
+          {{ item.delta_vs_prev.accuracy_delta | abs }}{% if item.delta_vs_prev.accuracy_delta != 0 %}%{% endif %}
+        </span>
+        <span class="{% if item.delta_vs_prev.time_delta < 0 %}rc-delta-up{% elif item.delta_vs_prev.time_delta > 0 %}rc-delta-down{% else %}rc-delta-neutral{% endif %}">
+          耗时 {% if item.delta_vs_prev.time_delta < 0 %}↓{% elif item.delta_vs_prev.time_delta > 0 %}↑{% endif %}
+          {{ item.delta_vs_prev.time_delta | abs }}s
+        </span>
+        {% endif %}
+      </div>
+      <div class="rc-report-actions">
+        {% if item.status == 'finished' %}
+        <a href="{{ url_for('diagnostic.report', attempt_id=item.attempt_id) }}" class="btn btn-sm btn-primary">查看报告</a>
+        {% elif item.status == 'in_progress' %}
+        <a href="{{ url_for('diagnostic.attempt', attempt_id=item.attempt_id) }}" class="btn btn-sm btn-primary">继续答题</a>
+        {% endif %}
+        {% if item.practice.exists and item.practice.practice_set_id %}
+        <a href="{{ url_for('diagnostic.practice', practice_set_id=item.practice.practice_set_id) }}" class="btn btn-sm btn-outline-primary">开始练习</a>
+        {% endif %}
+        {% if item.exam_history and item.exam_history|length > 1 %}
+        <a href="#" class="rc-same-exam-toggle" data-exam-id="{{ item.exam_id }}" data-card-id="{{ item.attempt_id }}">
+          同卷历史 ({{ item.exam_history|length }}次)
+        </a>
+        {% endif %}
+      </div>
+      {% if item.exam_history and item.exam_history|length > 1 %}
+      <div class="rc-same-exam-panel" id="panel-{{ item.attempt_id }}" style="display:none;">
+        <table>
+          <thead><tr><th>时间</th><th>正确率</th><th>耗时</th><th></th></tr></thead>
+          <tbody>
+            {% for h in item.exam_history[:5] %}
+            <tr>
+              <td>{{ h.submitted_at_str }}</td>
+              <td>{{ h.accuracy_percent }}%</td>
+              <td>{{ h.total_time_sec }}s</td>
+              <td><a href="{{ url_for('diagnostic.report', attempt_id=h.attempt_id) }}">查看</a></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <p class="mb-0 mt-2"><a href="{{ url_for('diagnostic.reports', exam=item.exam_id) }}">查看该卷全部历史报告</a></p>
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="rc-empty">
+      <div class="icon-empty"><i class="fas fa-folder-open"></i></div>
+      {% if reports_view.filters.q or reports_view.filters.competition or reports_view.filters.exam or reports_view.filters.range != 'all' %}
+      <p class="mb-0">没有找到符合条件的报告。尝试清除筛选条件。</p>
+      {% else %}
+      <p class="mb-0">你还没有报告。去<a href="{{ url_for('diagnostic.exams') }}">试卷中心</a>开始一次诊断。</p>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  {# C) Pagination #}
+  {% if reports_view.pagination.total_pages > 1 %}
+  <nav class="rc-pagination">
+    {% set p = reports_view.pagination %}
+    {% set f = reports_view.filters %}
+    {% set base_url = url_for('diagnostic.reports', q=f.q, competition=f.competition, exam=f.exam, range=f.range, sort=f.sort, include_in_progress=f.include_in_progress and '1' or '0') %}
+    {% if p.has_prev %}
+    <a href="{{ base_url }}&page={{ p.page - 1 }}" class="btn btn-sm btn-outline-secondary">上一页</a>
+    {% endif %}
+    <span class="align-self-center small text-muted">第 {{ p.page }}/{{ p.total_pages }} 页，共 {{ p.total }} 条</span>
+    {% if p.has_next %}
+    <a href="{{ base_url }}&page={{ p.page + 1 }}" class="btn btn-sm btn-outline-secondary">下一页</a>
+    {% endif %}
+  </nav>
+  {% endif %}
+</div>
+{% endblock %}
+{% block extra_js %}
+<script src="{{ url_for('static', filename='diagnostic/report_center.js') }}"></script>
+{% endblock %}

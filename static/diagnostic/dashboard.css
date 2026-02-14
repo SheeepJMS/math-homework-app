@@ -1,0 +1,367 @@
+/**
+ * 诊断 Dashboard 首页样式
+ * 复用 report.css tokens，布局：桌面两列，移动单列
+ */
+:root {
+  --bg: #f6f7fb;
+  --surface: #ffffff;
+  --surface-2: #fbfcff;
+  --border: #e6e8f0;
+  --text: #111827;
+  --muted: #6b7280;
+  --brand: #2563eb;
+  --success: #16a34a;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #0ea5e9;
+  --success-bg: #eaf7ef;
+  --danger-bg: #fef2f2;
+  --info-bg: #e8f6fe;
+  --brand-bg: #e8efff;
+  --r-lg: 16px;
+  --r-md: 12px;
+  --r-sm: 10px;
+  --shadow-1: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px; --s-6: 24px; --s-8: 32px;
+  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --h2: 18px;
+  --base: 14px;
+  --small: 12px;
+}
+
+.dashboard-page {
+  font-family: var(--font, ui-sans-serif, system-ui, sans-serif);
+  font-size: var(--base, 14px);
+  color: var(--text, #111827);
+  padding-bottom: var(--s-8, 32px);
+}
+
+/* ========== Hero 区 ========== */
+.dashboard-hero {
+  background: linear-gradient(135deg, var(--brand, #2563eb) 0%, #1d4ed8 100%);
+  border-radius: var(--r-lg);
+  padding: var(--s-5) var(--s-6);
+  margin-bottom: var(--s-6);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-5);
+  align-items: flex-start;
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.dashboard-hero:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
+}
+.dashboard-hero .hero-left { flex: 0 0 auto; }
+.dashboard-hero .hero-right { flex: 1 1 200px; }
+.dashboard-hero .hero-metric { display: flex; align-items: baseline; gap: var(--s-2); }
+.dashboard-hero .hero-score { font-size: 32px; font-weight: 800; }
+.dashboard-hero .hero-accuracy { font-size: 24px; font-weight: 600; opacity: 0.95; }
+.dashboard-hero .hero-label { font-size: var(--small); opacity: 0.85; margin-top: 4px; }
+.dashboard-hero .hero-summary { margin: 0 0 var(--s-4); font-size: var(--base); line-height: 1.5; opacity: 0.95; }
+.dashboard-hero .hero-actions { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.btn-hero-primary {
+  background: #fff;
+  color: var(--brand);
+  font-weight: 600;
+  padding: var(--s-2) var(--s-4);
+  border-radius: var(--r-sm);
+  text-decoration: none;
+  transition: background 0.2s, color 0.2s;
+}
+.btn-hero-primary:hover { background: #f0f4ff; color: var(--brand); }
+.btn-hero-secondary {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.5);
+  font-weight: 500;
+  padding: var(--s-2) var(--s-4);
+  border-radius: var(--r-sm);
+  text-decoration: none;
+  transition: background 0.2s;
+}
+.btn-hero-secondary:hover { background: rgba(255,255,255,0.3); color: #fff; }
+
+.trend-arrow { font-size: 12px; margin-left: 4px; }
+.trend-arrow.up { color: var(--success); }
+.trend-arrow.down { color: var(--danger); }
+
+/* ========== A) 欢迎区 + 指标卡 ========== */
+.dashboard-welcome {
+  margin-bottom: var(--s-6, 24px);
+}
+.dashboard-welcome h2 {
+  font-size: var(--h2, 18px);
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.dashboard-welcome .welcome-sub {
+  font-size: var(--small, 12px);
+  color: var(--muted, #6b7280);
+}
+
+/* 指标卡网格：4 张小卡 */
+.dashboard-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--s-3, 12px);
+  margin-bottom: var(--s-6, 24px);
+}
+@media (min-width: 576px) {
+  .dashboard-summary-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.dashboard-mini-card {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e6e8f0);
+  border-radius: var(--r-lg, 16px);
+  padding: var(--s-4, 16px);
+  box-shadow: var(--shadow-1, 0 1px 2px rgba(16,24,40,.06));
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3, 12px);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.dashboard-mini-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 24, 40, 0.08);
+}
+.dashboard-mini-card .icon-wrap {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-sm, 10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.dashboard-mini-card .icon-wrap.brand { background: var(--brand-bg, #e8efff); color: var(--brand, #2563eb); }
+.dashboard-mini-card .icon-wrap.success { background: var(--success-bg, #eaf7ef); color: var(--success, #16a34a); }
+.dashboard-mini-card .icon-wrap.info { background: var(--info-bg, #e8f6fe); color: var(--info, #0ea5e9); }
+.dashboard-mini-card .icon-wrap.neutral { background: #f3f4f6; color: var(--muted, #6b7280); }
+.dashboard-mini-card .metric-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+}
+.dashboard-mini-card .metric-label {
+  font-size: var(--small, 12px);
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* 参与频率仪表盘 */
+.gauge-wrap {
+  position: relative;
+  width: 180px;
+  height: 120px;
+}
+.gauge-wrap canvas {
+  display: block;
+  max-height: 120px;
+}
+.gauge-wrap .gauge-label {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  pointer-events: none;
+}
+.gauge-wrap .gauge-value {
+  display: block;
+  font-size: 22px;
+  font-weight: 700;
+}
+.gauge-wrap[data-days="0"] .gauge-value { color: #dc2626; }
+.gauge-wrap[data-days="1"] .gauge-value { color: #ca8a04; }
+.gauge-wrap[data-days="2"] .gauge-value { color: #84cc16; }
+.gauge-wrap[data-days="3"] .gauge-value { color: #22c55e; }
+.gauge-wrap[data-days="4"] .gauge-value,
+.gauge-wrap[data-days="5"] .gauge-value,
+.gauge-wrap[data-days="6"] .gauge-value,
+.gauge-wrap[data-days="7"] .gauge-value { color: #16a34a; }
+.gauge-wrap .gauge-desc {
+  font-size: var(--small);
+  color: var(--muted);
+}
+
+/* 右列保持顶部对齐 */
+.dashboard-right-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+
+/* ========== B) 中部两列 ========== */
+.dashboard-mid-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--s-4, 16px);
+  margin-bottom: var(--s-6, 24px);
+}
+@media (min-width: 768px) {
+  .dashboard-mid-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.dashboard-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.dashboard-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 24, 40, 0.08);
+}
+.dashboard-card .card-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  font-size: var(--h2);
+  color: var(--text);
+  padding: var(--s-4) var(--s-5);
+}
+.dashboard-card .card-body {
+  padding: var(--s-5);
+}
+
+/* 趋势图容器 */
+.dashboard-chart-wrap {
+  position: relative;
+  height: 160px;
+}
+
+/* 薄弱知识点列表 */
+.dashboard-weak-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.dashboard-weak-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--s-2) 0;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--base);
+}
+.dashboard-weak-list li:last-child { border-bottom: none; }
+.dashboard-weak-list .weak-count {
+  font-size: var(--small);
+  color: var(--muted);
+}
+
+/* 历史报告列表 */
+.dashboard-report-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.dashboard-report-list li.report-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s-4);
+  padding: var(--s-3) 0;
+  border-bottom: 1px solid var(--border);
+}
+.dashboard-report-list li:last-child { border-bottom: none; }
+.dashboard-report-list .report-main { min-width: 0; }
+.dashboard-report-list .report-title { font-weight: 500; display: block; }
+.dashboard-report-list .report-meta { font-size: var(--small); color: var(--muted); }
+.dashboard-report-list .report-actions { display: flex; gap: var(--s-2); flex-shrink: 0; justify-content: flex-end; }
+
+.dashboard-empty.small { padding: var(--s-4); }
+.dashboard-empty.small .icon-empty { font-size: 22px; }
+
+/* ========== C) 底部试卷列表 ========== */
+.dashboard-exams-section {
+  margin-top: var(--s-6);
+}
+.dashboard-exams-section h3 {
+  font-size: var(--h2);
+  font-weight: 600;
+  margin-bottom: var(--s-4);
+  color: var(--text);
+}
+
+/* 竞赛分组可折叠 */
+.dashboard-comp-group {
+  margin-bottom: var(--s-4);
+}
+.dashboard-comp-group .comp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--s-3) var(--s-4);
+  background: var(--surface-2, #fbfcff);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: var(--base);
+  color: var(--text);
+}
+.dashboard-comp-group .comp-header:hover {
+  background: #f3f4f6;
+}
+.dashboard-comp-group .comp-body {
+  padding: var(--s-2) 0 0 var(--s-2);
+}
+.dashboard-comp-group.collapsed .comp-body {
+  display: none;
+}
+
+/* 试卷行 */
+.dashboard-exam-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2) var(--s-4);
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  margin-bottom: var(--s-2);
+  background: var(--surface);
+}
+.dashboard-exam-row .exam-main { flex: 1 1 200px; }
+.dashboard-exam-row .exam-title { font-weight: 500; display: block; }
+.dashboard-exam-row .exam-meta { font-size: var(--small); color: var(--muted); display: block; margin-top: 2px; }
+.dashboard-exam-row .year-cooldown,
+.dashboard-exam-row .exam-cooldown { font-size: 11px; color: var(--warning); display: block; margin-top: 2px; }
+.dashboard-exam-row .exam-badges { display: flex; flex-wrap: wrap; gap: var(--s-1); }
+.dashboard-exam-row .exam-actions { display: flex; gap: var(--s-2); flex-shrink: 0; }
+
+/* 状态徽章 */
+.badge-status { font-size: 11px; padding: 2px 8px; border-radius: 6px; }
+.badge-status.completed { background: var(--success-bg); color: var(--success); }
+.badge-status.in_progress { background: var(--info-bg); color: var(--info); }
+.badge-status.not_started { background: #f3f4f6; color: var(--muted); }
+
+/* 空态 */
+.dashboard-empty {
+  text-align: center;
+  padding: var(--s-8);
+  color: var(--muted);
+  font-size: var(--base);
+  background: var(--surface-2);
+  border: 1px dashed var(--border);
+  border-radius: var(--r-md);
+}
+.dashboard-empty .icon-empty { font-size: 28px; opacity: 0.5; margin-bottom: var(--s-2); }
+
+/* 搜索框 */
+.dashboard-search-wrap {
+  margin-bottom: var(--s-4);
+  max-width: 280px;
+}

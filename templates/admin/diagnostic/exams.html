@@ -1,0 +1,111 @@
+{% extends "admin/base.html" %}
+{% block admin_content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>诊断试卷管理</h2>
+        <div>
+            <a href="{{ url_for('diagnostic_admin.competitions') }}" class="btn btn-outline-secondary me-2">竞赛与分值设置</a>
+            <a href="{{ url_for('diagnostic_admin.import_csv') }}" class="btn btn-primary">导入 CSV</a>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">新建试卷</div>
+        <div class="card-body">
+            <form method="post" action="{{ url_for('diagnostic_admin.exam_create') }}" class="row g-3">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="col-md-2">
+                    <label class="form-label">学科</label>
+                    <select class="form-select" name="subject">
+                        <option value="数学竞赛" selected>数学竞赛</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">大类</label>
+                    <select class="form-select" name="category" required>
+                        <option value="">请选择</option>
+                        <option value="滑铁卢数学竞赛">滑铁卢数学竞赛</option>
+                        <option value="AMC美国数学竞赛">AMC美国数学竞赛</option>
+                        <option value="UBC数学竞赛">UBC数学竞赛</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">具体竞赛</label>
+                    <input type="text" class="form-control" name="comp_name" id="compNameInput" list="contestDatalist" placeholder="如：Gauss 7、AMC 8" autocomplete="off" required>
+                    <datalist id="contestDatalist"></datalist>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">年份</label>
+                    <input type="number" class="form-control" name="year" placeholder="如：2025" min="1990" max="2100">
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">创建试卷</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">试卷列表（层级：学科 → 大类 → 具体竞赛 → 年份 试卷）</div>
+        <div class="card-body">
+            {% for (subject, category), comps_dict in hierarchy.items() %}
+            <div class="mb-4">
+                <div class="text-muted small mb-2">
+                    <strong class="text-dark">{{ subject }}</strong>
+                    <span class="mx-1">›</span>
+                    <strong class="text-dark">{{ category }}</strong>
+                </div>
+                {% for comp_key, data in comps_dict.items() %}
+                <div class="ms-3 mb-2">
+                    <div class="fw-bold text-primary mb-1">{{ data.comp.name }}</div>
+                    <ul class="list-unstyled ms-3">
+                        {% for exam in data.exams %}
+                        <li class="d-flex align-items-center py-1 border-bottom">
+                            <span class="me-2">{% if exam.year %}{{ exam.year }}年{% endif %}</span>
+                            <a href="{{ url_for('diagnostic_admin.exam_detail', id=exam.id) }}">{{ exam.title }}</a>
+                            {% if exam.is_published %}<span class="badge bg-success ms-2">已发布</span>{% else %}<span class="badge bg-secondary ms-2">未发布</span>{% endif %}
+                            <div class="ms-auto">
+                                <a href="{{ url_for('diagnostic_admin.exam_detail', id=exam.id) }}" class="btn btn-sm btn-outline-primary">详情</a>
+                                <form method="post" action="{{ url_for('diagnostic_admin.exam_delete', id=exam.id) }}" class="d-inline ms-1" onsubmit="return confirm('确定删除？');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">删除</button>
+                                </form>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endfor %}
+            </div>
+            {% endfor %}
+            {% if not hierarchy %}
+            <p class="text-muted mb-0">暂无试卷，请上方创建或导入 CSV。</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='diagnostic/contest_names.js') }}"></script>
+<script>
+(function(){
+  if (typeof CONTEST_BY_CATEGORY === 'undefined') return;
+  var categorySelect = document.querySelector('select[name="category"]');
+  var datalist = document.getElementById('contestDatalist');
+  var compInput = document.getElementById('compNameInput');
+  if (!categorySelect || !datalist) return;
+
+  function refreshContestOptions(){
+    var cat = categorySelect.value;
+    while (datalist.firstChild) datalist.removeChild(datalist.firstChild);
+    var names = CONTEST_BY_CATEGORY[cat] || [];
+    names.forEach(function(name){
+      var opt = document.createElement('option');
+      opt.value = name;
+      datalist.appendChild(opt);
+    });
+    if (!names.length && compInput) compInput.value = '';
+  }
+  categorySelect.addEventListener('change', refreshContestOptions);
+  refreshContestOptions();
+})();
+</script>
+{% endblock %}

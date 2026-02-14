@@ -1,0 +1,519 @@
+{% extends "admin/base.html" %}
+{% block admin_content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>{{ exam.title }}</h2>
+        <div>
+            {% if exam.is_published %}
+            <a href="{{ url_for('diagnostic.index') }}" target="_blank" class="btn btn-outline-success me-2">学生端答题入口</a>
+            {% endif %}
+            <form method="post" action="{{ url_for('diagnostic_admin.exam_publish', id=exam.id) }}" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn {{ 'btn-warning' if exam.is_published else 'btn-success' }}">{% if exam.is_published %}取消发布{% else %}发布{% endif %}</button>
+            </form>
+            <a href="{{ url_for('diagnostic_admin.import_csv') }}?from_exam={{ exam.id }}" class="btn btn-outline-info me-2">上传 CSV 导入知识点</a>
+            <a href="{{ url_for('diagnostic_admin.exams') }}" class="btn btn-outline-secondary">返回列表</a>
+        </div>
+    </div>
+
+    <!-- 第一步：逐个上传试题（与作业系统一致，粘贴图片） -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">第一步：逐个上传试题</h5>
+        </div>
+        <div class="card-body">
+            <div class="mb-3">
+                <label class="form-label">粘贴试题图片</label>
+                <div class="paste-area diag-paste-area" id="diagExamPasteArea" tabindex="0">
+                    <div class="paste-placeholder">点击此处获取焦点，然后粘贴图片 (Ctrl+V)，支持批量粘贴</div>
+                    <div id="diagExamPreviewContainer" class="preview-container"></div>
+                </div>
+                <div id="diagExamUploadForm" style="display: none;">
+                    <input type="hidden" name="csrf_token" id="diagCsrfToken" value="{{ csrf_token() }}">
+                    <button type="button" class="btn btn-primary mt-2" id="diagUploadBtn">确认上传全部</button>
+                    <button type="button" class="btn btn-secondary mt-2" id="diagCancelBtn">取消</button>
+                </div>
+            </div>
+
+            <h6 class="mt-4">已上传试题预览：</h6>
+            <div class="row" id="diagQuestionsPreview">
+                {% for eq in order %}
+                {% set q = questions[loop.index0] if questions and loop.index0 < questions|length else none %}
+                {% if q %}
+                <div class="col-md-4 mb-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <h6 class="card-title">第 {{ eq.q_index + 1 }} 题</h6>
+                            {% if q.stem_image_url %}
+                            <img src="{{ q.stem_image_url }}" class="img-fluid" alt="试题">
+                            {% else %}
+                            <p class="text-muted small mb-0">{{ q.stem_text[:80] }}{% if q.stem_text|length > 80 %}...{% endif %}</p>
+                            {% endif %}
+                            {% if q.answer_key %}<p class="small mb-0 mt-1"><strong>答案：</strong>{{ q.answer_key }}</p>{% endif %}
+                            {% if q.solution_image_url %}
+                            <p class="small mb-0 mt-1">解析：</p>
+                            <img src="{{ q.solution_image_url }}" class="img-fluid" alt="解析" style="max-height:120px;">
+                            {% endif %}
+                            <div class="mt-2">
+                                <form action="{{ url_for('diagnostic_admin.question_delete', id=q.id) }}" method="POST" class="d-inline" onsubmit="return confirm('确定删除这道题？');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-danger btn-sm">删除</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+            {% if not order %}
+            <p class="text-muted mb-0">暂无题目，请在上方粘贴试题图片逐个上传。知识点与练习题集可稍后通过「导入 CSV」录入。</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 第二步：添加题目答案（与作业系统一致） -->
+    <div class="card mb-4">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0">第二步：添加题目答案</h5>
+        </div>
+        <div class="card-body">
+            <form id="diagAnswersForm" action="{{ url_for('diagnostic_admin.save_answers', id=exam.id) }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="mb-3">
+                    <label for="diagQuestionCount" class="form-label">题目数量</label>
+                    <input type="number" class="form-control" id="diagQuestionCount" min="0" max="99" value="{{ order|length }}" placeholder="{{ order|length }}">
+                    <div class="form-text">与当前已上传题目数一致（{{ order|length }} 题），可修改后重新生成输入框</div>
+                    <button type="button" class="btn btn-primary mt-2" id="diagGenAnswerFields">生成答案输入框</button>
+                </div>
+                <div id="diagAnswerFields" class="mb-3">
+                    {% for eq in order %}
+                    {% set q = questions[loop.index0] if questions and loop.index0 < questions|length else none %}
+                    <div class="mb-2 row align-items-center">
+                        <div class="col-auto">
+                            <label class="col-form-label">第 {{ eq.q_index + 1 }} 题：</label>
+                        </div>
+                        <div class="col-auto">
+                            <input type="text" class="form-control answer-input" name="answers[]" value="{{ q.answer_key if q and q.answer_key else '' }}" placeholder="A/B/C/D 或填空答案" maxlength="50" style="max-width: 120px;">
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <button type="submit" class="btn btn-success" id="diagSubmitAnswers" {% if not order %}disabled{% endif %}>保存答案</button>
+            </form>
+
+            {% if order %}
+            <div class="mt-4">
+                <h6>已添加的题目（下方可配置知识点与章节）：</h6>
+                <div class="table-responsive">
+                    <table class="table table-striped table-sm">
+                        <thead>
+                            <tr>
+                                <th>题号</th>
+                                <th>类型</th>
+                                <th>答案</th>
+                                <th>主知识点</th>
+                                <th>章节/作业</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for eq in order %}
+                            {% set q = questions[loop.index0] if questions and loop.index0 < questions|length else none %}
+                            {% set t = q_tags.get(q.id, {}) if q else {} %}
+                            {% set cfg = q_config.get(q.id) if q else none %}
+                            <tr data-qid="{{ q.id if q else '' }}">
+                                <td>{{ eq.q_index + 1 }}</td>
+                                <td>
+                                    {% if q and q.answer_key %}
+                                    {% if q.answer_key in ['A','B','C','D','E'] %}选择{% else %}填空{% endif %}
+                                    {% else %}-{% endif %}
+                                </td>
+                                <td>{{ q.answer_key if q and q.answer_key else '-' }}</td>
+                                <td class="position-relative">
+                                    <input type="text" class="form-control form-control-sm kp-input" value="{{ t.primary or '' }}" placeholder="输入搜索知识点" data-qid="{{ q.id if q else '' }}" style="min-width:120px;" autocomplete="off">
+                                    <div class="search-dropdown kp-dropdown" style="display:none;"></div>
+                                </td>
+                                <td class="position-relative">
+                                    <input type="text" class="form-control form-control-sm lesson-input" value="{{ cfg.homework_title if cfg and cfg.homework_title else '' }}" placeholder="输入搜索章节/作业" data-qid="{{ q.id if q else '' }}" style="min-width:140px;" autocomplete="off">
+                                    <input type="hidden" class="lesson-id-hidden" value="{{ cfg.homework_assignment_id if cfg and cfg.homework_assignment_id else '' }}">
+                                    <div class="search-dropdown lesson-dropdown" style="display:none;"></div>
+                                </td>
+                                <td>
+                                    {% if q %}
+                                    <a href="{{ url_for('diagnostic_admin.question_config', id=q.id) }}" class="btn btn-sm btn-outline-secondary" title="查看知识点与错题练习题详情">查看详情</a>
+                                    {% endif %}
+                                    <button type="button" class="btn btn-sm btn-outline-primary btn-save-config" data-qid="{{ q.id if q else '' }}">保存配置</button>
+                                    <form action="{{ url_for('diagnostic_admin.question_delete', id=q.id) if q else '#' }}" method="POST" class="d-inline ms-1" onsubmit="return confirm('确定删除这道题？');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-danger" {% if not q %}disabled{% endif %}>删除</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-muted small mb-0 mt-2">主知识点、章节/作业：输入关键词实时搜索，选中后点「保存配置」即生效。批量 CSV 导入后可用「查看详情」查看每题的知识点与错题练习题配置。</p>
+            </div>
+
+            <div class="mt-4 border-top pt-3" id="csvImportSection">
+                <h6>CSV 导入知识点与练习题</h6>
+                {% if request.args.get('csv_ok') %}
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <strong>导入成功。</strong>已更新 {{ request.args.get('updated', 0) }} 题的知识点与练习题集。
+                    <span class="d-block small mt-1">列表中「主知识点」会更新；点「查看详情」可看每题完整配置。题号从 0 开始（第1题=0、第2题=1），若某题未更新请核对 CSV 的 q_index。</span>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endif %}
+                {% if request.args.get('csv_err') %}
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <strong>导入失败。</strong>请查看页面顶部错误提示或检查 CSV 格式。
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endif %}
+                {% if request.args.get('csv_ok') or request.args.get('csv_err') %}
+                <script>document.addEventListener('DOMContentLoaded', function(){ var el = document.getElementById('csvImportSection'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); });</script>
+                {% endif %}
+                <form id="diagCsvForm" method="post" action="{{ url_for('diagnostic_admin.import_csv') }}?from_exam={{ exam.id }}" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="from_exam" value="{{ exam.id }}">
+                    <input type="file" name="file" accept=".csv" id="diagCsvFileInput" style="display:none;">
+                    <div class="csv-drop-zone border border-2 border-dashed rounded p-3 mb-2 text-center" id="diagCsvDropZone" style="min-height:80px; cursor:pointer;">
+                        <span class="text-muted" id="diagCsvPlaceholder">将 CSV 文件拖拽到此处，或点击选择文件</span>
+                        <span class="d-none text-primary fw-bold" id="diagCsvFileName"></span>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm" id="diagCsvSubmitBtn" disabled>导入 CSV</button>
+                </form>
+                <p class="text-muted small mb-0 mt-1"><strong>从本页导入：</strong>只需填 <code>q_index</code>（题号，从 0 开始：第1题=0，第2题=1）+ 知识点等列，无需与竞赛/试卷标题一致。列说明见 <a href="{{ url_for('diagnostic_admin.import_csv') }}" target="_blank">导入页</a>。</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 第三步：逐个上传解析（粘贴图片） -->
+    <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0">第三步：逐个上传解析</h5>
+        </div>
+        <div class="card-body">
+            <div class="mb-3">
+                <label class="form-label">粘贴解析图片</label>
+                <div class="paste-area diag-paste-area" id="diagSolutionPasteArea" tabindex="0">
+                    <div class="paste-placeholder">点击此处获取焦点，然后粘贴图片 (Ctrl+V)，支持批量粘贴；按题号顺序对应</div>
+                    <div id="diagSolutionPreviewContainer" class="preview-container"></div>
+                </div>
+                <div id="diagSolutionUploadForm" style="display: none;">
+                    <input type="hidden" name="csrf_token" id="diagSolutionCsrf" value="{{ csrf_token() }}">
+                    <button type="button" class="btn btn-info mt-2" id="diagSolutionUploadBtn">确认上传全部解析</button>
+                    <button type="button" class="btn btn-secondary mt-2" id="diagSolutionCancelBtn">取消</button>
+                </div>
+            </div>
+            {% if order %}
+            <p class="text-muted small mb-0">当前共 {{ order|length }} 题，解析图将按顺序对应到第 1～{{ order|length }} 题。</p>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+<style>
+.diag-paste-area { border: 2px dashed #ccc; padding: 20px; text-align: center; cursor: pointer; background: #f8f9fa; min-height: 120px; }
+.diag-paste-area:focus { outline: none; border-color: #0d6efd; }
+.preview-container { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+.preview-item { position: relative; width: 200px; }
+.preview-item img { width: 100%; height: auto; border: 1px solid #ddd; border-radius: 4px; }
+.preview-item .remove-btn { position: absolute; top: 5px; right: 5px; background: rgba(255,255,255,0.9); border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; color: #dc3545; }
+.search-dropdown { position: absolute; top: 100%; left: 0; right: 0; z-index: 100; max-height: 180px; overflow-y: auto; background: #fff; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); margin-top: 2px; }
+.search-dropdown .search-item { padding: 6px 10px; cursor: pointer; font-size: 0.9rem; border-bottom: 1px solid #eee; }
+.search-dropdown .search-item:last-child { border-bottom: none; }
+.search-dropdown .search-item:hover { background: #f0f7ff; }
+</style>
+
+<script>
+(function() {
+    const examId = {{ exam.id }};
+    let diagExamImages = [];
+    const pasteArea = document.getElementById('diagExamPasteArea');
+    const previewContainer = document.getElementById('diagExamPreviewContainer');
+    const uploadForm = document.getElementById('diagExamUploadForm');
+    const placeholder = pasteArea && pasteArea.querySelector('.paste-placeholder');
+
+    function updateDiagPreviews() {
+        if (!previewContainer) return;
+        previewContainer.innerHTML = '';
+        diagExamImages.forEach((imageData, index) => {
+            const div = document.createElement('div');
+            div.className = 'preview-item';
+            div.innerHTML = '<img src="' + imageData + '" alt="预览 ' + (index+1) + '"><button type="button" class="remove-btn" data-idx="' + index + '">×</button>';
+            previewContainer.appendChild(div);
+        });
+        if (uploadForm) uploadForm.style.display = diagExamImages.length > 0 ? 'block' : 'none';
+        if (placeholder) placeholder.style.display = diagExamImages.length > 0 ? 'none' : 'block';
+    }
+    if (previewContainer && previewContainer.parentElement) {
+        previewContainer.addEventListener('click', function(e) {
+            const btn = e.target.closest('.remove-btn');
+            if (btn && btn.dataset.idx !== undefined) {
+                diagExamImages.splice(parseInt(btn.dataset.idx, 10), 1);
+                updateDiagPreviews();
+            }
+        });
+    }
+
+    if (pasteArea) {
+        pasteArea.addEventListener('paste', function(e) {
+            const items = e.clipboardData.items;
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') === 0) {
+                    const blob = items[i].getAsFile();
+                    const reader = new FileReader();
+                    reader.onload = function(ev) {
+                        diagExamImages.push(ev.target.result);
+                        updateDiagPreviews();
+                    };
+                    reader.readAsDataURL(blob);
+                }
+            }
+        });
+    }
+
+    document.getElementById('diagUploadBtn') && document.getElementById('diagUploadBtn').addEventListener('click', async function() {
+        const form = document.getElementById('diagExamUploadForm');
+        const csrf = document.getElementById('diagCsrfToken') && document.getElementById('diagCsrfToken').value;
+        const fd = new FormData();
+        fd.append('csrf_token', csrf || '');
+        diagExamImages.forEach(function(data) { fd.append('files[]', data); });
+        try {
+            const r = await fetch('/admin/diagnostic/exams/' + examId + '/upload_question_images', { method: 'POST', body: fd });
+            const j = await r.json();
+            if (j.success) { alert(j.message); window.location.reload(); } else { alert(j.message || '上传失败'); }
+        } catch (err) { alert('上传失败'); }
+    });
+    document.getElementById('diagCancelBtn') && document.getElementById('diagCancelBtn').addEventListener('click', function() {
+        diagExamImages = [];
+        updateDiagPreviews();
+    });
+
+    // 第二步：生成答案输入框
+    const diagAnswerFields = document.getElementById('diagAnswerFields');
+    const diagQuestionCountInput = document.getElementById('diagQuestionCount');
+    const diagGenAnswerFieldsBtn = document.getElementById('diagGenAnswerFields');
+    const diagSubmitAnswersBtn = document.getElementById('diagSubmitAnswers');
+    if (diagGenAnswerFieldsBtn && diagAnswerFields && diagQuestionCountInput) {
+        diagGenAnswerFieldsBtn.addEventListener('click', function() {
+            const count = parseInt(diagQuestionCountInput.value, 10) || 0;
+            if (count <= 0 || count > 99) {
+                alert('请输入 1–99 之间的题目数量');
+                return;
+            }
+            var existing = [];
+            diagAnswerFields.querySelectorAll('input[name="answers[]"]').forEach(function(inp) { existing.push(inp.value); });
+            diagAnswerFields.innerHTML = '';
+            for (var i = 1; i <= count; i++) {
+                var div = document.createElement('div');
+                div.className = 'mb-2 row align-items-center';
+                div.innerHTML = '<div class="col-auto"><label class="col-form-label">第 ' + i + ' 题：</label></div><div class="col-auto"><input type="text" class="form-control answer-input" name="answers[]" value="' + (existing[i - 1] || '') + '" placeholder="A/B/C/D 或填空答案" maxlength="50" style="max-width:120px;"></div>';
+                diagAnswerFields.appendChild(div);
+            }
+            if (diagSubmitAnswersBtn) diagSubmitAnswersBtn.disabled = false;
+        });
+    }
+
+    // 第三步：粘贴解析图片并上传
+    var diagSolutionImages = [];
+    var solutionPasteArea = document.getElementById('diagSolutionPasteArea');
+    var solutionPreviewContainer = document.getElementById('diagSolutionPreviewContainer');
+    var solutionUploadForm = document.getElementById('diagSolutionUploadForm');
+    var solutionPlaceholder = solutionPasteArea && solutionPasteArea.querySelector('.paste-placeholder');
+    function updateSolutionPreviews() {
+        if (!solutionPreviewContainer) return;
+        solutionPreviewContainer.innerHTML = '';
+        diagSolutionImages.forEach(function(data, index) {
+            var div = document.createElement('div');
+            div.className = 'preview-item';
+            div.innerHTML = '<img src="' + data + '" alt="解析 ' + (index + 1) + '"><button type="button" class="remove-btn" data-idx="' + index + '">×</button>';
+            solutionPreviewContainer.appendChild(div);
+        });
+        if (solutionUploadForm) solutionUploadForm.style.display = diagSolutionImages.length > 0 ? 'block' : 'none';
+        if (solutionPlaceholder) solutionPlaceholder.style.display = diagSolutionImages.length > 0 ? 'none' : 'block';
+    }
+    if (solutionPreviewContainer && solutionPreviewContainer.parentElement) {
+        solutionPreviewContainer.addEventListener('click', function(e) {
+            var btn = e.target.closest('.remove-btn');
+            if (btn && btn.dataset.idx !== undefined) {
+                diagSolutionImages.splice(parseInt(btn.dataset.idx, 10), 1);
+                updateSolutionPreviews();
+            }
+        });
+    }
+    if (solutionPasteArea) {
+        solutionPasteArea.addEventListener('paste', function(e) {
+            var items = e.clipboardData.items;
+            for (var i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') === 0) {
+                    var blob = items[i].getAsFile();
+                    var reader = new FileReader();
+                    reader.onload = function(ev) {
+                        diagSolutionImages.push(ev.target.result);
+                        updateSolutionPreviews();
+                    };
+                    reader.readAsDataURL(blob);
+                }
+            }
+        });
+    }
+    document.getElementById('diagSolutionUploadBtn') && document.getElementById('diagSolutionUploadBtn').addEventListener('click', async function() {
+        var csrf = document.getElementById('diagSolutionCsrf') && document.getElementById('diagSolutionCsrf').value;
+        var fd = new FormData();
+        fd.append('csrf_token', csrf || '');
+        diagSolutionImages.forEach(function(data) { fd.append('files[]', data); });
+        try {
+            var r = await fetch('/admin/diagnostic/exams/' + examId + '/upload_solution_images', { method: 'POST', body: fd });
+            var j = await r.json();
+            if (j.success) { alert(j.message); window.location.reload(); } else { alert(j.message || '上传失败'); }
+        } catch (err) { alert('上传失败'); }
+    });
+    document.getElementById('diagSolutionCancelBtn') && document.getElementById('diagSolutionCancelBtn').addEventListener('click', function() {
+        diagSolutionImages = [];
+        updateSolutionPreviews();
+    });
+
+    // 主知识点、章节 搜索（AJAX，输入即搜索）
+    var competitionId = {{ exam.competition_id }};
+    function attachKpSearch(input) {
+        if (!input) return;
+        var dropdown = input.closest('td').querySelector('.kp-dropdown');
+        var tid;
+        input.addEventListener('input', function() {
+            var q = input.value.trim();
+            clearTimeout(tid);
+            dropdown.style.display = 'none';
+            if (q.length < 1) return;
+            tid = setTimeout(async function() {
+                try {
+                    var r = await fetch('/admin/diagnostic/search/kp?q=' + encodeURIComponent(q) + '&competition_id=' + competitionId);
+                    var items = await r.json();
+                    dropdown.innerHTML = '';
+                    if (items.length === 0) {
+                        dropdown.innerHTML = '<div class="search-item text-muted small">未找到，可直接输入后点保存配置</div>';
+                    } else {
+                        items.forEach(function(it) {
+                            var div = document.createElement('div');
+                            div.className = 'search-item';
+                            div.textContent = it.text || it.id;
+                            div.dataset.id = it.id;
+                            div.onclick = function() { input.value = it.id; dropdown.style.display = 'none'; };
+                            dropdown.appendChild(div);
+                        });
+                    }
+                    dropdown.style.display = 'block';
+                } catch (e) { dropdown.innerHTML = '<div class="search-item text-muted small">搜索失败</div>'; dropdown.style.display = 'block'; }
+            }, 200);
+        });
+        input.addEventListener('blur', function() { setTimeout(function() { dropdown.style.display = 'none'; }, 150); });
+    }
+    function attachLessonSearch(input, hiddenId) {
+        if (!input) return;
+        var dropdown = input.closest('td').querySelector('.lesson-dropdown');
+        var tid;
+        input.addEventListener('input', function() {
+            var q = input.value.trim();
+            clearTimeout(tid);
+            dropdown.style.display = 'none';
+            if (hiddenId) hiddenId.value = '';
+            if (q.length < 1) return;
+            tid = setTimeout(async function() {
+                try {
+                    var r = await fetch('/admin/diagnostic/search/lessons?q=' + encodeURIComponent(q));
+                    var items = await r.json();
+                    dropdown.innerHTML = '';
+                    if (items.length === 0) {
+                        dropdown.innerHTML = '<div class="search-item text-muted small">未找到匹配的章节</div>';
+                    } else {
+                        items.forEach(function(it) {
+                            var div = document.createElement('div');
+                            div.className = 'search-item';
+                            div.textContent = it.text || it.id;
+                            div.dataset.id = it.id;
+                            div.dataset.text = it.text || it.id;
+                            div.onclick = function() {
+                                input.value = it.text || it.id;
+                                if (hiddenId) hiddenId.value = it.id;
+                                dropdown.style.display = 'none';
+                            };
+                            dropdown.appendChild(div);
+                        });
+                    }
+                    dropdown.style.display = 'block';
+                } catch (e) { dropdown.innerHTML = '<div class="search-item text-muted small">搜索失败</div>'; dropdown.style.display = 'block'; }
+            }, 200);
+        });
+        input.addEventListener('blur', function() { setTimeout(function() { dropdown.style.display = 'none'; }, 150); });
+    }
+    document.querySelectorAll('.kp-input').forEach(attachKpSearch);
+    document.querySelectorAll('.lesson-input').forEach(function(inp) {
+        var hid = inp.closest('td').querySelector('.lesson-id-hidden');
+        attachLessonSearch(inp, hid);
+    });
+
+    // CSV 拖拽导入
+    (function() {
+        var zone = document.getElementById('diagCsvDropZone');
+        var input = document.getElementById('diagCsvFileInput');
+        var placeholder = document.getElementById('diagCsvPlaceholder');
+        var fileName = document.getElementById('diagCsvFileName');
+        var submitBtn = document.getElementById('diagCsvSubmitBtn');
+        if (!zone || !input) return;
+        function setFile(file) {
+            if (file && file.name && (file.name.toLowerCase().endsWith('.csv') || file.type === 'text/csv')) {
+                var dt = new DataTransfer();
+                dt.items.add(file);
+                input.files = dt.files;
+                placeholder.classList.add('d-none');
+                fileName.textContent = file.name;
+                fileName.classList.remove('d-none');
+                submitBtn.disabled = false;
+            }
+        }
+        zone.addEventListener('click', function() { input.click(); });
+        zone.addEventListener('dragover', function(e) { e.preventDefault(); e.stopPropagation(); zone.classList.add('bg-light'); });
+        zone.addEventListener('dragleave', function(e) { e.preventDefault(); zone.classList.remove('bg-light'); });
+        zone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            zone.classList.remove('bg-light');
+            var f = e.dataTransfer.files[0];
+            if (f) setFile(f);
+        });
+        input.addEventListener('change', function() {
+            if (input.files && input.files[0]) setFile(input.files[0]);
+        });
+    })();
+
+    // 保存配置（AJAX，不跳转）
+    document.querySelectorAll('.btn-save-config').forEach(function(btn) {
+        btn.addEventListener('click', async function() {
+            var qid = btn.dataset.qid;
+            if (!qid) return;
+            var row = btn.closest('tr');
+            var kpInput = row.querySelector('.kp-input');
+            var lessonIdInput = row.querySelector('.lesson-id-hidden');
+            var fd = new FormData();
+            fd.append('csrf_token', document.querySelector('[name="csrf_token"]') ? document.querySelector('[name="csrf_token"]').value : '');
+            fd.append('kp_primary', kpInput ? kpInput.value : '');
+            fd.append('homework_assignment_id', lessonIdInput ? lessonIdInput.value : '');
+            fd.append('practice_mode', 'bank_by_kp');
+            fd.append('random_count', '3');
+            btn.disabled = true;
+            try {
+                var r = await fetch('/admin/diagnostic/questions/' + qid + '/config_save', { method: 'POST', body: fd });
+                var j = await r.json();
+                if (j.success) { alert('已保存'); } else { alert(j.message || '保存失败'); }
+            } catch (e) { alert('保存失败'); }
+            btn.disabled = false;
+        });
+    });
+})();
+</script>
+{% endblock %}

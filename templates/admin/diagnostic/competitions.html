@@ -1,0 +1,58 @@
+{% extends "admin/base.html" %}
+{% block admin_content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>竞赛与分段分值设置</h2>
+        <a href="{{ url_for('diagnostic_admin.exams') }}" class="btn btn-outline-secondary">返回试卷管理</a>
+    </div>
+    <p class="text-muted">按「每 10 题」设置分值，同一竞赛下所有试卷共用。按 学科 → 竞赛大类 → 具体竞赛 层级展示。留空表示该段每题 1 分。</p>
+    <div class="card">
+        <div class="card-body">
+            {% for (subject, category), comps_in_group in hierarchy.items() %}
+            <div class="mb-4">
+                <div class="text-muted small mb-2"><strong>{{ subject }}</strong> &gt; <strong>{{ category }}</strong></div>
+                {% for comp in comps_in_group %}
+            <div class="border rounded p-3 mb-2 ms-3" style="border-left: 3px solid #0d6efd !important;">
+                <h6 class="mb-2">{{ comp.name }}</h6>
+                <form method="post" action="{{ url_for('diagnostic_admin.competition_score_scheme', comp_id=comp.id) }}" class="row g-2 align-items-end">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    {% set segs = segments_by_comp.get(comp.id, {}) %}
+                    <div class="col-auto">
+                        <label class="form-label small mb-0">第 1–10 题</label>
+                        <input type="number" class="form-control form-control-sm" name="seg_1_10" placeholder="分值" min="0" value="{{ segs.get('1_10', '') }}" style="width: 70px;">
+                    </div>
+                    <div class="col-auto">
+                        <label class="form-label small mb-0">第 11–20 题</label>
+                        <input type="number" class="form-control form-control-sm" name="seg_11_20" placeholder="分值" min="0" value="{{ segs.get('11_20', '') }}" style="width: 70px;">
+                    </div>
+                    <div class="col-auto">
+                        <label class="form-label small mb-0">第 21–30 题</label>
+                        <input type="number" class="form-control form-control-sm" name="seg_21_30" placeholder="分值" min="0" value="{{ segs.get('21_30', '') }}" style="width: 70px;">
+                    </div>
+                    <div class="col-auto">
+                        <label class="form-label small mb-0">第 31–40 题</label>
+                        <input type="number" class="form-control form-control-sm" name="seg_31_40" placeholder="分值" min="0" value="{{ segs.get('31_40', '') }}" style="width: 70px;">
+                    </div>
+                    <div class="col-auto">
+                        <label class="form-label small mb-0">第 41–50 题</label>
+                        <input type="number" class="form-control form-control-sm" name="seg_41_50" placeholder="分值" min="0" value="{{ segs.get('41_50', '') }}" style="width: 70px;">
+                    </div>
+                    <div class="col-auto">
+                        <label class="form-label small mb-0">空题加分值</label>
+                        <input type="number" class="form-control form-control-sm" name="blank_bonus" placeholder="0" min="0" value="{{ comp.blank_bonus | default(0) }}" style="width: 70px;" title="未作答每题加几分，默认 0">
+                    </div>
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-sm btn-primary">保存</button>
+                    </div>
+                </form>
+            </div>
+                {% endfor %}
+            </div>
+            {% endfor %}
+            {% if not hierarchy %}
+            <p class="text-muted mb-0">暂无竞赛，请先在「试卷管理」中创建试卷（会自动创建竞赛）。</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,145 @@
+/**
+ * 报告中心样式 - 复用 dashboard/report tokens
+ */
+:root {
+  --rc-bg: #f6f7fb;
+  --rc-surface: #ffffff;
+  --rc-border: #e6e8f0;
+  --rc-text: #111827;
+  --rc-muted: #6b7280;
+  --rc-brand: #2563eb;
+  --rc-success: #16a34a;
+  --rc-danger: #ef4444;
+  --rc-warning: #f59e0b;
+  --rc-success-bg: #eaf7ef;
+  --rc-danger-bg: #feecec;
+  --rc-r-md: 12px;
+  --rc-r-sm: 8px;
+  --rc-s-2: 8px;
+  --rc-s-3: 12px;
+  --rc-s-4: 16px;
+  --rc-shadow: 0 1px 2px rgba(16,24,40,.06);
+}
+
+.report-center-page {
+  font-size: 14px;
+  color: var(--rc-text);
+  padding-bottom: 24px;
+}
+
+/* Filter Bar */
+.rc-filter-bar {
+  background: var(--rc-surface);
+  border: 1px solid var(--rc-border);
+  border-radius: var(--rc-r-md);
+  padding: var(--rc-s-4);
+  margin-bottom: var(--rc-s-4);
+  box-shadow: var(--rc-shadow);
+}
+.rc-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rc-s-3);
+  align-items: center;
+  margin-bottom: var(--rc-s-2);
+}
+.rc-filter-row:last-child { margin-bottom: 0; }
+.rc-filter-group {
+  display: flex;
+  align-items: center;
+  gap: var(--rc-s-2);
+}
+.rc-filter-group label {
+  font-size: 12px;
+  color: var(--rc-muted);
+  white-space: nowrap;
+}
+.rc-search-input { width: 180px; }
+.rc-range-btns .btn { font-size: 12px; }
+.rc-sort-select { width: 140px; }
+
+/* Report List */
+.rc-list { margin-top: var(--rc-s-4); }
+.rc-report-card {
+  background: var(--rc-surface);
+  border: 1px solid var(--rc-border);
+  border-radius: var(--rc-r-md);
+  padding: var(--rc-s-4);
+  margin-bottom: var(--rc-s-3);
+  box-shadow: var(--rc-shadow);
+  transition: box-shadow 0.15s;
+}
+.rc-report-card:hover { box-shadow: 0 4px 12px rgba(16,24,40,.08); }
+.rc-report-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--rc-s-2);
+  margin-bottom: var(--rc-s-2);
+}
+.rc-report-title {
+  font-weight: 600;
+  color: var(--rc-text);
+}
+.rc-report-meta {
+  font-size: 12px;
+  color: var(--rc-muted);
+}
+.rc-report-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rc-s-4);
+  font-size: 13px;
+  margin-bottom: var(--rc-s-3);
+}
+.rc-report-metrics span { color: var(--rc-muted); }
+.rc-delta-up { color: var(--rc-success); }
+.rc-delta-down { color: var(--rc-danger); }
+.rc-delta-neutral { color: var(--rc-muted); }
+.rc-report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rc-s-2);
+  align-items: center;
+}
+.rc-report-actions .btn-sm { font-size: 12px; }
+
+/* Same exam history expand */
+.rc-same-exam-toggle {
+  font-size: 12px;
+  color: var(--rc-brand);
+  cursor: pointer;
+  text-decoration: none;
+}
+.rc-same-exam-toggle:hover { text-decoration: underline; }
+.rc-same-exam-panel {
+  margin-top: var(--rc-s-3);
+  padding-top: var(--rc-s-3);
+  border-top: 1px dashed var(--rc-border);
+  font-size: 12px;
+  color: var(--rc-muted);
+}
+.rc-same-exam-panel table { width: 100%; }
+.rc-same-exam-panel td { padding: 4px 8px 4px 0; }
+
+/* Empty state */
+.rc-empty {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--rc-muted);
+  background: var(--rc-surface);
+  border: 1px dashed var(--rc-border);
+  border-radius: var(--rc-r-md);
+  margin-top: var(--rc-s-4);
+}
+.rc-empty .icon-empty { font-size: 32px; opacity: 0.5; margin-bottom: 12px; }
+
+/* Pagination */
+.rc-pagination {
+  display: flex;
+  justify-content: center;
+  gap: var(--rc-s-2);
+  margin-top: var(--rc-s-4);
+  flex-wrap: wrap;
+}

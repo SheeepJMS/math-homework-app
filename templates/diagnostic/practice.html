@@ -1,0 +1,99 @@
+{% extends "diagnostic/base.html" %}
+{% block title %}练习包{% endblock %}
+{% block extra_css %}
+<style>
+.practice-card { margin-bottom: 1rem; }
+.practice-options { max-width: 420px; margin-top: 0.5rem; }
+.result-row { border-left: 3px solid transparent; padding: 0.75rem; }
+.result-row.correct { border-left-color: #198754; }
+.result-row.wrong { border-left-color: #dc3545; }
+.solution-box { background: #f8f9fa; border-radius: 8px; padding: 12px; margin-top: 8px; border-left: 4px solid #0d6efd; }
+</style>
+{% endblock %}
+{% block content %}
+<h2 class="mb-4">练习题目</h2>
+
+{% if completed %}
+<p class="text-muted">本练习包已完成，以下为答题结果与解析。</p>
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">得分：<strong>{{ score_earned }}</strong> / {{ score_max }}</h5>
+    </div>
+</div>
+{% for row in result_rows %}
+<div class="card practice-card">
+    <div class="card-header">第 {{ loop.index }} 题 {% if row.source == 'bank' %}(题库){% else %}(作业){% endif %}</div>
+    <div class="card-body">
+        {% if row.question %}
+        <div class="mb-2">
+            {% if row.source == 'bank' and row.question.stem_image_url %}<img src="{{ row.question.stem_image_url }}" class="img-fluid mb-2" alt="题目">{% endif %}
+            {% if row.source == 'bank' %}{{ row.question.stem_text | safe }}{% else %}{{ row.question.content | default('—') }}{% endif %}
+        </div>
+        <div class="result-row {% if row.is_correct %}correct{% else %}wrong{% endif %}">
+            <p class="mb-1">你的答案：<strong>{{ row.user_answer }}</strong></p>
+            <p class="mb-1">正确答案：<strong class="text-success">{{ row.correct_answer }}</strong></p>
+            {% if row.is_correct %}<span class="badge bg-success">正确</span>{% else %}<span class="badge bg-danger">错误</span>{% endif %}
+        </div>
+        {% if row.solution_text %}
+        <div class="solution-box mt-2">
+            <strong>解析</strong>
+            <div class="small mt-1">{{ row.solution_text | safe }}</div>
+        </div>
+        {% endif %}
+        {% else %}
+        <p class="text-muted">题目不存在或已删除</p>
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
+{% else %}
+<p class="text-muted">根据错题生成的练习，来源：诊断题库或作业题库。作答后点击「提交答案」。</p>
+<form id="practiceForm" method="post" action="{{ url_for('diagnostic.practice_submit', practice_set_id=practice_set.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% for item in questions %}
+    <div class="card practice-card">
+        <div class="card-header">第 {{ loop.index }} 题 {% if item.source == 'bank' %}(题库){% else %}(作业){% endif %}</div>
+        <div class="card-body">
+            {% if item.question %}
+            <div class="mb-3">
+                {% if item.source == 'bank' %}
+                    {% if item.question.stem_image_url %}<img src="{{ item.question.stem_image_url }}" class="img-fluid mb-2" alt="题目">{% endif %}
+                    {{ item.question.stem_text | safe }}
+                {% else %}
+                    {{ item.question.content | default('—') }}
+                {% endif %}
+            </div>
+            <div class="mb-2">
+                <label class="form-label">你的答案</label>
+                {% if item.choices %}
+                <div class="practice-options">
+                    {% for opt in item.choices %}
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="answer_{{ item.item.id }}" id="q{{ item.item.id }}_opt{{ loop.index }}" value="{{ opt.get('key', opt) }}">
+                        <label class="form-check-label" for="q{{ item.item.id }}_opt{{ loop.index }}">{{ opt.get('key', opt) }}{% if opt.get('text') != opt.get('key', opt) %} {{ opt.get('text', opt) }}{% endif %}</label>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <input type="text" class="form-control" name="answer_{{ item.item.id }}" placeholder="填写答案" style="max-width: 280px;">
+                {% endif %}
+            </div>
+            {% else %}
+            <p class="text-muted">题目不存在或已删除</p>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+    {% if questions %}
+    <div class="mb-4">
+        <button type="submit" class="btn btn-primary">提交答案</button>
+    </div>
+    {% endif %}
+</form>
+{% endif %}
+
+{% if not questions and not (result_rows or []) %}
+<p class="text-muted">暂无练习题。</p>
+{% endif %}
+<a href="{{ url_for('diagnostic.report', attempt_id=practice_set.attempt_id) }}" class="btn btn-outline-primary">返回试卷报告</a>
+{% endblock %}

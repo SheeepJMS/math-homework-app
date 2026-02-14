@@ -1,0 +1,283 @@
+{% extends "diagnostic/base.html" %}
+{% block title %}诊断系统 - 首页{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='diagnostic/report.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='diagnostic/dashboard.css') }}">
+{% endblock %}
+{% block content %}
+<div class="dashboard-page">
+  {# A) Hero 区 #}
+  <div class="dashboard-hero">
+    <div class="hero-left">
+      <div class="hero-metric">
+        {% if last_attempt %}
+        <span class="hero-score">{{ last_attempt.score }}/{{ last_attempt.score_max }}</span>
+        <span class="hero-accuracy">{{ last_attempt.accuracy_percent }}%</span>
+        {% else %}
+        <span class="hero-accuracy">--</span>
+        {% endif %}
+      </div>
+      <div class="hero-label">本次得分 / 正确率</div>
+    </div>
+    <div class="hero-right">
+      <p class="hero-summary">{{ hero.summary_text | default('暂无诊断总结') }}</p>
+      <div class="hero-actions">
+        {% if hero.in_progress_attempt %}
+        <a href="{{ url_for('diagnostic.attempt', attempt_id=hero.in_progress_attempt.attempt_id) }}" class="btn btn-hero-primary">{{ hero.cta_primary }}</a>
+        {% elif hero.recommended_exam and hero.recommended_exam.type == 'continue' %}
+        <a href="{{ url_for('diagnostic.attempt', attempt_id=hero.recommended_exam.attempt_id) }}" class="btn btn-hero-primary">{{ hero.cta_primary }}</a>
+        {% elif hero.recommended_exam and hero.recommended_exam.type in ('start', 'retry') %}
+        <a href="{{ url_for('diagnostic.start_exam', exam_id=hero.recommended_exam.exam_id) }}" class="btn btn-hero-primary">{{ hero.cta_primary }}</a>
+        {% else %}
+        <a href="{{ url_for('diagnostic.exams') }}" class="btn btn-hero-primary">{{ hero.cta_primary }}</a>
+        {% endif %}
+        <a href="{{ url_for('diagnostic.reports') }}" class="btn btn-hero-secondary">{{ hero.cta_secondary }}</a>
+      </div>
+    </div>
+  </div>
+
+  {# B) 4 张指标卡 #}
+  <div class="dashboard-summary-grid">
+    <div class="dashboard-mini-card">
+      <div class="icon-wrap brand"><i class="fas fa-chart-line"></i></div>
+      <div>
+        <div class="metric-value">
+          {% if last_attempt %}
+          {{ last_attempt.score }}/{{ last_attempt.score_max }} · {{ last_attempt.accuracy_percent }}%
+          {% else %}
+          N/A
+          {% endif %}
+        </div>
+        <div class="metric-label">最近一次 得分/正确率</div>
+      </div>
+    </div>
+    <div class="dashboard-mini-card">
+      <div class="icon-wrap success"><i class="fas fa-percent"></i></div>
+      <div>
+        <div class="metric-value">
+          {% if stats_30d %}{{ stats_30d.avg_accuracy_percent }}%
+          {% if stats_30d.accuracy_trend is defined and stats_30d.accuracy_trend != 0 %}
+          <span class="trend-arrow {{ 'up' if stats_30d.accuracy_trend > 0 else 'down' }}">{% if stats_30d.accuracy_trend > 0 %}↑{% else %}↓{% endif %}{{ stats_30d.accuracy_trend|abs }}</span>
+          {% endif %}
+          {% else %}N/A{% endif %}
+        </div>
+        <div class="metric-label">近 30 天平均正确率</div>
+      </div>
+    </div>
+    <div class="dashboard-mini-card">
+      <div class="icon-wrap info"><i class="fas fa-clock"></i></div>
+      <div>
+        <div class="metric-value">
+          {% if stats_30d %}{{ stats_30d.avg_time_per_q_sec | format_time_sec }}{% else %}N/A{% endif %}
+        </div>
+        <div class="metric-label">近 30 天均题耗时</div>
+      </div>
+    </div>
+    <div class="dashboard-mini-card">
+      <div class="icon-wrap neutral"><i class="fas fa-check-double"></i></div>
+      <div>
+        <div class="metric-value">
+          {% if stats_30d %}{{ stats_30d.attempts_count }}{% else %}0{% endif %}
+        </div>
+        <div class="metric-label">近 30 天完成次数</div>
+      </div>
+    </div>
+  </div>
+
+  {% if not last_attempt and not trend %}
+  <div class="dashboard-empty mb-4">
+    <div class="icon-empty"><i class="fas fa-chart-pie"></i></div>
+    <p class="mb-0">暂无数据。去<a href="{{ url_for('diagnostic.exams') }}">试卷中心</a>完成一次诊断即可看到你的表现与趋势。</p>
+  </div>
+  {% endif %}
+
+  {# C) 图表区：左列趋势+耗时，右列薄弱点+报告 #}
+  <div class="dashboard-mid-grid">
+    <div>
+      <div class="dashboard-card mb-3">
+        <div class="card-header"><i class="fas fa-chart-line me-2"></i>最近 6 次正确率趋势</div>
+        <div class="card-body">
+          {% if trend and trend|length > 0 %}
+          <div class="dashboard-chart-wrap">
+            <canvas id="trendChart"></canvas>
+          </div>
+          {% else %}
+          <div class="dashboard-empty small">
+            <div class="icon-empty"><i class="fas fa-chart-line"></i></div>
+            <p class="mb-0">暂无趋势数据</p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      <div class="dashboard-card">
+        <div class="card-header"><i class="fas fa-exclamation-triangle me-2"></i>Top 3 薄弱知识点</div>
+        <div class="card-body">
+          {% if weak_kps and weak_kps|length > 0 %}
+          <div class="dashboard-chart-wrap" style="height: 120px;">
+            <canvas id="weakBarChart"></canvas>
+          </div>
+          <ul class="dashboard-weak-list mt-2">
+            {% for w in weak_kps %}
+            <li><span>{{ w.kp_name }}</span><span class="weak-count">{{ w.wrong_count }}/{{ w.n_questions }} 题</span></li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <div class="dashboard-empty small">
+            <div class="icon-empty"><i class="fas fa-tags"></i></div>
+            <p class="mb-0">暂无知识点标签。请在后台为题目选择知识点后，即可生成薄弱点榜单。</p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="dashboard-right-col">
+      <div class="dashboard-card mb-3">
+        <div class="card-header"><i class="fas fa-calendar-check me-2"></i>最近一周参与频率</div>
+        <div class="card-body d-flex align-items-center justify-content-center" style="min-height: 160px;">
+          <div class="gauge-wrap" data-days="{{ weekly_participation.days_active | default(0) }}">
+            <canvas id="participationGauge"></canvas>
+            <div class="gauge-label">
+              <span class="gauge-value">{{ weekly_participation.days_active | default(0) }}/7</span>
+              <span class="gauge-desc">有完成测验的天数</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="dashboard-card" style="align-self: start;">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="fas fa-history me-2"></i>最近报告</span>
+          <a href="{{ url_for('diagnostic.reports') }}" class="btn btn-sm btn-outline-primary">全部报告</a>
+        </div>
+        <div class="card-body">
+          {% if recent_reports and recent_reports|length > 0 %}
+          <ul class="dashboard-report-list">
+            {% for r in recent_reports %}
+            <li class="report-row">
+              <div class="report-main">
+                <span class="report-title">{{ r.exam_title }}</span>
+                <span class="report-meta">{{ r.submitted_at_str }} · {{ r.score }}/{{ r.score_max }} · {{ r.accuracy_percent }}% · {{ r.total_time_sec | format_time_sec }}</span>
+              </div>
+              <div class="report-actions">
+                <a href="{{ url_for('diagnostic.report', attempt_id=r.attempt_id) }}" class="btn btn-sm btn-primary">查看报告</a>
+                {% if r.practice_set_id %}
+                <a href="{{ url_for('diagnostic.practice', practice_set_id=r.practice_set_id) }}" class="btn btn-sm btn-outline-secondary">开始练习</a>
+                {% endif %}
+              </div>
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <div class="dashboard-empty small">
+            <div class="icon-empty"><i class="fas fa-file-alt"></i></div>
+            <p class="mb-0">暂无报告。完成试卷后即可在此查看。</p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# D) 底部：推荐/最近试卷（3–6 条） #}
+  <div class="dashboard-exams-section">
+    <h3><i class="fas fa-pencil-alt me-2"></i>开始新试卷</h3>
+    <p class="text-muted small mb-3">选择试卷开始答题，或前往 <a href="{{ url_for('diagnostic.exams') }}">试卷中心</a> 查看完整四级树结构。</p>
+    <div class="dashboard-search-wrap mb-3">
+      <input type="text" id="examSearch" class="form-control form-control-sm" placeholder="搜索 Gauss 2025、AMC 8 等..." autocomplete="off">
+    </div>
+    {% if exams_grouped %}
+    {% for group in exams_grouped %}
+    <div class="dashboard-comp-group" data-comp="{{ group.competition_name }}">
+      <div class="comp-header" onclick="this.parentElement.classList.toggle('collapsed')">
+        <span>{{ group.competition_name }}</span>
+        <i class="fas fa-chevron-down"></i>
+      </div>
+      <div class="comp-body">
+        {% for ex in group.exams %}
+        <div class="dashboard-exam-row exam-row" data-title="{{ ex.exam_title | lower }}" data-comp="{{ group.competition_name | lower }}">
+          <div class="exam-main">
+            <span class="exam-title">{{ ex.exam_title }}</span>
+            {% if ex.in_progress %}
+            <span class="exam-meta">进行中：已做 {{ ex.in_progress.answered }}/{{ ex.in_progress.total }} · 已用时 {{ ex.in_progress.time_sec | format_time_sec }}</span>
+            {% elif ex.last_finished %}
+            <span class="exam-meta">最近一次：{{ ex.last_finished.finished_at_str }} · {{ ex.last_finished.score }}/{{ ex.last_finished.total }} · {{ ex.last_finished.accuracy_percent }}%</span>
+            {% else %}
+            <span class="exam-meta">未参加</span>
+            {% endif %}
+          </div>
+          <span class="exam-badges">
+            {% if ex.status == 'in_progress' %}
+            <span class="badge-status in_progress">进行中</span>
+            {% elif ex.status == 'completed' %}
+            <span class="badge-status completed">已完成</span>
+            {% else %}
+            <span class="badge-status not_started">未开始</span>
+            {% endif %}
+          </span>
+          <span class="exam-actions">
+            {% if ex.status == 'in_progress' %}
+            <a href="{{ url_for('diagnostic.attempt', attempt_id=ex.in_progress.attempt_id) }}" class="btn btn-sm btn-primary">继续</a>
+            {% elif ex.status == 'completed' %}
+              {% if ex.retry_policy.can_retry %}
+              <a href="{{ url_for('diagnostic.report', attempt_id=ex.last_finished.attempt_id) }}" class="btn btn-sm btn-outline-primary">查看报告</a>
+              <a href="{{ url_for('diagnostic.start_exam', exam_id=ex.exam_id) }}" class="btn btn-sm btn-primary">重做</a>
+              {% else %}
+              <a href="{{ url_for('diagnostic.report', attempt_id=ex.last_finished.attempt_id) }}" class="btn btn-sm btn-primary">查看报告</a>
+              <a href="{{ url_for('diagnostic.reports', exam=ex.exam_id) }}" class="btn btn-sm btn-outline-secondary">历史报告</a>
+              <span class="btn btn-sm btn-outline-secondary disabled" title="可在 {{ ex.retry_policy.next_retry_at | format_date }} 后重做（每份试卷每4个月可重做一次）">重做</span>
+              {% endif %}
+            {% else %}
+            <a href="{{ url_for('diagnostic.start_exam', exam_id=ex.exam_id) }}" class="btn btn-sm btn-primary">开始</a>
+            {% endif %}
+          </span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="dashboard-empty">
+      <div class="icon-empty"><i class="fas fa-file-alt"></i></div>
+      <p class="mb-0">暂无已发布的试卷。</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<script src="https://cdn.bootcdn.net/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+{% endblock %}
+{% block extra_js %}
+<script>
+  window.DASHBOARD_DATA = {
+    chart_trend_labels: {{ chart_trend_labels | default([]) | tojson }},
+    chart_trend_values: {{ chart_trend_values | default([]) | tojson }},
+    weak_kps: {{ weak_kps | default([]) | tojson }},
+    weekly_participation: {{ weekly_participation | default({'days_active': 0, 'total_days': 7, 'percentage': 0}) | tojson }},
+  };
+</script>
+<script src="{{ url_for('static', filename='diagnostic/dashboard.js') }}"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    if (window.initDiagnosticDashboardCharts) {
+      initDiagnosticDashboardCharts(window.DASHBOARD_DATA);
+    }
+    var search = document.getElementById('examSearch');
+    if (search) {
+      search.addEventListener('input', function () {
+        var q = (this.value || '').toLowerCase().trim();
+        document.querySelectorAll('.exam-row').forEach(function (row) {
+          var title = (row.getAttribute('data-title') || '').toLowerCase();
+          var comp = (row.getAttribute('data-comp') || '').toLowerCase();
+          var match = !q || title.indexOf(q) >= 0 || comp.indexOf(q) >= 0;
+          row.style.display = match ? '' : 'none';
+        });
+        document.querySelectorAll('.dashboard-comp-group').forEach(function (g) {
+          var visible = g.querySelectorAll('.exam-row');
+          var anyVisible = false;
+          visible.forEach(function (r) { if (r.style.display !== 'none') anyVisible = true; });
+          g.style.display = anyVisible ? '' : 'none';
+        });
+      });
+    }
+  });
+</script>
+{% endblock %}

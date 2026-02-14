@@ -1,0 +1,90 @@
+{# 四级试卷树：Subject -> Category -> Contest -> Year #}
+<div class="exam-tree" id="examTree">
+  <div class="exam-tree-search mb-3">
+    <input type="text" id="examTreeSearch" class="form-control form-control-sm" placeholder="搜索 Gauss 2025、AMC 8 等..." autocomplete="off">
+  </div>
+  {% if exam_tree and exam_tree|length > 0 %}
+  <div class="exam-tree-root">
+    {% for sub in exam_tree %}
+    <div class="tree-level-1 tree-node" data-subject="{{ sub.subject }}" data-category="" data-contest="">
+      <div class="tree-toggle" onclick="this.parentElement.classList.toggle('collapsed')">
+        <i class="fas fa-chevron-down tree-chevron"></i>
+        <span class="tree-label">{{ sub.subject }}</span>
+        <span class="tree-badge">{{ sub.categories | length }}</span>
+      </div>
+      <div class="tree-children">
+        {% for cat in sub.categories %}
+        <div class="tree-level-2 tree-node" data-subject="{{ sub.subject }}" data-category="{{ cat.category }}" data-contest="">
+          <div class="tree-toggle" onclick="this.parentElement.classList.toggle('collapsed')">
+            <i class="fas fa-chevron-down tree-chevron"></i>
+            <span class="tree-label">{{ cat.category }}</span>
+            <span class="tree-badge">{{ cat.contests | length }}</span>
+          </div>
+          <div class="tree-children">
+            {% for cont in cat.contests %}
+            <div class="tree-level-3 tree-node" data-subject="{{ sub.subject }}" data-category="{{ cat.category }}" data-contest="{{ cont.contest }}">
+              <div class="tree-toggle" onclick="this.parentElement.classList.toggle('collapsed')">
+                <i class="fas fa-chevron-down tree-chevron"></i>
+                <span class="tree-label">{{ cont.contest }}</span>
+                <span class="tree-badge">{{ cont.years | length }}</span>
+              </div>
+              <div class="tree-children">
+                {% for yr in cont.years %}
+                <div class="tree-level-4 tree-year-row" data-subject="{{ sub.subject }}" data-category="{{ cat.category }}" data-contest="{{ cont.contest }}" data-year="{{ yr.year }}" data-title="{{ yr.exam_title | lower }}">
+                  <div class="year-main">
+                    <span class="year-label">{{ yr.exam_title }}</span>
+                    {% if yr.in_progress %}
+                    <span class="year-meta">进行中：已做 {{ yr.in_progress.answered }}/{{ yr.in_progress.total }} · 已用时 {{ yr.in_progress.time_sec | format_time_sec }}</span>
+                    {% elif yr.last_finished %}
+                    <span class="year-meta">最近一次：{{ yr.last_finished.finished_at_str }} · {{ yr.last_finished.score }}/{{ yr.last_finished.total }} · {{ yr.last_finished.accuracy_percent }}%</span>
+                    {% else %}
+                    <span class="year-meta">未参加</span>
+                    {% endif %}
+                    {% if yr.status == 'completed' and yr.retry_policy and not yr.retry_policy.can_retry and yr.retry_policy.next_retry_at %}
+                    <span class="year-cooldown">可在 {{ yr.retry_policy.next_retry_at | format_date }} 后重做（每份试卷每4个月可重做一次）</span>
+                    {% endif %}
+                  </div>
+                  <span class="year-badges">
+                    {% if yr.status == 'in_progress' %}
+                    <span class="badge-status in_progress">进行中</span>
+                    {% elif yr.status == 'completed' %}
+                    <span class="badge-status completed">已完成</span>
+                    {% else %}
+                    <span class="badge-status not_started">未开始</span>
+                    {% endif %}
+                  </span>
+                  <span class="year-actions">
+                    {% if yr.status == 'in_progress' %}
+                    <a href="{{ url_for('diagnostic.attempt', attempt_id=yr.in_progress_attempt_id) }}" class="btn btn-sm btn-primary">继续</a>
+                    {% elif yr.status == 'completed' %}
+                      {% if yr.retry_policy and yr.retry_policy.can_retry %}
+                      <a href="{{ url_for('diagnostic.report', attempt_id=yr.last_attempt_id) }}" class="btn btn-sm btn-outline-primary">查看报告</a>
+                      <a href="{{ url_for('diagnostic.start_exam', exam_id=yr.exam_id) }}" class="btn btn-sm btn-primary">重做</a>
+                      {% else %}
+                      <a href="{{ url_for('diagnostic.report', attempt_id=yr.last_attempt_id) }}" class="btn btn-sm btn-primary">查看报告</a>
+                      <a href="{{ url_for('diagnostic.reports', exam=yr.exam_id) }}" class="btn btn-sm btn-outline-secondary">历史报告</a>
+                      <span class="btn btn-sm btn-outline-secondary disabled">重做</span>
+                      {% endif %}
+                    {% else %}
+                    <a href="{{ url_for('diagnostic.start_exam', exam_id=yr.exam_id) }}" class="btn btn-sm btn-primary">开始</a>
+                    {% endif %}
+                  </span>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="dashboard-empty">
+    <div class="icon-empty"><i class="fas fa-folder-open"></i></div>
+    <p class="mb-0">暂无已发布的试卷。</p>
+  </div>
+  {% endif %}
+</div>
