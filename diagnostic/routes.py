@@ -263,6 +263,13 @@ def login():
     return render_template('diagnostic/login.html')
 
 
+@diagnostic_bp.route('/sample-report')
+def sample_report():
+    """示例报告占位页。"""
+    user = get_diag_user_from_cookie()
+    return render_template('diagnostic/sample_report_placeholder.html', user=user)
+
+
 @diagnostic_bp.route('/legal/terms')
 def legal_terms():
     """预留：服务条款页面。"""

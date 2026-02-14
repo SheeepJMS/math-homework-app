@@ -1,0 +1,11 @@
+{% extends "diagnostic/base.html" %}
+{% block title %}示例报告 - 诊断系统{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-body text-center py-5">
+        <h4>示例报告</h4>
+        <p class="text-muted mt-3">即将推出。完成一次诊断后即可查看您的专属报告。</p>
+        <a href="{{ url_for('diagnostic.index') }}" class="btn btn-primary mt-2">返回首页</a>
+    </div>
+</div>
+{% endblock %}

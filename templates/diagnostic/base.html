@@ -15,7 +15,7 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top {% block nav_extra_class %}{% endblock %}">
         <div class="container">
             <a class="navbar-brand" href="{{ url_for('diagnostic.index') }}">诊断系统</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#diagNav">
@@ -40,14 +40,14 @@
                     <li class="nav-item"><span class="nav-link">{{ user.username }}</span></li>
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('diagnostic.logout') }}">退出</a></li>
                     {% else %}
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('diagnostic.login') }}">登录</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('diagnostic.register') }}">注册</a></li>
+                    <li class="nav-item"><a class="nav-link {% if request.endpoint == 'diagnostic.login' %}active{% endif %}" href="{{ url_for('diagnostic.login') }}">登录</a></li>
+                    <li class="nav-item"><a class="nav-link {% if request.endpoint == 'diagnostic.register' %}active{% endif %}" href="{{ url_for('diagnostic.register') }}">注册</a></li>
                     {% endif %}
                 </ul>
             </div>
         </div>
     </nav>
-    <div class="container mt-4">
+    <div class="{% block content_wrapper_class %}container mt-4{% endblock %}">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}

@@ -1,0 +1,45 @@
+{% extends "diagnostic/base.html" %}
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='diagnostic/auth.css') }}">
+{% endblock %}
+{% block nav_extra_class %}auth-page-nav{% endblock %}
+{% block content_wrapper_class %}auth-page-wrapper{% endblock %}
+{% block content %}
+<div class="auth-page">
+  <div class="auth-container">
+    <div class="auth-hero">
+      <h1>数学竞赛诊断卷<br>+ 自动报告</h1>
+      <p class="auth-subtitle">计时、跳题轨迹、知识点薄弱分析，并自动生成针对性练习。</p>
+      <ul class="auth-highlights">
+        <li>
+          <span class="auth-icon"><i class="fas fa-clock"></i></span>
+          <div>
+            <strong>精准计时</strong>
+            <span>每题耗时与关键行为可视化</span>
+          </div>
+        </li>
+        <li>
+          <span class="auth-icon"><i class="fas fa-chart-line"></i></span>
+          <div>
+            <strong>知识点画像</strong>
+            <span>薄弱点 Top3 与进步趋势</span>
+          </div>
+        </li>
+        <li>
+          <span class="auth-icon"><i class="fas fa-lightbulb"></i></span>
+          <div>
+            <strong>自动练习包</strong>
+            <span>错题对应知识点随机 3 题巩固</span>
+          </div>
+        </li>
+      </ul>
+      <a href="{{ url_for('diagnostic.sample_report') }}" class="auth-sample-btn">
+        <i class="fas fa-file-alt"></i> 查看示例报告
+      </a>
+    </div>
+    <div class="auth-form-col">
+      {% block auth_form %}{% endblock %}
+    </div>
+  </div>
+</div>
+{% endblock %}

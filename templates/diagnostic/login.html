@@ -1,26 +1,25 @@
-{% extends "diagnostic/base.html" %}
+{% extends "diagnostic/base_auth.html" %}
 {% block title %}诊断系统 - 登录{% endblock %}
-{% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-5">
-        <div class="card">
-            <div class="card-header"><h5 class="mb-0">登录</h5></div>
-            <div class="card-body">
-                <form method="post" action="{{ url_for('diagnostic.login') }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <div class="mb-3">
-                        <label for="username" class="form-label">用户名</label>
-                        <input type="text" class="form-control" id="username" name="username" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="password" class="form-label">密码</label>
-                        <input type="password" class="form-control" id="password" name="password" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary">登录</button>
-                    <a href="{{ url_for('diagnostic.register') }}" class="btn btn-link">没有账号？注册</a>
-                </form>
-            </div>
+{% block auth_form %}
+<div class="auth-card">
+    <h2 class="auth-card-title">登录</h2>
+    <form method="post" action="{{ url_for('diagnostic.login') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="auth-field">
+            <label for="username" class="auth-label">用户名</label>
+            <input type="text" class="auth-input" id="username" name="username" required>
         </div>
-    </div>
+        <div class="auth-field">
+            <label for="password" class="auth-label">密码</label>
+            <input type="password" class="auth-input" id="password" name="password" required>
+        </div>
+        <button type="submit" class="auth-btn">登录</button>
+    </form>
+    <p class="auth-switch">
+        没有账号？<a href="{{ url_for('diagnostic.register') }}">注册</a>
+    </p>
+    <p class="auth-privacy">
+        数据仅用于生成学习报告，不对外公开。
+    </p>
 </div>
 {% endblock %}
