@@ -27,6 +27,14 @@
                     <a class="nav-link {% if request.endpoint == 'admin_users' %}active{% endif %}" 
                        href="{{ url_for('admin_users') }}">用户管理</a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint and request.endpoint.startswith('diagnostic_admin') and 'diag_user' not in (request.endpoint or '') %}active{% endif %}" 
+                       href="{{ url_for('diagnostic_admin.exams') }}">诊断管理</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint and (request.endpoint == 'diagnostic_admin.diag_users' or (request.endpoint or '').startswith('diagnostic_admin.diag_user')) %}active{% endif %}" 
+                       href="{{ url_for('diagnostic_admin.diag_users') }}">测评用户管理</a>
+                </li>
             </ul>
             <div class="d-flex align-items-center">
                 <span class="text-light me-3">{{ current_user.username }}</span>
@@ -35,6 +43,27 @@
         </div>
     </div>
 </nav>
+
+<div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="mt-2 mb-2" id="adminFlashMessages">
+        {% for category, message in messages %}
+        <div class="alert alert-{{ 'danger' if category == 'error' else category or 'info' }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var el = document.getElementById('adminFlashMessages');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+});
+</script>
 
 {% block admin_content %}{% endblock %}
 

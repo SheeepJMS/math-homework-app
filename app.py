@@ -56,10 +56,13 @@ if not database_url:
     # 如果没有设置环境变量，使用默认的SQLite配置（用于本地开发）
     base_dir = os.path.abspath(os.path.dirname(__file__))
     database_url = f'sqlite:///{os.path.join(base_dir, "instance", "quiz.db")}'
-    print(f"警告：未设置DATABASE_URL环境变量，使用SQLite作为默认数据库: {database_url}")
 
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# 延迟初始化 SQLAlchemy，避免 debug reloader 下 _app_engines KeyError（诊断端注册/登录等）
+db = SQLAlchemy()
+db.init_app(app)
 
 # 配置文件上传
 UPLOAD_FOLDER = 'uploads'  # 修改为不带 static 前缀的路径
@@ -74,8 +77,6 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 限制文件大小为16MB
 os.makedirs(os.path.join('static', UPLOAD_FOLDER, 'exams'), exist_ok=True)
 os.makedirs(os.path.join('static', UPLOAD_FOLDER, 'explanations'), exist_ok=True)
 
-# 初始化数据库
-db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
 def create_default_admin():
@@ -353,6 +354,191 @@ class QuizHistory(db.Model):
     @property
     def correct_rate(self):
         return (self.correct_answers / self.total_questions * 100) if self.total_questions > 0 else 0
+
+
+# ========== 诊断模块独立表（diag_ 前缀，不影响现有业务）==========
+class DiagUser(db.Model):
+    __tablename__ = 'diag_users'
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class DiagSession(db.Model):
+    __tablename__ = 'diag_sessions'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('diag_users.id'), nullable=False)
+    token = db.Column(db.String(64), unique=True, nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user = db.relationship('DiagUser', backref=db.backref('sessions', lazy=True))
+
+
+class DiagCompetition(db.Model):
+    __tablename__ = 'diag_competitions'
+    id = db.Column(db.Integer, primary_key=True)
+    subject = db.Column(db.String(80), nullable=True, default='')   # 学科，如：数学竞赛
+    category = db.Column(db.String(80), nullable=True, default='')  # 竞赛大类，如：Waterloo
+    name = db.Column(db.String(120), nullable=False)                # 具体竞赛，如：Gauss7 2025
+    # 分段分值 JSON：[{"start":1,"end":10,"points":5},{"start":11,"end":20,"points":6}]，题号 1-based，未设则每题 1 分
+    score_scheme = db.Column(db.Text, nullable=True)
+    blank_bonus = db.Column(db.Integer, nullable=True, default=0)  # 空题加分值，未作答每题加几分，默认 0
+
+
+class DiagExam(db.Model):
+    __tablename__ = 'diag_exams'
+    id = db.Column(db.Integer, primary_key=True)
+    competition_id = db.Column(db.Integer, db.ForeignKey('diag_competitions.id'), nullable=False)
+    title = db.Column(db.String(255), nullable=False)
+    year = db.Column(db.Integer, nullable=True)  # 年份，如 2025
+    time_limit_sec = db.Column(db.Integer, nullable=True)
+    is_published = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    competition = db.relationship('DiagCompetition', backref=db.backref('exams', lazy=True))
+
+
+class DiagQuestion(db.Model):
+    __tablename__ = 'diag_questions'
+    id = db.Column(db.Integer, primary_key=True)
+    competition_id = db.Column(db.Integer, db.ForeignKey('diag_competitions.id'), nullable=False)
+    stem_text = db.Column(db.Text, nullable=False)
+    stem_image_url = db.Column(db.String(512), nullable=True)  # 题干图片（粘贴上传）
+    choices_json = db.Column(db.Text, nullable=True)
+    answer_key = db.Column(db.String(20), nullable=True)
+    solution_text = db.Column(db.Text, nullable=True)
+    solution_image_url = db.Column(db.String(512), nullable=True)  # 解析图片（粘贴上传）
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    competition = db.relationship('DiagCompetition', backref=db.backref('questions', lazy=True))
+
+
+class DiagExamQuestion(db.Model):
+    __tablename__ = 'diag_exam_questions'
+    exam_id = db.Column(db.Integer, db.ForeignKey('diag_exams.id'), primary_key=True)
+    question_id = db.Column(db.Integer, db.ForeignKey('diag_questions.id'), primary_key=True)
+    q_index = db.Column(db.Integer, nullable=False)
+    exam = db.relationship('DiagExam', backref=db.backref('exam_questions', lazy=True))
+    question = db.relationship('DiagQuestion', backref=db.backref('exam_links', lazy=True))
+
+
+class DiagAttempt(db.Model):
+    __tablename__ = 'diag_attempts'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('diag_users.id'), nullable=False)
+    exam_id = db.Column(db.Integer, db.ForeignKey('diag_exams.id'), nullable=False)
+    status = db.Column(db.String(20), default='in_progress')
+    started_at = db.Column(db.DateTime, default=datetime.utcnow)
+    finished_at = db.Column(db.DateTime, nullable=True)
+    total_time_ms = db.Column(db.BigInteger, default=0)
+    user = db.relationship('DiagUser', backref=db.backref('attempts', lazy=True))
+    exam = db.relationship('DiagExam', backref=db.backref('attempts', lazy=True))
+
+
+class DiagAttemptAnswer(db.Model):
+    __tablename__ = 'diag_attempt_answers'
+    id = db.Column(db.Integer, primary_key=True)
+    attempt_id = db.Column(db.Integer, db.ForeignKey('diag_attempts.id'), nullable=False)
+    question_id = db.Column(db.Integer, db.ForeignKey('diag_questions.id'), nullable=False)
+    answer = db.Column(db.String(50), nullable=True)
+    is_correct = db.Column(db.Boolean, nullable=True)
+    time_spent_ms = db.Column(db.BigInteger, default=0)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    attempt = db.relationship('DiagAttempt', backref=db.backref('answers', lazy=True))
+    question = db.relationship('DiagQuestion', backref=db.backref('attempt_answers', lazy=True))
+
+
+class DiagKnowledgePoint(db.Model):
+    __tablename__ = 'diag_knowledge_points'
+    kp_id = db.Column(db.String(64), primary_key=True)
+    competition_id = db.Column(db.Integer, db.ForeignKey('diag_competitions.id'), nullable=False)
+    name_en = db.Column(db.String(120), nullable=True)
+    name_cn = db.Column(db.String(120), nullable=True)
+    parent_kp_id = db.Column(db.String(64), nullable=True)
+    competition = db.relationship('DiagCompetition', backref=db.backref('knowledge_points', lazy=True))
+
+
+class DiagQuestionTag(db.Model):
+    __tablename__ = 'diag_question_tags'
+    question_id = db.Column(db.Integer, db.ForeignKey('diag_questions.id'), primary_key=True)
+    kp_id = db.Column(db.String(64), primary_key=True)
+    weight = db.Column(db.Float, default=1.0)
+    manual_override = db.Column(db.Boolean, default=False)
+    question = db.relationship('DiagQuestion', backref=db.backref('tags', lazy=True))
+
+
+class DiagBankQuestion(db.Model):
+    __tablename__ = 'diag_bank_questions'
+    id = db.Column(db.Integer, primary_key=True)
+    competition_id = db.Column(db.Integer, db.ForeignKey('diag_competitions.id'), nullable=False)
+    stem_text = db.Column(db.Text, nullable=False)
+    choices_json = db.Column(db.Text, nullable=True)
+    answer_key = db.Column(db.String(20), nullable=True)
+    solution_text = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    competition = db.relationship('DiagCompetition', backref=db.backref('bank_questions', lazy=True))
+
+
+class DiagBankQuestionTag(db.Model):
+    __tablename__ = 'diag_bank_question_tags'
+    bank_question_id = db.Column(db.Integer, db.ForeignKey('diag_bank_questions.id'), primary_key=True)
+    kp_id = db.Column(db.String(64), primary_key=True)
+    weight = db.Column(db.Float, default=1.0)
+    bank_question = db.relationship('DiagBankQuestion', backref=db.backref('tags', lazy=True))
+
+
+class DiagQuestionBankLink(db.Model):
+    __tablename__ = 'diag_question_bank_links'
+    question_id = db.Column(db.Integer, db.ForeignKey('diag_questions.id'), primary_key=True)
+    bank_question_id = db.Column(db.Integer, db.ForeignKey('diag_bank_questions.id'), primary_key=True)
+    link_order = db.Column(db.Integer, nullable=False)
+    question = db.relationship('DiagQuestion', backref=db.backref('bank_links', lazy=True))
+    bank_question = db.relationship('DiagBankQuestion', backref=db.backref('diagnostic_links', lazy=True))
+
+
+class DiagQuestionPracticeConfig(db.Model):
+    __tablename__ = 'diag_question_practice_config'
+    question_id = db.Column(db.Integer, db.ForeignKey('diag_questions.id'), primary_key=True)
+    is_capstone = db.Column(db.Boolean, default=False)
+    practice_mode = db.Column(db.String(64), default='bank_by_kp')
+    random_count = db.Column(db.Integer, default=3)
+    homework_assignment_id = db.Column(db.Integer, nullable=True)
+    curated_homework_question_ids = db.Column(db.Text, nullable=True)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    question = db.relationship('DiagQuestion', backref=db.backref('practice_config', uselist=False), lazy=True)
+
+
+class DiagPracticeSet(db.Model):
+    __tablename__ = 'diag_practice_sets'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('diag_users.id'), nullable=False)
+    attempt_id = db.Column(db.Integer, db.ForeignKey('diag_attempts.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user = db.relationship('DiagUser', backref=db.backref('practice_sets', lazy=True))
+    attempt = db.relationship('DiagAttempt', backref=db.backref('practice_sets', lazy=True))
+
+
+class DiagPracticeSetItem(db.Model):
+    __tablename__ = 'diag_practice_set_items'
+    id = db.Column(db.Integer, primary_key=True)
+    practice_set_id = db.Column(db.Integer, db.ForeignKey('diag_practice_sets.id'), nullable=False)
+    source_type = db.Column(db.String(16), nullable=False)
+    source_question_id = db.Column(db.Integer, nullable=False)
+    q_index = db.Column(db.Integer, nullable=False)
+    practice_set = db.relationship('DiagPracticeSet', backref=db.backref('items', lazy=True))
+
+
+class DiagPracticeAttempt(db.Model):
+    """练习包提交记录：每个练习包每人只能提交一次，再进入显示已完成与得分"""
+    __tablename__ = 'diag_practice_attempts'
+    id = db.Column(db.Integer, primary_key=True)
+    practice_set_id = db.Column(db.Integer, db.ForeignKey('diag_practice_sets.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('diag_users.id'), nullable=False)
+    answers_json = db.Column(db.Text, nullable=True)  # {"item_id": "A", ...}
+    submitted_at = db.Column(db.DateTime, default=datetime.utcnow)
+    practice_set = db.relationship('DiagPracticeSet', backref=db.backref('attempts', lazy=True))
+    user = db.relationship('DiagUser', backref=db.backref('practice_attempts', lazy=True))
+
 
 def admin_required(f):
     @wraps(f)
@@ -1484,34 +1670,22 @@ def question_stats_data(lesson_id):
     return jsonify(question_stats)
 
 def upload_to_cloudinary(file_data, resource_type='image'):
-    """上传文件到 Cloudinary 并返回 URL"""
+    """上传文件到 Cloudinary 并返回 URL（无 print，避免 Windows 控制台编码错误）"""
     try:
-        print("开始上传到 Cloudinary...")
-        # 对于 Base64 图片数据
         if isinstance(file_data, str) and file_data.startswith('data:image'):
-            print("正在上传 Base64 图片数据...")
-            # 上传 Base64 图片数据
             result = cloudinary.uploader.upload(
                 file_data,
                 resource_type=resource_type
             )
         else:
-            print("正在上传文件对象...")
-            # 上传文件对象
             result = cloudinary.uploader.upload(
                 file_data,
                 resource_type=resource_type
             )
-        print("上传结果: ", result)
         if 'secure_url' in result:
-            print("上传成功，URL:", result['secure_url'])
             return result['secure_url']
-        else:
-            print("上传成功但未返回 secure_url:", result)
-            return None
-    except Exception as e:
-        print(f"Cloudinary 上传失败: {str(e)}")
-        print(f"错误类型: {type(e)}")
+        return None
+    except Exception:
         return None
 
 @app.route('/admin/lesson/<int:lesson_id>/upload_exam_files', methods=['POST'])
@@ -2712,6 +2886,12 @@ def lesson_students(lesson_id):
         })
 
     return render_template('admin/students.html', lesson=lesson, completed_scores=completed_scores, not_completed=not_completed, question_stats=question_stats)
+
+# 诊断模块蓝图（独立路由与表，不影响现有业务）
+from diagnostic.routes import diagnostic_bp
+from diagnostic.admin_routes import diagnostic_admin_bp
+app.register_blueprint(diagnostic_bp, url_prefix='/diagnostic')
+app.register_blueprint(diagnostic_admin_bp)
 
 if __name__ == '__main__':
     # init_db()  # 注释掉自动初始化，避免每次启动都清空数据
