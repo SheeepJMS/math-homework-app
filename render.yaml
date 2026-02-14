@@ -4,7 +4,7 @@
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: bash render_start.sh
+    startCommand: python app.py
     envVars:
       - key: FLASK_APP
         value: app.py

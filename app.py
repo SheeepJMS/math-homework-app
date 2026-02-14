@@ -13,7 +13,7 @@ import base64
 import io
 from PIL import Image
 import random
-from flask_migrate import Migrate
+from flask_migrate import Migrate, upgrade, stamp
 import json
 import time
 from collections import namedtuple
@@ -2896,5 +2896,10 @@ app.register_blueprint(diagnostic_admin_bp)
 if __name__ == '__main__':
     # init_db()  # 注释掉自动初始化，避免每次启动都清空数据
     with app.app_context():
+        try:
+            upgrade()
+        except Exception:
+            stamp('b4fefe386c31')
+            upgrade()
         clean_duplicate_quiz_history()  # 自动清理重复答题记录
     app.run(debug=True, host='0.0.0.0', port=5000) 
