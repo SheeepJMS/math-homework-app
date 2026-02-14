@@ -6,9 +6,16 @@
         <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2 class="card-title mb-0">课程管理</h2>
-                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addLessonModal">
-                    <i class="fas fa-plus"></i> 添加课程
-                </button>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#activeLessonsModal">
+                        <i class="fas fa-list-check"></i> 已激活课件
+                        {% set active_count = lessons|selectattr('is_active')|list|length %}
+                        {% if active_count %}<span class="badge bg-success ms-1">{{ active_count }}</span>{% endif %}
+                    </button>
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addLessonModal">
+                        <i class="fas fa-plus"></i> 添加课程
+                    </button>
+                </div>
             </div>
             
             <div class="table-responsive">
@@ -25,7 +32,7 @@
                     </thead>
                     <tbody>
                         {% for lesson in lessons %}
-                        <tr>
+                        <tr data-lesson-id="{{ lesson.id }}">
                             <td>{{ lesson.title }}</td>
                             <td>{{ lesson.description }}</td>
                             <td>
@@ -100,6 +107,32 @@
                         {% endfor %}
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 已激活课件列表模态框 -->
+<div class="modal fade" id="activeLessonsModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-scrollable modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">已激活课件 · 点击停用</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="activeLessonsList" class="list-group list-group-flush">
+                    {% for lesson in lessons if lesson.is_active %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center py-3" data-lesson-id="{{ lesson.id }}">
+                        <span class="fw-medium">{{ lesson.title }}</span>
+                        <button type="button" class="btn btn-warning btn-sm toggle-status-btn" data-lesson-id="{{ lesson.id }}">
+                            <i class="fas fa-pause"></i> 停用
+                        </button>
+                    </div>
+                    {% else %}
+                    <p class="text-muted mb-0">暂无已激活的课件</p>
+                    {% endfor %}
+                </div>
             </div>
         </div>
     </div>
@@ -386,8 +419,44 @@ function toggleLessonStatus(lessonId, button) {
     });
 }
 
-// 确保模态框正常工作
+// 已激活课件模态框内的停用按钮
 document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('#activeLessonsModal .toggle-status-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var lessonId = this.dataset.lessonId;
+            var listItem = this.closest('.list-group-item');
+            var self = this;
+            fetch('/admin/lesson/' + lessonId + '/toggle', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token() }}',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success && !data.is_active) {
+                    listItem.remove();
+                    var mainRow = document.querySelector('tr[data-lesson-id="' + lessonId + '"]');
+                    if (mainRow) {
+                        var badge = mainRow.querySelector('td:nth-child(4) .badge');
+                        var toggleBtn = mainRow.querySelector('button[onclick^="toggleLessonStatus"]');
+                        if (badge) { badge.className = 'badge bg-secondary'; badge.textContent = '未激活'; }
+                        if (toggleBtn) {
+                            toggleBtn.className = 'btn btn-success btn-sm';
+                            toggleBtn.innerHTML = '<i class="fas fa-play"></i> 激活';
+                        }
+                    }
+                    var countBadge = document.querySelector('[data-bs-target="#activeLessonsModal"] .badge');
+                    if (countBadge) {
+                        var n = parseInt(countBadge.textContent, 10) || 0;
+                        if (n > 1) countBadge.textContent = n - 1; else countBadge.remove();
+                    }
+                }
+            });
+        });
+    });
+
     // 初始化所有模态框
     var modals = document.querySelectorAll('.modal');
     modals.forEach(function(modal) {
