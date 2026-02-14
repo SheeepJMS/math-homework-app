@@ -16,7 +16,7 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column('diag_users', sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.text('1')))
+    op.add_column('diag_users', sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.text('true')))
 
 
 def downgrade():
