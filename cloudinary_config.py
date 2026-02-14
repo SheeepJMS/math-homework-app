@@ -1,9 +1,6 @@
 import cloudinary
 import os
 
-# 调试信息
-print("正在配置 Cloudinary...")
-
 # 尝试从环境变量获取配置
 cloud_name = os.environ.get('CLOUDINARY_CLOUD_NAME', 'dhjim7xbr')
 api_key = os.environ.get('CLOUDINARY_API_KEY', '149872547298524')
@@ -15,5 +12,3 @@ cloudinary.config(
     api_secret = api_secret,
     secure = True
 )
-
-print("Cloudinary 配置完成") 

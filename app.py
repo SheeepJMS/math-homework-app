@@ -73,6 +73,11 @@ ALLOWED_EXCEL_EXTENSIONS = {'xlsx', 'xls'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 限制文件大小为16MB
 
+# 诊断模块预留配置（subscription scaffolding，当前不启用）
+app.config['BILLING_ENABLED'] = os.environ.get('BILLING_ENABLED', 'false').lower() == 'true'
+app.config['STRIPE_WEBHOOK_SECRET'] = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
+app.config['DIAG_SHOW_HELP_BUTTON'] = False  # 未来开启帮助入口
+
 # 确保上传目录存在
 os.makedirs(os.path.join('static', UPLOAD_FOLDER, 'exams'), exist_ok=True)
 os.makedirs(os.path.join('static', UPLOAD_FOLDER, 'explanations'), exist_ok=True)
@@ -364,6 +369,62 @@ class DiagUser(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # 预留：未来邮箱找回
+    email = db.Column(db.String(255), nullable=True)
+    email_verified = db.Column(db.Boolean, default=False, nullable=False)
+
+
+class DiagPasswordResetToken(db.Model):
+    """预留：密码重置 token，当前不启用 UI"""
+    __tablename__ = 'diag_password_reset_tokens'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('diag_users.id', ondelete='CASCADE'), nullable=False)
+    token = db.Column(db.String(64), unique=True, nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user = db.relationship('DiagUser', backref=db.backref('reset_tokens', lazy=True))
+
+
+class DiagSubscription(db.Model):
+    """预留：订阅状态，默认 allow_all，未来收费时启用"""
+    __tablename__ = 'diag_subscriptions'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('diag_users.id', ondelete='CASCADE'), nullable=False)
+    plan = db.Column(db.String(32), nullable=False, default='legacy_active')  # free/trial/pro/legacy_active
+    status = db.Column(db.String(32), nullable=False, default='active')  # active/trialing/past_due/canceled/none
+    current_period_end = db.Column(db.DateTime, nullable=True)
+    provider = db.Column(db.String(32), nullable=True)  # stripe
+    provider_customer_id = db.Column(db.String(255), nullable=True)
+    provider_subscription_id = db.Column(db.String(255), nullable=True)
+    entitlements_json = db.Column(db.Text, nullable=True)  # 功能开关 JSON
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    user = db.relationship('DiagUser', backref=db.backref('subscriptions', lazy=True))
+
+
+class DiagSupportTicket(db.Model):
+    """预留：客服工单，当前无 UI"""
+    __tablename__ = 'diag_support_tickets'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('diag_users.id', ondelete='CASCADE'), nullable=False)
+    category = db.Column(db.String(64), nullable=True)
+    message = db.Column(db.Text, nullable=False)
+    attachment_url = db.Column(db.String(512), nullable=True)
+    status = db.Column(db.String(32), nullable=False, default='open')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user = db.relationship('DiagUser', backref=db.backref('support_tickets', lazy=True))
+
+
+class DiagAuthAudit(db.Model):
+    """预留：登录审计，当前不启用同时在线限制"""
+    __tablename__ = 'diag_auth_audit'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('diag_users.id', ondelete='CASCADE'), nullable=False)
+    event = db.Column(db.String(32), nullable=False)  # login/logout
+    ip = db.Column(db.String(64), nullable=True)
+    user_agent = db.Column(db.String(512), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user = db.relationship('DiagUser', backref=db.backref('auth_audits', lazy=True))
 
 
 class DiagSession(db.Model):
@@ -2890,8 +2951,10 @@ def lesson_students(lesson_id):
 # 诊断模块蓝图（独立路由与表，不影响现有业务）
 from diagnostic.routes import diagnostic_bp
 from diagnostic.admin_routes import diagnostic_admin_bp
+from diagnostic.billing import billing_bp
 app.register_blueprint(diagnostic_bp, url_prefix='/diagnostic')
 app.register_blueprint(diagnostic_admin_bp)
+app.register_blueprint(billing_bp)
 
 if __name__ == '__main__':
     # init_db()  # 注释掉自动初始化，避免每次启动都清空数据

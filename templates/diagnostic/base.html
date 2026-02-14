@@ -60,6 +60,12 @@
         {% endwith %}
         {% block content %}{% endblock %}
     </div>
+    {# 预留：帮助入口，app.config['DIAG_SHOW_HELP_BUTTON']=True 时显示 #}
+    {% if config.get('DIAG_SHOW_HELP_BUTTON') %}
+    <div class="position-fixed bottom-0 end-0 p-3">
+        <a href="{{ url_for('diagnostic.support_placeholder') }}" class="btn btn-outline-primary btn-sm shadow">帮助</a>
+    </div>
+    {% endif %}
     <script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
     {% block extra_js %}{% endblock %}
 </body>

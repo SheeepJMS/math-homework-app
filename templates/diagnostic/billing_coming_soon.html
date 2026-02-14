@@ -1,0 +1,11 @@
+{% extends "diagnostic/base.html" %}
+{% block title %}{{ title }} - 诊断系统{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-body text-center py-5">
+        <h4>{{ title }}</h4>
+        <p class="text-muted mt-3">即将推出，敬请期待。</p>
+        <a href="{{ url_for('diagnostic.index') }}" class="btn btn-primary mt-2">返回首页</a>
+    </div>
+</div>
+{% endblock %}

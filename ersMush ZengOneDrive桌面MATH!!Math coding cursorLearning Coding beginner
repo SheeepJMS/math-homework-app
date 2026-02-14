@@ -1,0 +1,50 @@
+[33mcommit 03c8384b82e3051788d59e64b5af2e526ffd8129[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m, [m[1;31morigin/master[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: SheeepJMS <zengmushi@gmail.com>
+Date:   Fri Feb 13 21:57:42 2026 -0800
+
+    feat(diagnostic): 诊断系统完整模块
+
+DIAGNOSTIC_README.md
+add_diag_competition_columns.py
+add_diag_user_is_active.py
+diagnostic/__init__.py
+diagnostic/admin_routes.py
+diagnostic/routes.py
+fix_diag_columns.py
+instance/quiz.db
+migrations/versions/a1b2c3d4e5f6_add_diagnostic_tables.py
+migrations/versions/b2c3d4e5f6a7_diag_questions_stem_image_url.py
+migrations/versions/c3d4e5f6a7b8_diag_questions_solution_image_url.py
+migrations/versions/d5e6f7a8b9c0_diag_competition_subject_category.py
+migrations/versions/e6f7a8b9c0d1_diag_competition_score_scheme.py
+migrations/versions/f7a8b9c0d1e2_diag_practice_attempts.py
+migrations/versions/g8b9c0d1e2f3_diag_user_is_active.py
+static/diagnostic/contest_names.js
+static/diagnostic/dashboard.css
+static/diagnostic/dashboard.js
+static/diagnostic/diagnostic_import_sample.csv
+static/diagnostic/exam_tree.css
+static/diagnostic/report.css
+static/diagnostic/report.js
+static/diagnostic/report_center.css
+static/diagnostic/report_center.js
+templates/admin/diagnostic/competitions.html
+templates/admin/diagnostic/diag_user_detail.html
+templates/admin/diagnostic/diag_users.html
+templates/admin/diagnostic/exam_detail.html
+templates/admin/diagnostic/exams.html
+templates/admin/diagnostic/import.html
+templates/admin/diagnostic/question_config.html
+templates/diagnostic/_exam_tree.html
+templates/diagnostic/attempt.html
+templates/diagnostic/base.html
+templates/diagnostic/dashboard.html
+templates/diagnostic/exam_center.html
+templates/diagnostic/history.html
+templates/diagnostic/index.html
+templates/diagnostic/login.html
+templates/diagnostic/practice.html
+templates/diagnostic/register.html
+templates/diagnostic/report.html
+templates/diagnostic/report_center.html
+templates/diagnostic/start_exam.html

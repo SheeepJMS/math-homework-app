@@ -263,6 +263,34 @@ def login():
     return render_template('diagnostic/login.html')
 
 
+@diagnostic_bp.route('/legal/terms')
+def legal_terms():
+    """预留：服务条款页面。"""
+    user = get_diag_user_from_cookie()
+    return render_template('diagnostic/legal/terms.html', user=user)
+
+
+@diagnostic_bp.route('/legal/privacy')
+def legal_privacy():
+    """预留：隐私政策页面。"""
+    user = get_diag_user_from_cookie()
+    return render_template('diagnostic/legal/privacy.html', user=user)
+
+
+@diagnostic_bp.route('/legal/data-request')
+def legal_data_request():
+    """预留：数据删除/导出请求入口。当前占位，不执行删除。"""
+    user = get_diag_user_from_cookie()
+    return render_template('diagnostic/legal/data_request_placeholder.html', user=user)
+
+
+@diagnostic_bp.route('/support')
+def support_placeholder():
+    """预留：帮助/客服入口。DIAG_SHOW_HELP_BUTTON 开启时显示。"""
+    user = get_diag_user_from_cookie()
+    return render_template('diagnostic/legal/support_placeholder.html', user=user)
+
+
 @diagnostic_bp.route('/logout')
 def logout():
     resp = make_response(redirect(url_for('diagnostic.index')))

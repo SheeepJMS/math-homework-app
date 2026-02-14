@@ -1,0 +1,3 @@
+competition,exam_title,time_limit_sec,q_index,stem_text,answer_key,kp_primary_id,practice_count_default
+数学竞赛,诊断卷A,3600,0,以下哪个是质数？,A,number_basic,3
+数学竞赛,诊断卷A,3600,1,1+2+3=?,B,arithmetic,3
