@@ -1,6 +1,11 @@
 {% extends "diagnostic/base.html" %}
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='diagnostic/auth.css') }}">
+<style>
+:root {
+  --auth-hero-bg: url('{{ url_for("static", filename="diagnostic/img/auth-hero.png") }}');
+}
+</style>
 {% endblock %}
 {% block nav_extra_class %}auth-page-nav{% endblock %}
 {% block content_wrapper_class %}auth-page-wrapper{% endblock %}
