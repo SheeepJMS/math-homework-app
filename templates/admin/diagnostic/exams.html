@@ -56,8 +56,12 @@
                     <strong class="text-dark">{{ category }}</strong>
                 </div>
                 {% for comp_key, data in comps_dict.items() %}
-                <div class="ms-3 mb-2">
-                    <div class="fw-bold text-primary mb-1">{{ data.comp.name }}</div>
+                <div class="ms-3 mb-2 exam-comp-group">
+                    <div class="fw-bold text-primary mb-1 d-flex align-items-center comp-toggle" data-bs-toggle="collapse" data-bs-target="#collapse-comp-{{ data.comp.id }}" role="button" aria-expanded="true">
+                        <i class="fas fa-chevron-down comp-chevron me-1" style="transition:transform .2s;"></i>
+                        {{ data.comp.name }}
+                    </div>
+                    <div class="collapse show" id="collapse-comp-{{ data.comp.id }}">
                     <ul class="list-unstyled ms-3">
                         {% for exam in data.exams %}
                         <li class="d-flex align-items-center py-1 border-bottom">
@@ -74,6 +78,7 @@
                         </li>
                         {% endfor %}
                     </ul>
+                    </div>
                 </div>
                 {% endfor %}
             </div>
@@ -106,6 +111,26 @@
   }
   categorySelect.addEventListener('change', refreshContestOptions);
   refreshContestOptions();
+
+  // 竞赛分组收起/展开时旋转 chevron 图标
+  document.querySelectorAll('.exam-comp-group .collapse').forEach(function(el) {
+    el.addEventListener('shown.bs.collapse', function() {
+      var id = this.id;
+      var btn = document.querySelector('[data-bs-target="#' + id + '"]');
+      if (btn) {
+        var chevron = btn.querySelector('.comp-chevron');
+        if (chevron) chevron.style.transform = 'rotate(0)';
+      }
+    });
+    el.addEventListener('hidden.bs.collapse', function() {
+      var id = this.id;
+      var btn = document.querySelector('[data-bs-target="#' + id + '"]');
+      if (btn) {
+        var chevron = btn.querySelector('.comp-chevron');
+        if (chevron) chevron.style.transform = 'rotate(-90deg)';
+      }
+    });
+  });
 })();
 </script>
 {% endblock %}
