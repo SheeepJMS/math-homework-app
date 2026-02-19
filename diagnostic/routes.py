@@ -645,9 +645,8 @@ def _grade_attempt(attempt_id):
 def _build_practice_set(attempt_id):
     db = _get_db()
     from app import (
-        DiagAttempt, DiagAttemptAnswer, DiagQuestion, DiagExamQuestion, DiagQuestionTag,
-        DiagQuestionPracticeConfig, DiagQuestionPracticeItem, DiagExamQuestionPracticeConfig,
-        DiagBankQuestion, DiagBankQuestionTag, DiagQuestionBankLink, DiagPracticeSet, DiagPracticeSetItem,
+        DiagAttempt, DiagAttemptAnswer, DiagExamQuestion, DiagQuestionPracticeItem,
+        DiagExamQuestionPracticeConfig, DiagPracticeSet, DiagPracticeSetItem,
     )
     from sqlalchemy.sql import func
     att = db.session.get(DiagAttempt, attempt_id)
@@ -691,68 +690,6 @@ def _build_practice_set(attempt_id):
                         source_question_id=pi.id, q_index=idx
                     ))
                     idx += 1
-            continue
-
-        config = db.session.query(DiagQuestionPracticeConfig).filter_by(question_id=qid).first()
-        mode = (config.practice_mode if config else None) or 'bank_by_kp'
-        count = (config.random_count if config else 3) if config else 3
-
-        if mode == 'bank_linked_3':
-            links = db.session.query(DiagQuestionBankLink).filter_by(question_id=qid).order_by(DiagQuestionBankLink.link_order).limit(count).all()
-            for link in links:
-                key = ('bank', link.bank_question_id)
-                if key not in seen:
-                    seen.add(key)
-                    db.session.add(DiagPracticeSetItem(practice_set_id=ps.id, source_type='bank', source_question_id=link.bank_question_id, q_index=idx))
-                    idx += 1
-            continue
-
-        if mode == 'homework_curated_ids' and config and config.curated_homework_question_ids:
-            from app import Question
-            ids = [int(x.strip()) for x in config.curated_homework_question_ids.split(',') if x.strip().isdigit()]
-            for hid in ids[:count]:
-                key = ('homework', hid)
-                if key not in seen and db.session.get(Question, hid):
-                    seen.add(key)
-                    db.session.add(DiagPracticeSetItem(practice_set_id=ps.id, source_type='homework', source_question_id=hid, q_index=idx))
-                    idx += 1
-            if idx > 0:
-                continue
-
-        if mode == 'homework_assignment_random' and config and config.homework_assignment_id:
-            from app import Question
-            pool = db.session.query(Question).filter_by(lesson_id=config.homework_assignment_id).all()
-            sample = random.sample(pool, min(count, len(pool))) if pool else []  # noqa: S311
-            for q in sample:
-                key = ('homework', q.id)
-                if key not in seen:
-                    seen.add(key)
-                    db.session.add(DiagPracticeSetItem(practice_set_id=ps.id, source_type='homework', source_question_id=q.id, q_index=idx))
-                    idx += 1
-            continue
-
-        q = db.session.get(DiagQuestion, qid)
-        tags = db.session.query(DiagQuestionTag).filter_by(question_id=qid).order_by(DiagQuestionTag.manual_override.desc()).all()
-        kp_ids = [t.kp_id for t in tags] if tags else []
-        if not kp_ids and q:
-            kp_ids = [t.kp_id for t in db.session.query(DiagQuestionTag).filter_by(question_id=qid).all()]
-        bank_pool = []
-        if kp_ids:
-            bank_ids = db.session.query(DiagBankQuestionTag.bank_question_id).filter(
-                DiagBankQuestionTag.kp_id.in_(kp_ids)
-            ).distinct().all()
-            bank_ids = [r[0] for r in bank_ids]
-            if bank_ids:
-                bank_pool = db.session.query(DiagBankQuestion).filter(DiagBankQuestion.id.in_(bank_ids)).all()
-        if not bank_pool:
-            bank_pool = db.session.query(DiagBankQuestion).filter_by(competition_id=q.competition_id).limit(50).all()
-        sample = random.sample(bank_pool, min(count, len(bank_pool))) if bank_pool else []  # noqa: S311
-        for bq in sample:
-            key = ('bank', bq.id)
-            if key not in seen:
-                seen.add(key)
-                db.session.add(DiagPracticeSetItem(practice_set_id=ps.id, source_type='bank', source_question_id=bq.id, q_index=idx))
-                idx += 1
 
 
 def _attempt_quick_stats(att, db):
@@ -835,7 +772,7 @@ def _build_dashboard_data(user, db):
     from sqlalchemy import func
     from app import (
         DiagAttempt, DiagAttemptAnswer, DiagExam, DiagExamQuestion, DiagCompetition,
-        DiagQuestion, DiagQuestionTag, DiagKnowledgePoint, DiagPracticeSet,
+        DiagQuestion, DiagQuestionKp, DiagKnowledgePoint, DiagPracticeSet,
     )
     user_display_name = getattr(user, 'username', None) or 'N/A'
     cutoff_30d = datetime.utcnow() - timedelta(days=30)
@@ -923,21 +860,25 @@ def _build_dashboard_data(user, db):
 
         kp_wrong = {}
         kp_total = {}
+        imported_kp_by_exam = {}
         for att in finished[:5]:
+            if att.exam_id not in imported_kp_by_exam:
+                imported_kp_by_exam[att.exam_id] = {r.q_index: r for r in db.session.query(DiagQuestionKp).filter_by(exam_id=att.exam_id).all()}
+            kp_map = imported_kp_by_exam[att.exam_id]
             order = db.session.query(DiagExamQuestion).filter_by(exam_id=att.exam_id).order_by(DiagExamQuestion.q_index).all()
             for eq in order:
-                tags = db.session.query(DiagQuestionTag).filter_by(question_id=eq.question_id).order_by(DiagQuestionTag.manual_override.desc()).all()
-                for t in tags[:1]:
-                    kp = db.session.get(DiagKnowledgePoint, t.kp_id)
-                    kp_name = (kp.name_cn or kp.name_en or t.kp_id) if kp else str(t.kp_id)
+                kp_row = kp_map.get(eq.q_index)
+                kp_name = (kp_row.kp_primary or 'N/A') if kp_row and kp_row.kp_primary else None
+                if kp_name:
                     kp_total[kp_name] = kp_total.get(kp_name, 0) + 1
+            qid_to_qindex = {eq.question_id: eq.q_index for eq in order}
             answers = db.session.query(DiagAttemptAnswer).filter_by(attempt_id=att.id, is_correct=False).all()
             for aa in answers:
                 if aa.is_correct is False:
-                    tags = db.session.query(DiagQuestionTag).filter_by(question_id=aa.question_id).order_by(DiagQuestionTag.manual_override.desc()).all()
-                    for t in tags[:1]:
-                        kp = db.session.get(DiagKnowledgePoint, t.kp_id)
-                        kp_name = (kp.name_cn or kp.name_en or t.kp_id) if kp else str(t.kp_id)
+                    q_index = qid_to_qindex.get(aa.question_id)
+                    kp_row = kp_map.get(q_index) if q_index is not None else None
+                    kp_name = (kp_row.kp_primary or 'N/A') if kp_row and kp_row.kp_primary else None
+                    if kp_name:
                         kp_wrong[kp_name] = kp_wrong.get(kp_name, 0) + 1
         weak_kps = sorted([
             {'kp_name': k, 'wrong_count': kp_wrong.get(k, 0), 'n_questions': kp_total.get(k, 1)}
@@ -1065,7 +1006,7 @@ def _parse_choices(choices_json):
 def _build_report_data(att, user, db):
     """组装报告数据结构，缺失字段安全降级为 N/A 或空。优先使用 CSV 导入的答案/解析/知识点。"""
     from sqlalchemy import func
-    from app import (DiagAttempt, DiagAttemptAnswer, DiagExamQuestion, DiagQuestion, DiagQuestionTag,
+    from app import (DiagAttempt, DiagAttemptAnswer, DiagExamQuestion, DiagQuestion,
                      DiagKnowledgePoint, DiagPracticeSetItem, DiagQuestionAnswer, DiagQuestionKp)
     exam = att.exam
     competition = getattr(exam, 'competition', None) if exam else None
@@ -1141,14 +1082,13 @@ def _build_report_data(att, user, db):
             slow_wrong.append({'qnum': i + 1, 'time_sec': time_sec})
         if not is_blank and not is_correct and p25 > 0 and time_sec < p25:
             fast_wrong.append({'qnum': i + 1, 'time_sec': time_sec})
-        tags = db.session.query(DiagQuestionTag).filter_by(question_id=eq.question_id).order_by(DiagQuestionTag.manual_override.desc()).all()
         primary_kp = None
         secondary_kps = []
         imp_ans = imported_answers.get(eq.q_index)
         imp_kp = imported_kp.get(eq.q_index)
         if imp_kp and imp_kp.kp_primary:
             primary_kp = imp_kp.kp_primary
-            secondary_kps = [x.strip() for x in (imp_kp.kp_secondary or '').replace('；', ',').split(',') if x.strip()]
+            secondary_kps = [x.strip() for x in (imp_kp.kp_secondary or '').replace('\uff1b', ',').replace(';', ',').split(',') if x.strip()]
             kp_id = 'imported:' + (imp_kp.kp_primary or '')
             if kp_id not in kp_stats:
                 kp_stats[kp_id] = {'kp_name': imp_kp.kp_primary, 'wrong_count': 0, 'n_questions': 0, 'total_time_ms': 0}
@@ -1156,23 +1096,6 @@ def _build_report_data(att, user, db):
             kp_stats[kp_id]['total_time_ms'] += my_ms
             if not is_blank and not is_correct:
                 kp_stats[kp_id]['wrong_count'] += 1
-        for idx, t in enumerate(tags):
-            kp = db.session.get(DiagKnowledgePoint, t.kp_id)
-            kp_name = (kp.name_cn or kp.name_en or t.kp_id) if kp else str(t.kp_id)
-            if not (imp_kp and imp_kp.kp_primary):
-                if not primary_kp:
-                    primary_kp = kp_name
-                elif idx > 0:
-                    secondary_kps.append(kp_name)
-            kp_id = t.kp_id
-            if kp_id not in kp_stats:
-                kp_stats[kp_id] = {'kp_name': kp_name, 'wrong_count': 0, 'n_questions': 0, 'total_time_ms': 0}
-            kp_stats[kp_id]['n_questions'] += 1
-            kp_stats[kp_id]['total_time_ms'] += my_ms
-            if not is_blank and not is_correct:
-                kp_stats[kp_id]['wrong_count'] += 1
-        if tags and not primary_kp:
-            primary_kp = (tags[0].kp_id,)
         correct_ans = (imp_ans.correct_answer or '').strip() if imp_ans and imp_ans.correct_answer else ((q.answer_key or '').strip() if q else '')
         solution_txt = (imp_ans.solution_explain or '') if imp_ans and imp_ans.solution_explain else (q.solution_text if q else '')
         pq = {

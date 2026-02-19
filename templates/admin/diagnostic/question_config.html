@@ -67,27 +67,6 @@
                 </li>
                 {% endfor %}
             </ol>
-            {% elif bank_items %}
-            <p class="text-muted mb-2">以下为 CSV 或「固定 3 题」模式导入的题库小题，作答错题后会推送给学生练习：</p>
-            <ol class="mb-0">
-                {% for order, bq in bank_items %}
-                <li class="mb-2">
-                    <span class="fw-bold">题干：</span>{{ bq.stem_text[:200] }}{% if bq.stem_text|length > 200 %}...{% endif %}
-                    {% if bq.answer_key %}<span class="ms-2">答案：{{ bq.answer_key }}</span>{% endif %}
-                </li>
-                {% endfor %}
-            </ol>
-            {% elif hw_curated_list %}
-            <p class="text-muted mb-2">指定作业题（homework_curated_ids）：</p>
-            <ul class="mb-0">
-                {% for sid, hwq in hw_curated_list %}
-                <li>ID {{ sid }}{% if hwq %}：{{ (hwq.content or '')[:80] or ('题目 ' ~ hwq.question_number) }}{% if (hwq.content or '')|length > 80 %}...{% endif %}{% else %}（未找到该题）{% endif %}</li>
-                {% endfor %}
-            </ul>
-            {% elif config and config.practice_mode == 'bank_by_kp' %}
-            <p class="text-muted mb-0">按主知识点从题库随机抽取，不固定题目。学生作答后根据主/次知识点从题库匹配错题练习。</p>
-            {% elif config and config.practice_mode == 'homework_assignment_random' %}
-            <p class="text-muted mb-0">从所选作业题集中随机抽取题目作为练习。未固定具体题号。</p>
             {% else %}
             <p class="text-muted mb-0">暂无关联的错题/练习题。可通过 CSV 增强导入（p1_stem、p2_stem 等列）或选择「固定使用导入的 3 题」后重新导入。</p>
             {% endif %}

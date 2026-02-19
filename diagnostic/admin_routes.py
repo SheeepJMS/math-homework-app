@@ -117,7 +117,7 @@ def exam_detail(id):
     db = _db()
     M = _models()
     DiagCompetition, DiagExam, DiagQuestion, DiagExamQuestion, DiagKnowledgePoint = M[0], M[1], M[2], M[3], M[4]
-    DiagQuestionTag, DiagQuestionPracticeConfig, Lesson = M[5], M[9], M[14]
+    DiagQuestionKp, DiagQuestionPracticeConfig, Lesson = M[11], M[9], M[14]
     exam = db.session.get(DiagExam, id)
     if exam is None:
         abort(404)
@@ -125,20 +125,21 @@ def exam_detail(id):
     questions = [db.session.get(DiagQuestion, eq.question_id) for eq in order]
     kp_list = db.session.query(DiagKnowledgePoint).filter_by(competition_id=exam.competition_id).all()
     lessons = db.session.query(Lesson).order_by(Lesson.title).all()
-    q_tags = {}  # question_id -> {primary: str, secondary: [str]}
+    imported_kp = {r.q_index: r for r in db.session.query(DiagQuestionKp).filter_by(exam_id=id).all()}
+    q_tags = {}  # question_id -> {primary: str, secondary: str}
     q_config = {}  # question_id -> config
     lesson_titles = {l.id: l.title for l in lessons}
-    for q in questions:
+    for eq in order:
+        q = db.session.get(DiagQuestion, eq.question_id)
         if not q:
             continue
-        tags = db.session.query(DiagQuestionTag).filter_by(question_id=q.id).all()
-        primary, secondary = '', []
-        for t in tags:
-            if t.weight >= 0.99:
-                primary = t.kp_id
-            else:
-                secondary.append(t.kp_id)
-        q_tags[q.id] = {'primary': primary, 'secondary': ','.join(secondary[:2])}
+        primary, secondary = '', ''
+        kp_row = imported_kp.get(eq.q_index)
+        if kp_row and kp_row.kp_primary:
+            primary = kp_row.kp_primary
+            sec_parts = [x.strip() for x in (kp_row.kp_secondary or '').replace('\uff1b', ',').replace(';', ',').split(',') if x.strip()][:2]
+            secondary = ','.join(sec_parts)
+        q_tags[q.id] = {'primary': primary, 'secondary': secondary}
         cfg = db.session.query(DiagQuestionPracticeConfig).filter_by(question_id=q.id).first()
         hw_id = cfg.homework_assignment_id if cfg and cfg.homework_assignment_id else None
         q_config[q.id] = {
@@ -304,13 +305,19 @@ def question_delete(id):
     db = _db()
     M = _models()
     DiagQuestion, DiagExamQuestion, DiagQuestionTag, DiagQuestionPracticeConfig, DiagQuestionBankLink = M[2], M[3], M[5], M[9], M[8]
+    DiagQuestionAnswer, DiagQuestionKp, DiagQuestionPracticeItem, DiagExamQuestionPracticeConfig = M[10], M[11], M[12], M[13]
     question = db.session.get(DiagQuestion, id)
     if question is None:
         abort(404)
+    eq = db.session.query(DiagExamQuestion).filter(DiagExamQuestion.question_id == id).first()
+    if eq:
+        db.session.query(DiagQuestionAnswer).filter_by(exam_id=eq.exam_id, q_index=eq.q_index).delete()
+        db.session.query(DiagQuestionKp).filter_by(exam_id=eq.exam_id, q_index=eq.q_index).delete()
+        db.session.query(DiagQuestionPracticeItem).filter_by(exam_id=eq.exam_id, q_index=eq.q_index).delete()
+        db.session.query(DiagExamQuestionPracticeConfig).filter_by(exam_id=eq.exam_id, q_index=eq.q_index).delete()
     db.session.query(DiagQuestionTag).filter(DiagQuestionTag.question_id == id).delete()
     db.session.query(DiagQuestionPracticeConfig).filter(DiagQuestionPracticeConfig.question_id == id).delete()
     db.session.query(DiagQuestionBankLink).filter(DiagQuestionBankLink.question_id == id).delete()
-    eq = db.session.query(DiagExamQuestion).filter(DiagExamQuestion.question_id == id).first()
     exam_id = eq.exam_id if eq else None
     db.session.query(DiagExamQuestion).filter(DiagExamQuestion.question_id == id).delete()
     db.session.delete(question)
@@ -685,35 +692,37 @@ def import_csv():
 @diagnostic_admin_bp.route('/questions/<int:id>/config_save', methods=['POST'])
 @admin_required
 def question_config_save(id):
-    """AJAX：快速保存题目配置（主知识点、章节/作业），不跳转"""
+    """AJAX：快速保存题目配置（主知识点），写入 DiagQuestionKp"""
     from flask import jsonify
     db = _db()
     M = _models()
-    DiagQuestion, DiagKnowledgePoint, DiagQuestionTag, DiagQuestionPracticeConfig = M[2], M[4], M[5], M[9]
+    DiagQuestion, DiagKnowledgePoint, DiagExamQuestion, DiagQuestionKp, DiagQuestionPracticeConfig = M[2], M[4], M[3], M[11], M[9]
     question = db.session.get(DiagQuestion, id)
     if question is None:
         return jsonify({'success': False, 'message': '题目不存在'}), 404
     try:
         primary_kp = (request.form.get('kp_primary') or '').strip()
-        hw_val = (request.form.get('homework_assignment_id') or '').strip()
-        hw_id = int(hw_val) if hw_val.isdigit() else None
-        practice_mode = request.form.get('practice_mode') or 'bank_by_kp'
-        for t in db.session.query(DiagQuestionTag).filter_by(question_id=id).all():
-            db.session.delete(t)
-        if primary_kp:
-            if not db.session.get(DiagKnowledgePoint, primary_kp):
+        secondary_raw = (request.form.get('kp_secondary') or '').strip().split(',')[:2]
+        secondary = ','.join([x.strip() for x in secondary_raw if x.strip()])
+        exam_link = db.session.query(DiagExamQuestion).filter(DiagExamQuestion.question_id == id).first()
+        if exam_link:
+            if primary_kp and not db.session.get(DiagKnowledgePoint, primary_kp):
                 db.session.add(DiagKnowledgePoint(kp_id=primary_kp, competition_id=question.competition_id, name_cn=primary_kp))
                 db.session.flush()
-            db.session.add(DiagQuestionTag(question_id=id, kp_id=primary_kp, weight=1.0, manual_override=True))
+            kp_row = db.session.query(DiagQuestionKp).filter_by(exam_id=exam_link.exam_id, q_index=exam_link.q_index).first()
+            if kp_row:
+                kp_row.kp_primary = primary_kp or None
+                kp_row.kp_secondary = secondary or None
+            else:
+                db.session.add(DiagQuestionKp(exam_id=exam_link.exam_id, q_index=exam_link.q_index, kp_primary=primary_kp or None, kp_secondary=secondary or None))
         config = db.session.query(DiagQuestionPracticeConfig).filter_by(question_id=id).first()
-        if not config:
-            config = DiagQuestionPracticeConfig(question_id=id)
-            db.session.add(config)
-            db.session.flush()
-        config.practice_mode = practice_mode
-        config.random_count = int(request.form.get('random_count') or 3)
-        config.homework_assignment_id = hw_id
-        config.updated_at = datetime.utcnow()
+        if config:
+            hw_val = (request.form.get('homework_assignment_id') or '').strip()
+            hw_id = int(hw_val) if hw_val.isdigit() else None
+            config.practice_mode = request.form.get('practice_mode') or 'bank_by_kp'
+            config.random_count = int(request.form.get('random_count') or 3)
+            config.homework_assignment_id = hw_id
+            config.updated_at = datetime.utcnow()
         db.session.commit()
         return jsonify({'success': True, 'message': '已保存'})
     except Exception as e:
@@ -727,9 +736,9 @@ def question_config(id):
     db = _db()
     M = _models()
     DiagCompetition, DiagExam, DiagQuestion, DiagExamQuestion, DiagKnowledgePoint = M[0], M[1], M[2], M[3], M[4]
-    DiagQuestionTag, DiagBankQuestion, DiagBankQuestionTag, DiagQuestionBankLink, DiagQuestionPracticeConfig = M[5], M[6], M[7], M[8], M[9]
-    DiagQuestionPracticeItem = M[12]
-    Lesson, HomeworkQuestion = M[14], M[15]
+    DiagQuestionPracticeConfig = M[9]
+    DiagQuestionPracticeItem, DiagQuestionKp = M[12], M[11]
+    Lesson = M[14]
     question = db.session.get(DiagQuestion, id)
     if question is None:
         abort(404)
@@ -742,18 +751,14 @@ def question_config(id):
         secondary = (request.form.get('kp_secondary') or '').strip().split(',')[:2]
         secondary = [x.strip() for x in secondary if x.strip()]
 
-        for t in db.session.query(DiagQuestionTag).filter_by(question_id=id).all():
-            db.session.delete(t)
-        if primary_kp:
-            if not db.session.get(DiagKnowledgePoint, primary_kp):
-                db.session.add(DiagKnowledgePoint(kp_id=primary_kp, competition_id=question.competition_id, name_cn=primary_kp))
-                db.session.flush()
-            db.session.add(DiagQuestionTag(question_id=id, kp_id=primary_kp, weight=1.0, manual_override=True))
-        for kp in secondary:
-            if not db.session.get(DiagKnowledgePoint, kp):
-                db.session.add(DiagKnowledgePoint(kp_id=kp, competition_id=question.competition_id, name_cn=kp))
-                db.session.flush()
-            db.session.add(DiagQuestionTag(question_id=id, kp_id=kp, weight=0.5, manual_override=True))
+        exam_link_for_post = db.session.query(DiagExamQuestion).filter(DiagExamQuestion.question_id == id).first()
+        if exam_link_for_post:
+            kp_row = db.session.query(DiagQuestionKp).filter_by(exam_id=exam_link_for_post.exam_id, q_index=exam_link_for_post.q_index).first()
+            if kp_row:
+                kp_row.kp_primary = primary_kp or None
+                kp_row.kp_secondary = ','.join(secondary) if secondary else None
+            else:
+                db.session.add(DiagQuestionKp(exam_id=exam_link_for_post.exam_id, q_index=exam_link_for_post.q_index, kp_primary=primary_kp or None, kp_secondary=','.join(secondary) if secondary else None))
 
         config = db.session.query(DiagQuestionPracticeConfig).filter_by(question_id=id).first()
         if not config:
@@ -771,48 +776,31 @@ def question_config(id):
         flash('已保存', 'success')
         return redirect(url_for('diagnostic_admin.question_config', id=id))
 
-    tags = db.session.query(DiagQuestionTag).filter_by(question_id=id).all()
     config = db.session.query(DiagQuestionPracticeConfig).filter_by(question_id=id).first()
-    primary_kp = ''
-    secondary_kps = []
-    for t in tags:
-        if t.weight >= 0.99:
-            primary_kp = t.kp_id
-        else:
-            secondary_kps.append(t.kp_id)
     exam_link = db.session.query(DiagExamQuestion).filter(DiagExamQuestion.question_id == id).first()
+    primary_kp, secondary_kps = '', []
     csv_practice_items = []
+    csv_kp = None
     if exam_link:
+        csv_kp = db.session.query(DiagQuestionKp).filter_by(exam_id=exam_link.exam_id, q_index=exam_link.q_index).first()
+        if csv_kp and csv_kp.kp_primary:
+            primary_kp = csv_kp.kp_primary
+            sec_raw = (csv_kp.kp_secondary or '').replace('\uff1b', ',').replace(';', ',').split(',')
+            secondary_kps = [x.strip() for x in sec_raw if x.strip()][:2]
         csv_practice_items = db.session.query(DiagQuestionPracticeItem).filter_by(
             exam_id=exam_link.exam_id, q_index=exam_link.q_index
         ).order_by(DiagQuestionPracticeItem.item_index).all()
-    bank_items = []
-    for link in db.session.query(DiagQuestionBankLink).filter_by(question_id=id).order_by(DiagQuestionBankLink.link_order).all():
-        bq = db.session.get(DiagBankQuestion, link.bank_question_id)
-        if bq:
-            bank_items.append((link.link_order, bq))
-    hw_curated_list = []
-    if config and config.curated_homework_question_ids:
-        for sid in config.curated_homework_question_ids.strip().split(','):
-            sid = sid.strip()
-            if not sid or not sid.isdigit():
-                continue
-            hwq = db.session.get(HomeworkQuestion, int(sid))
-            hw_curated_list.append((sid, hwq))
     return render_template(
         'admin/diagnostic/question_config.html',
         question=question,
         comp=comp,
         kp_list=kp_list,
         lessons=lessons,
-        tags=tags,
         config=config,
         primary_kp=primary_kp,
         secondary_kps=','.join(secondary_kps[:2]),
         exam_id=exam_link.exam_id if exam_link else None,
         csv_practice_items=csv_practice_items,
-        bank_items=bank_items,
-        hw_curated_list=hw_curated_list,
     )
 
 
