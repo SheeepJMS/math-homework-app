@@ -50,20 +50,20 @@
         <div class="card-body">
             {% for (subject, category), comps_dict in hierarchy.items() %}
             <div class="mb-4 category-group">
-                <div class="text-muted small mb-2 d-flex align-items-center category-toggle" data-bs-toggle="collapse" data-bs-target="#collapse-cat-{{ loop.index }}" role="button" aria-expanded="true">
-                    <i class="fas fa-chevron-down category-chevron me-1" style="transition:transform .2s;"></i>
+                <div class="text-muted small mb-2 d-flex align-items-center category-toggle" data-bs-toggle="collapse" data-bs-target="#collapse-cat-{{ loop.index }}" role="button" aria-expanded="false">
+                    <i class="fas fa-chevron-down category-chevron me-1" style="transition:transform .2s; transform:rotate(-90deg);"></i>
                     <strong class="text-dark">{{ subject }}</strong>
                     <span class="mx-1">›</span>
                     <strong class="text-dark">{{ category }}</strong>
                 </div>
-                <div class="collapse show" id="collapse-cat-{{ loop.index }}">
+                <div class="collapse" id="collapse-cat-{{ loop.index }}">
                 {% for comp_key, data in comps_dict.items() %}
                 <div class="ms-3 mb-2 exam-comp-group">
-                    <div class="fw-bold text-primary mb-1 d-flex align-items-center comp-toggle" data-bs-toggle="collapse" data-bs-target="#collapse-comp-{{ data.comp.id }}" role="button" aria-expanded="true">
-                        <i class="fas fa-chevron-down comp-chevron me-1" style="transition:transform .2s;"></i>
+                    <div class="fw-bold text-primary mb-1 d-flex align-items-center comp-toggle" data-bs-toggle="collapse" data-bs-target="#collapse-comp-{{ data.comp.id }}" role="button" aria-expanded="false">
+                        <i class="fas fa-chevron-down comp-chevron me-1" style="transition:transform .2s; transform:rotate(-90deg);"></i>
                         {{ data.comp.name }}
                     </div>
-                    <div class="collapse show" id="collapse-comp-{{ data.comp.id }}">
+                    <div class="collapse" id="collapse-comp-{{ data.comp.id }}">
                     <ul class="list-unstyled ms-3">
                         {% for exam in data.exams %}
                         <li class="d-flex align-items-center py-1 border-bottom">

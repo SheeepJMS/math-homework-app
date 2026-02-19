@@ -6,7 +6,7 @@
   {% if exam_tree and exam_tree|length > 0 %}
   <div class="exam-tree-root">
     {% for sub in exam_tree %}
-    <div class="tree-level-1 tree-node" data-subject="{{ sub.subject }}" data-category="" data-contest="">
+    <div class="tree-level-1 tree-node collapsed" data-subject="{{ sub.subject }}" data-category="" data-contest="">
       <div class="tree-toggle" onclick="this.parentElement.classList.toggle('collapsed')">
         <i class="fas fa-chevron-down tree-chevron"></i>
         <span class="tree-label">{{ sub.subject }}</span>
@@ -14,7 +14,7 @@
       </div>
       <div class="tree-children">
         {% for cat in sub.categories %}
-        <div class="tree-level-2 tree-node" data-subject="{{ sub.subject }}" data-category="{{ cat.category }}" data-contest="">
+        <div class="tree-level-2 tree-node collapsed" data-subject="{{ sub.subject }}" data-category="{{ cat.category }}" data-contest="">
           <div class="tree-toggle" onclick="this.parentElement.classList.toggle('collapsed')">
             <i class="fas fa-chevron-down tree-chevron"></i>
             <span class="tree-label">{{ cat.category }}</span>
@@ -22,7 +22,7 @@
           </div>
           <div class="tree-children">
             {% for cont in cat.contests %}
-            <div class="tree-level-3 tree-node" data-subject="{{ sub.subject }}" data-category="{{ cat.category }}" data-contest="{{ cont.contest }}">
+            <div class="tree-level-3 tree-node collapsed" data-subject="{{ sub.subject }}" data-category="{{ cat.category }}" data-contest="{{ cont.contest }}">
               <div class="tree-toggle" onclick="this.parentElement.classList.toggle('collapsed')">
                 <i class="fas fa-chevron-down tree-chevron"></i>
                 <span class="tree-label">{{ cont.contest }}</span>

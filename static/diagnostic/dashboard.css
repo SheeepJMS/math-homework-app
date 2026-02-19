@@ -315,11 +315,17 @@
 .dashboard-comp-group .comp-header:hover {
   background: #f3f4f6;
 }
+.dashboard-comp-group .comp-header .fa-chevron-down {
+  transition: transform 0.2s;
+}
 .dashboard-comp-group .comp-body {
   padding: var(--s-2) 0 0 var(--s-2);
 }
 .dashboard-comp-group.collapsed .comp-body {
   display: none;
+}
+.dashboard-comp-group.collapsed .comp-header .fa-chevron-down {
+  transform: rotate(-90deg);
 }
 
 /* 试卷行 */

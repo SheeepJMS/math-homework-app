@@ -105,38 +105,13 @@
         </div>
     </div>
 
-    <!-- 第二步：添加题目答案 -->
+    <!-- 题目列表与 CSV 导入（答案、知识点、题库均通过 CSV 录入） -->
     <div class="card mb-4" id="step2Card">
         <div class="card-header bg-success text-white">
-            <h5 class="mb-0">第二步：添加题目答案</h5>
+            <h5 class="mb-0">题目列表与配置</h5>
         </div>
         <div class="card-body">
-            <form id="diagAnswersForm" action="{{ url_for('diagnostic_admin.save_answers', id=exam.id) }}" method="POST">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <div class="mb-3">
-                    <label for="diagQuestionCount" class="form-label">题目数量</label>
-                    <input type="number" class="form-control" id="diagQuestionCount" min="0" max="99" value="{{ order|length }}" placeholder="{{ order|length }}">
-                    <div class="form-text">与当前已上传题目数一致（{{ order|length }} 题），可修改后重新生成输入框</div>
-                    <button type="button" class="btn btn-primary mt-2" id="diagGenAnswerFields">生成答案输入框</button>
-                </div>
-                <div id="diagAnswerFields" class="mb-3">
-                    {% for eq in order %}
-                    {% set q = questions[loop.index0] if questions and loop.index0 < questions|length else none %}
-                    {% set imp_ans_ = imported_answers.get(eq.q_index) if imported_answers else none %}
-                    {% set ans_val_ = (imp_ans_.correct_answer or '') if imp_ans_ and imp_ans_.correct_answer else (q.answer_key if q and q.answer_key else '') %}
-                    <div class="mb-2 row align-items-center">
-                        <div class="col-auto">
-                            <label class="col-form-label">第 {{ eq.q_index + 1 }} 题：</label>
-                        </div>
-                        <div class="col-auto">
-                            <input type="text" class="form-control answer-input" name="answers[]" value="{{ ans_val_ }}" placeholder="A/B/C/D 或填空答案" maxlength="50" style="max-width: 120px;">
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-                <button type="submit" class="btn btn-success" id="diagSubmitAnswers" {% if not order %}disabled{% endif %}>保存答案</button>
-            </form>
-
+            <p class="text-muted small mb-3">答案、知识点、错题练习题均通过 CSV 导入，无需手动输入。</p>
             {% if order %}
             <div class="mt-4">
                 <h6>已添加的题目（下方可配置知识点与章节）：</h6>
@@ -225,7 +200,7 @@
             </div>
 
             <div class="mt-4 border-top pt-3" id="csvImportSection">
-                <h6>CSV 导入知识点与练习题</h6>
+                <h6>CSV 导入（答案、解析、知识点、错题练习题）</h6>
                 {% if request.args.get('csv_ok') %}
                 <div class="alert alert-success alert-dismissible fade show" role="alert">
                     <strong>导入成功。</strong>已更新 {{ request.args.get('updated', 0) }} 题的知识点与练习题集。
@@ -252,8 +227,10 @@
                     </div>
                     <button type="submit" class="btn btn-primary btn-sm" id="diagCsvSubmitBtn" disabled>导入 CSV</button>
                 </form>
-                <p class="text-muted small mb-0 mt-1"><strong>从本页导入：</strong>在 CSV 中填 <code>exam_id={{ exam.id }}</code> 或对应的 competition_name + exam_title，以及 <code>q_index</code>（题号从 1 开始）。列说明见 <a href="{{ url_for('diagnostic_admin.import_csv_enhanced') }}" target="_blank">导入页</a>。</p>
+                <p class="text-muted small mb-0 mt-1"><strong>从本页导入：</strong>在 CSV 中填 <code>exam_id={{ exam.id }}</code> 或对应的 competition_name + exam_title，以及 <code>q_index</code>（题号从 1 开始）。<strong>逐个模式</strong>不采用 stem_text，只导入答案、解析、知识点、题库；<strong>批量模式</strong>已通过上方 CSV 创建。列说明见 <a href="{{ url_for('diagnostic_admin.import_csv_enhanced') }}" target="_blank">导入页</a>。</p>
             </div>
+            {% else %}
+            <p class="text-muted mb-0">暂无题目。逐个模式请先完成第一步粘贴试题；批量模式请先在上方选择批量上传并导入 CSV 创建题目。</p>
             {% endif %}
         </div>
     </div>
@@ -379,31 +356,6 @@ body.mode-one #bulkImageConfirmSection { display: none !important; }
         diagExamImages = [];
         updateDiagPreviews();
     });
-
-    // 第二步：生成答案输入框
-    const diagAnswerFields = document.getElementById('diagAnswerFields');
-    const diagQuestionCountInput = document.getElementById('diagQuestionCount');
-    const diagGenAnswerFieldsBtn = document.getElementById('diagGenAnswerFields');
-    const diagSubmitAnswersBtn = document.getElementById('diagSubmitAnswers');
-    if (diagGenAnswerFieldsBtn && diagAnswerFields && diagQuestionCountInput) {
-        diagGenAnswerFieldsBtn.addEventListener('click', function() {
-            const count = parseInt(diagQuestionCountInput.value, 10) || 0;
-            if (count <= 0 || count > 99) {
-                alert('请输入 1–99 之间的题目数量');
-                return;
-            }
-            var existing = [];
-            diagAnswerFields.querySelectorAll('input[name="answers[]"]').forEach(function(inp) { existing.push(inp.value); });
-            diagAnswerFields.innerHTML = '';
-            for (var i = 1; i <= count; i++) {
-                var div = document.createElement('div');
-                div.className = 'mb-2 row align-items-center';
-                div.innerHTML = '<div class="col-auto"><label class="col-form-label">第 ' + i + ' 题：</label></div><div class="col-auto"><input type="text" class="form-control answer-input" name="answers[]" value="' + (existing[i - 1] || '') + '" placeholder="A/B/C/D 或填空答案" maxlength="50" style="max-width:120px;"></div>';
-                diagAnswerFields.appendChild(div);
-            }
-            if (diagSubmitAnswersBtn) diagSubmitAnswersBtn.disabled = false;
-        });
-    }
 
     // 第三步：粘贴解析图片并上传
     var diagSolutionImages = [];

@@ -186,7 +186,7 @@
     </div>
     {% if exams_grouped %}
     {% for group in exams_grouped %}
-    <div class="dashboard-comp-group" data-comp="{{ group.competition_name }}">
+    <div class="dashboard-comp-group collapsed" data-comp="{{ group.competition_name }}">
       <div class="comp-header" onclick="this.parentElement.classList.toggle('collapsed')">
         <span>{{ group.competition_name }}</span>
         <i class="fas fa-chevron-down"></i>
