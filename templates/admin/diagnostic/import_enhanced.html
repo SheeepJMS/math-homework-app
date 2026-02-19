@@ -2,7 +2,7 @@
 {% block admin_content %}
 <div class="container">
     <h2 class="mb-4">诊断 CSV 增强导入</h2>
-    <p class="text-muted">一次性导入：<strong>每题答案 + 解析 + 知识点（一级/二级）+ 错题练习集（5–8 题）+ 默认练习数量</strong>。题目原题与图片仍按原流程在试卷详情页上传，CSV 仅补充结构化数据。</p>
+    <p class="text-muted">一次性导入：<strong>题干文本 + 答案 + 解析 + 知识点（一级/二级）+ 错题练习集（5–8 题）+ 默认练习数量</strong>。支持两种用法：① 批量模式（试卷无题目时）含 <code>stem_text</code> 可创建题目，之后在详情页表格中粘贴题干图、解析图；② 原有流程（先粘贴试题图片）时 CSV 补充答案与解析。</p>
 
     <div class="card mb-4">
         <div class="card-body">
@@ -21,6 +21,7 @@
         </div>
         <div class="card-body small">
             <p class="mb-1"><strong>定位列：</strong> competition_name / exam_title / exam_id（优先）, q_index（题号从 1 开始）</p>
+            <p class="mb-1"><strong>题干（批量创建时必填）：</strong> stem_text（题干文本，批量模式下若无题目则会据此创建）</p>
             <p class="mb-1"><strong>答案与解析：</strong> correct_answer, solution_explain, answer_format（mcq|numeric|text）</p>
             <p class="mb-1"><strong>知识点：</strong> kp_primary, kp_secondary（逗号或分号分隔）</p>
             <p class="mb-1"><strong>预留列：</strong> reserved_1, reserved_2, reserved_3（供未来扩展标签等）</p>
@@ -49,6 +50,7 @@
                             <th>行</th>
                             <th>竞赛/试卷</th>
                             <th>q_index</th>
+                            <th>题干</th>
                             <th>答案</th>
                             <th>知识点</th>
                             <th>练习数</th>
@@ -59,7 +61,8 @@
                         <tr>
                             <td>{{ loop.index }}</td>
                             <td>{{ r.comp_name }} / {{ r.exam_title or r.exam_id or '—' }}</td>
-                            <td>{{ r.q_index }}</td>
+                            <td>{{ r.q_index + 1 }}</td>
+                            <td title="{{ r.stem_text or '' }}">{{ (r.stem_text or '')[:30] }}{% if (r.stem_text or '')|length > 30 %}…{% endif %}</td>
                             <td>{{ r.correct_answer or '—' }}</td>
                             <td>{{ r.kp_primary or '—' }}{% if r.kp_secondary %}；{{ r.kp_secondary }}{% endif %}</td>
                             <td>{{ r.practice_count_default }}（题库 {{ r.practice_pool | length }} 道）</td>

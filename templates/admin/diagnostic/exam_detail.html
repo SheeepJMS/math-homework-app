@@ -16,8 +16,21 @@
         </div>
     </div>
 
-    <!-- 第一步：逐个上传试题（与作业系统一致，粘贴图片） -->
-    <div class="card mb-4">
+    <!-- 上传模式选择 -->
+    <div class="card mb-3">
+        <div class="card-body py-2">
+            <div class="btn-group" role="group">
+                <input type="radio" class="btn-check" name="uploadMode" id="modeOneByOne" value="one" {% if order %}checked{% endif %}>
+                <label class="btn btn-outline-primary" for="modeOneByOne">逐个上传</label>
+                <input type="radio" class="btn-check" name="uploadMode" id="modeBulk" value="bulk" {% if not order %}checked{% endif %}>
+                <label class="btn btn-outline-secondary" for="modeBulk">批量上传</label>
+            </div>
+            <span class="text-muted small ms-2">二选一，避免同时使用</span>
+        </div>
+    </div>
+
+    <!-- 逐个上传：第一步 -->
+    <div class="card mb-4 upload-mode-card" data-mode="one">
         <div class="card-header bg-primary text-white">
             <h5 class="mb-0">第一步：逐个上传试题</h5>
         </div>
@@ -72,8 +85,28 @@
         </div>
     </div>
 
-    <!-- 第二步：添加题目答案（与作业系统一致） -->
-    <div class="card mb-4">
+    <!-- 批量上传：CSV 创建题目 -->
+    <div class="card mb-4 upload-mode-card" data-mode="bulk" style="display:none;">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0">批量上传：CSV 创建题目</h5>
+        </div>
+        <div class="card-body">
+            <p class="text-muted small">选择批量模式时，用 CSV 一次性创建所有题目（需含 <code>stem_text</code> 列）。创建后可下方列表中为每题粘贴题目图、解析图。</p>
+            <form id="diagBulkCsvForm" method="post" action="{{ url_for('diagnostic_admin.import_csv_enhanced') }}?from_exam={{ exam.id }}" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="from_exam" value="{{ exam.id }}">
+                <input type="file" name="file" accept=".csv" id="diagBulkCsvFileInput" style="display:none;">
+                <div class="csv-drop-zone border border-2 border-dashed rounded p-4 mb-2 text-center bulk-csv-zone" id="diagBulkCsvDropZone" style="min-height:100px; cursor:pointer;">
+                    <span class="text-muted" id="diagBulkCsvPlaceholder">将 CSV 拖拽到此处或点击选择，需含 stem_text、correct_answer、solution_explain 等列</span>
+                    <span class="d-none text-primary fw-bold" id="diagBulkCsvFileName"></span>
+                </div>
+                <button type="submit" class="btn btn-info" id="diagBulkCsvSubmitBtn" disabled>导入 CSV 创建题目</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 第二步：添加题目答案 -->
+    <div class="card mb-4" id="step2Card">
         <div class="card-header bg-success text-white">
             <h5 class="mb-0">第二步：添加题目答案</h5>
         </div>
@@ -117,6 +150,8 @@
                                 <th>主知识点</th>
                                 <th>次知识点</th>
                                 <th>章节/作业</th>
+                                <th class="bulk-image-col">题目图</th>
+                                <th class="bulk-image-col">解析图</th>
                                 <th>操作</th>
                             </tr>
                         </thead>
@@ -147,6 +182,24 @@
                                     <input type="hidden" class="lesson-id-hidden" value="{{ cfg.homework_assignment_id if cfg and cfg.homework_assignment_id else '' }}">
                                     <div class="search-dropdown lesson-dropdown" style="display:none;"></div>
                                 </td>
+                                <td class="bulk-image-col align-middle" style="width:100px;">
+                                    <div class="paste-cell" data-qid="{{ q.id if q else '' }}" data-type="stem" tabindex="0" title="点击后粘贴题干图 Ctrl+V">
+                                        {% if q and q.stem_image_url %}
+                                        <img src="{{ q.stem_image_url }}" class="img-thumb" alt="题干" style="max-width:80px;max-height:60px;">
+                                        {% else %}
+                                        <span class="paste-hint">粘贴</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td class="bulk-image-col align-middle" style="width:100px;">
+                                    <div class="paste-cell" data-qid="{{ q.id if q else '' }}" data-type="solution" tabindex="0" title="点击后粘贴解析图 Ctrl+V">
+                                        {% if q and q.solution_image_url %}
+                                        <img src="{{ q.solution_image_url }}" class="img-thumb" alt="解析" style="max-width:80px;max-height:60px;">
+                                        {% else %}
+                                        <span class="paste-hint">粘贴</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
                                 <td>
                                     {% if q %}
                                     <a href="{{ url_for('diagnostic_admin.question_config', id=q.id) }}" class="btn btn-sm btn-outline-secondary" title="查看知识点与错题练习题详情">查看详情</a>
@@ -163,6 +216,12 @@
                     </table>
                 </div>
                 <p class="text-muted small mb-0 mt-2">主知识点、章节/作业：输入关键词实时搜索，选中后点「保存配置」即生效。批量 CSV 导入后可用「查看详情」查看每题的知识点与错题练习题配置。</p>
+                {% if order %}
+                <div class="mt-3 pt-3 border-top" id="bulkImageConfirmSection">
+                    <button type="button" class="btn btn-primary" id="bulkImageConfirmBtn">确认添加图片</button>
+                    <span class="text-muted small ms-2">在表格中点击「粘贴」格、按 Ctrl+V 粘贴图片后，点此按钮写入</span>
+                </div>
+                {% endif %}
             </div>
 
             <div class="mt-4 border-top pt-3" id="csvImportSection">
@@ -199,8 +258,8 @@
         </div>
     </div>
 
-    <!-- 第三步：逐个上传解析（粘贴图片） -->
-    <div class="card mb-4">
+    <!-- 逐个上传：第三步 -->
+    <div class="card mb-4 upload-mode-card" data-mode="one">
         <div class="card-header bg-info text-white">
             <h5 class="mb-0">第三步：逐个上传解析</h5>
         </div>
@@ -228,6 +287,13 @@
 <style>
 .diag-paste-area { border: 2px dashed #ccc; padding: 20px; text-align: center; cursor: pointer; background: #f8f9fa; min-height: 120px; }
 .diag-paste-area:focus { outline: none; border-color: #0d6efd; }
+body.mode-bulk .upload-mode-card[data-mode="one"] { display: none !important; }
+body.mode-one .upload-mode-card[data-mode="bulk"] { display: none !important; }
+body.mode-one .bulk-image-col { display: none !important; }
+body.mode-one #bulkImageConfirmSection { display: none !important; }
+.paste-cell { border: 1px dashed #ccc; min-height: 50px; padding: 4px; text-align: center; cursor: pointer; font-size: 0.8rem; background: #fafafa; }
+.paste-cell:focus { outline: none; border-color: #0d6efd; background: #fff; }
+.paste-cell .paste-hint { color: #999; }
 .preview-container { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
 .preview-item { position: relative; width: 200px; }
 .preview-item img { width: 100%; height: auto; border: 1px solid #ddd; border-radius: 4px; }
@@ -241,6 +307,17 @@
 <script>
 (function() {
     const examId = {{ exam.id }};
+    const hasQuestions = {{ 'true' if order else 'false' }};
+    const initMode = hasQuestions ? 'one' : 'bulk';
+    document.body.classList.add('mode-' + initMode);
+    document.getElementById('modeOneByOne').checked = (initMode === 'one');
+    document.getElementById('modeBulk').checked = (initMode === 'bulk');
+    document.getElementById('modeOneByOne').addEventListener('change', function() {
+        if (this.checked) { document.body.classList.remove('mode-bulk'); document.body.classList.add('mode-one'); }
+    });
+    document.getElementById('modeBulk').addEventListener('change', function() {
+        if (this.checked) { document.body.classList.remove('mode-one'); document.body.classList.add('mode-bulk'); }
+    });
     let diagExamImages = [];
     const pasteArea = document.getElementById('diagExamPasteArea');
     const previewContainer = document.getElementById('diagExamPreviewContainer');
@@ -498,6 +575,106 @@
             if (input.files && input.files[0]) setFile(input.files[0]);
         });
     })();
+
+    // 批量模式：CSV 拖拽
+    (function() {
+        var zone = document.getElementById('diagBulkCsvDropZone');
+        var input = document.getElementById('diagBulkCsvFileInput');
+        var ph = document.getElementById('diagBulkCsvPlaceholder');
+        var fn = document.getElementById('diagBulkCsvFileName');
+        var btn = document.getElementById('diagBulkCsvSubmitBtn');
+        if (!zone || !input) return;
+        function setFile(file) {
+            if (file && file.name && file.name.toLowerCase().endsWith('.csv')) {
+                var dt = new DataTransfer();
+                dt.items.add(file);
+                input.files = dt.files;
+                ph.classList.add('d-none');
+                fn.textContent = file.name;
+                fn.classList.remove('d-none');
+                btn.disabled = false;
+            }
+        }
+        zone.addEventListener('click', function() { input.click(); });
+        zone.addEventListener('dragover', function(e) { e.preventDefault(); zone.classList.add('bg-light'); });
+        zone.addEventListener('dragleave', function(e) { zone.classList.remove('bg-light'); });
+        zone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            zone.classList.remove('bg-light');
+            if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+        });
+        input.addEventListener('change', function() {
+            if (input.files && input.files[0]) setFile(input.files[0]);
+        });
+    })();
+
+    // 批量模式：表格内粘贴题目图/解析图
+    var pastedImages = {};
+    document.querySelectorAll('.paste-cell').forEach(function(cell) {
+        var qid = cell.dataset.qid;
+        var type = cell.dataset.type;
+        if (!qid) return;
+        cell.addEventListener('paste', function(e) {
+            var items = e.clipboardData.items;
+            for (var i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') === 0) {
+                    e.preventDefault();
+                    var reader = new FileReader();
+                    reader.onload = function(ev) {
+                        var key = qid + '_' + type;
+                        pastedImages[key] = ev.target.result;
+                        var img = cell.querySelector('img');
+                        if (img) img.remove();
+                        var hint = cell.querySelector('.paste-hint');
+                        if (hint) hint.remove();
+                        var im = document.createElement('img');
+                        im.className = 'img-thumb';
+                        im.src = ev.target.result;
+                        im.style.cssText = 'max-width:80px;max-height:60px;';
+                        cell.appendChild(im);
+                    };
+                    reader.readAsDataURL(items[i].getAsFile());
+                    break;
+                }
+            }
+        });
+    });
+    document.getElementById('bulkImageConfirmBtn') && document.getElementById('bulkImageConfirmBtn').addEventListener('click', async function() {
+        var items = [];
+        document.querySelectorAll('.paste-cell[data-qid]').forEach(function(cell) {
+            var qid = cell.dataset.qid;
+            if (!qid) return;
+            var type = cell.dataset.type;
+            var key = qid + '_' + type;
+            if (pastedImages[key]) {
+                var qidNum = parseInt(qid, 10);
+                var it = items.find(function(x){ return x.question_id === qidNum; });
+                if (!it) {
+                    it = { question_id: qidNum, stem_image: null, solution_image: null };
+                    items.push(it);
+                }
+                if (type === 'stem') it.stem_image = pastedImages[key];
+                else it.solution_image = pastedImages[key];
+            }
+        });
+        if (items.length === 0) {
+            alert('请先在表格中点击对应格子，按 Ctrl+V 粘贴图片');
+            return;
+        }
+        var btn = this;
+        btn.disabled = true;
+        try {
+            var r = await fetch('/admin/diagnostic/exams/' + examId + '/upload_question_images_bulk', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name="csrf_token"]') ? document.querySelector('[name="csrf_token"]').value : '' },
+                body: JSON.stringify({ items: items })
+            });
+            var j = await r.json();
+            if (j.success) { alert(j.message); pastedImages = {}; window.location.reload(); }
+            else { alert(j.message || '上传失败'); }
+        } catch (e) { alert('上传失败'); }
+        btn.disabled = false;
+    });
 
     // 保存配置（AJAX，不跳转）
     document.querySelectorAll('.btn-save-config').forEach(function(btn) {

@@ -78,12 +78,13 @@ flask db upgrade
 
 **入口**：诊断管理 → 增强导入 CSV；或 `/admin/diagnostic/import_csv_enhanced`
 
-**流程**：题目原题与图片仍在试卷详情页上传；CSV 仅补充答案、解析、知识点、错题练习集。
+**流程**：支持两种用法。① **批量模式**：试卷无题目时，CSV 含 `stem_text` 可创建题目，之后在试卷详情页表格中粘贴题干图、解析图。② **原流程**：先粘贴试题图片，CSV 补充答案、解析、知识点、错题练习集。
 
 **步骤**：
-1. 在后台创建试卷并上传题目图片（按 q_index 顺序）
+1. 在后台创建试卷（可先不传题）
 2. 下载增强版模板：`/admin/diagnostic/import_csv_enhanced/sample`
-3. 填写 CSV 后上传 → 预览校验 → 确认写入
+3. 填写 CSV（批量模式必填 stem_text、correct_answer、solution_explain 等）→ 上传 → 预览校验 → 确认写入
+4. 批量创建的题目可在试卷详情页「题目图」「解析图」列粘贴补充图片
 
 **列说明**：
 
@@ -94,6 +95,8 @@ flask db upgrade
 | exam_title | 试卷标题 |
 | exam_id | 试卷 ID（有则优先，可省略 competition_name/exam_title） |
 | q_index | 题号，从 1 开始 |
+| **题干（批量创建时必填）** | |
+| stem_text | 题干文本，批量模式下若试卷无题目则据此创建题目 |
 | **答案与解析** | |
 | correct_answer | 正确答案（A/B/C/D 或数值/文本） |
 | solution_explain | 解析文本 |

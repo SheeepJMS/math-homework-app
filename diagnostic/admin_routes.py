@@ -361,6 +361,63 @@ def save_answers(id):
     return redirect(url_for('diagnostic_admin.exam_detail', id=id))
 
 
+@diagnostic_admin_bp.route('/exams/<int:id>/upload_question_images_bulk', methods=['POST'])
+@admin_required
+def upload_question_images_bulk(id):
+    """批量模式：按题目逐行粘贴的题干图、解析图，写入对应 DiagQuestion"""
+    from flask import jsonify
+    from app import upload_to_cloudinary
+    db = _db()
+    DiagExam, DiagQuestion, DiagExamQuestion = _models()[1], _models()[2], _models()[3]
+    exam = db.session.get(DiagExam, id)
+    if exam is None:
+        abort(404)
+    try:
+        data = request.get_json()
+        items = data.get('items') if isinstance(data, dict) else []
+        if not items:
+            return jsonify({'success': False, 'message': '没有接收到图片数据'}), 400
+        success_stem, success_solution = 0, 0
+        for it in items:
+            qid = it.get('question_id')
+            if not qid:
+                continue
+            q = db.session.get(DiagQuestion, int(qid))
+            if q is None:
+                continue
+            eq = db.session.query(DiagExamQuestion).filter_by(
+                exam_id=id, question_id=q.id
+            ).first()
+            if not eq:
+                continue
+            stem_data = it.get('stem_image')
+            if stem_data and str(stem_data).startswith('data:image'):
+                url = upload_to_cloudinary(stem_data)
+                if url:
+                    q.stem_image_url = url
+                    success_stem += 1
+            sol_data = it.get('solution_image')
+            if sol_data and str(sol_data).startswith('data:image'):
+                url = upload_to_cloudinary(sol_data)
+                if url:
+                    q.solution_image_url = url
+                    success_solution += 1
+        if success_stem > 0 or success_solution > 0:
+            db.session.commit()
+        msg = '成功添加'
+        parts = []
+        if success_stem:
+            parts.append('{} 题题干图'.format(success_stem))
+        if success_solution:
+            parts.append('{} 题解析图'.format(success_solution))
+        if parts:
+            msg += '：' + '、'.join(parts)
+        return jsonify({'success': True, 'message': msg})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
 @diagnostic_admin_bp.route('/exams/<int:id>/upload_solution_images', methods=['POST'])
 @admin_required
 def upload_solution_images(id):
@@ -486,11 +543,13 @@ def _parse_enhanced_csv(raw):
                 row_errors.append('practice_count_default({}) 不能大于练习题数({})'.format(practice_count, len(practice_pool)))
             for e in row_errors:
                 errors.append((i + 2, e))
+            stem_text_val = _col(row, 'stem_text', 'stem')
             rows.append({
                 'comp_name': comp_name,
                 'exam_title': exam_title,
                 'exam_id': exam_id_val,
                 'q_index': q_idx,
+                'stem_text': stem_text_val,
                 'correct_answer': _col(row, 'correct_answer'),
                 'solution_explain': _col(row, 'solution_explain'),
                 'answer_format': _col(row, 'answer_format') or 'mcq',
@@ -511,7 +570,7 @@ def _parse_enhanced_csv(raw):
 def _write_csv_rows(db, rows, M, force_exam_id=None):
     """将解析后的 CSV 行写入数据库，返回成功更新的题数。不提交，由调用方 commit。
     force_exam_id: 若提供（如从试卷详情页上传），则所有行强制使用该试卷，忽略 CSV 的 competition_name/exam_title。"""
-    DiagCompetition, DiagExam, DiagExamQuestion = M[0], M[1], M[3]
+    DiagCompetition, DiagExam, DiagQuestion, DiagExamQuestion = M[0], M[1], M[2], M[3]
     DiagQuestionAnswer, DiagQuestionKp, DiagQuestionPracticeItem, DiagExamQuestionPracticeConfig = M[10], M[11], M[12], M[13]
     updated = 0
     forced_exam = None
@@ -545,7 +604,22 @@ def _write_csv_rows(db, rows, M, force_exam_id=None):
         eq = db.session.query(DiagExamQuestion).filter_by(
             exam_id=exam.id, q_index=q_index
         ).first()
-        if not eq:
+        if not eq and forced_exam and (r.get('stem_text') or '').strip():
+            q = DiagQuestion(
+                competition_id=exam.competition_id,
+                stem_text=(r.get('stem_text') or '').strip(),
+                stem_image_url=None,
+                choices_json=None,
+                answer_key=r.get('correct_answer') or None,
+                solution_text=r.get('solution_explain') or None,
+                solution_image_url=None,
+            )
+            db.session.add(q)
+            db.session.flush()
+            eq = DiagExamQuestion(exam_id=exam.id, question_id=q.id, q_index=q_index)
+            db.session.add(eq)
+            db.session.flush()
+        elif not eq:
             continue
         updated += 1
         res1, res2, res3 = r.get('reserved_1') or None, r.get('reserved_2') or None, r.get('reserved_3') or None
