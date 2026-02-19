@@ -241,6 +241,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
+  justify-content: space-between;
   gap: var(--s-4);
 }
 
@@ -261,6 +262,15 @@
   color: var(--muted);
 }
 
+/* 竞赛名、时间、人名放大并右对齐 */
+.report-meta.report-meta-right {
+  margin-left: auto;
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--text);
+  text-align: right;
+}
+
 .report-meta-item {
   display: inline-flex;
   align-items: center;
@@ -278,6 +288,36 @@
   background: var(--muted-2);
   border-radius: 50%;
   opacity: 0.6;
+}
+
+/* 悬浮返回顶部按钮 */
+.report-back-to-top {
+  position: fixed;
+  bottom: 32px;
+  right: 32px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--brand);
+  color: #fff;
+  border: none;
+  box-shadow: var(--shadow-2);
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  transition: opacity 0.2s, transform 0.2s;
+}
+.report-back-to-top:hover {
+  opacity: 0.9;
+  transform: translateY(-2px);
+}
+.report-back-to-top.visible {
+  display: flex;
+}
+@media print {
+  .report-back-to-top { display: none !important; }
 }
 
 /* ========== C) Badge ========== */

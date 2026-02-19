@@ -3,6 +3,7 @@ from flask import Blueprint, request, redirect, url_for, render_template, flash,
 from datetime import datetime, timedelta
 from functools import wraps
 import os
+import re
 import secrets
 import json
 import random
@@ -1198,6 +1199,42 @@ def report(attempt_id):
     return render_template('diagnostic/report.html', **report_data)
 
 
+def _parse_practice_choices(choices_str):
+    """解析练习题的 choices 文本。支持多种格式。"""
+    if not choices_str or not str(choices_str).strip():
+        return []
+    s = str(choices_str).strip()
+    try:
+        raw = json.loads(s)
+        if isinstance(raw, dict):
+            return [{'key': k, 'text': str(v)} for k, v in raw.items()]
+        if isinstance(raw, list) and all(isinstance(x, dict) and 'key' in x for x in raw):
+            return raw
+        if isinstance(raw, list):
+            return [{'key': c.get('key', c), 'text': str(c.get('text', c))} for c in raw]
+    except Exception:
+        pass
+    # 格式 "A) value B) value" 或 "A. value B. value"：支持 ) 或 . 作为分隔符，[A-Z] 支持更多选项
+    for pattern in [
+        r'([A-Z])\)\s*(.*?)(?=\s*[A-Z]\)|$)',
+        r'([A-Z])\.\s*(.*?)(?=\s*[A-Z]\.|$)',
+        r'([A-Z]):\s*(.*?)(?=\s*[A-Z]:|$)',
+    ]:
+        parts = re.findall(pattern, s, re.DOTALL)
+        if parts:
+            result = [{'key': k, 'text': v.strip().rstrip(',').strip()} for k, v in parts if v.strip()]
+            if result:
+                return result
+    # 纯值列表 "20, 30, 60, 120" 或 "20；30；60"：按逗号/分号/空格分隔后赋 A,B,C,D
+    if ',' in s or ';' in s or '；' in s:
+        sep = re.compile(r'[,;\uff1b\s]+')
+        vals = [x.strip() for x in sep.split(s) if x.strip() and len(x.strip()) < 50]
+        if 2 <= len(vals) <= 10:
+            letters = list('ABCDEFGHIJ')[:len(vals)]
+            return [{'key': letters[i], 'text': vals[i]} for i in range(len(vals))]
+    return []
+
+
 def _practice_questions_from_items(db, items):
     from app import DiagBankQuestion, DiagQuestionPracticeItem
     from app import Question as HomeworkQuestion
@@ -1208,23 +1245,11 @@ def _practice_questions_from_items(db, items):
             pi = db.session.get(DiagQuestionPracticeItem, it.source_question_id)
             if not pi:
                 continue
-            choices = []
-            if pi.choices:
-                try:
-                    raw = json.loads(pi.choices)
-                    if isinstance(raw, dict):
-                        choices = [{'key': k, 'text': v} for k, v in raw.items()]
-                    elif isinstance(raw, list):
-                        choices = raw
-                except Exception:
-                    if ')' in (pi.choices or ''):
-                        for part in (pi.choices or '').split():
-                            if ')' in part:
-                                k = part.split(')')[0].strip()
-                                v = part.split(')', 1)[1].strip() if ')' in part else part
-                                choices.append({'key': k, 'text': v})
+            choices = _parse_practice_choices(pi.choices)
+            # 仅有空字符串或解析失败且无有效选项时保持 []，模板会显示文本输入框
+            # 避免显示无意义的 A/B/C/D/E 单选（无选项值）
             if not choices:
-                choices = [{'key': c, 'text': c} for c in ('A', 'B', 'C', 'D', 'E')]
+                pass
             fake_q = SimpleNamespace(stem_text=pi.stem, stem_image_url=None, content=pi.stem)
             questions.append({
                 'item': it, 'source': 'csv_practice', 'question': fake_q,

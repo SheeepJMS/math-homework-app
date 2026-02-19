@@ -15,8 +15,8 @@
     <div class="report-header">
       <div class="report-header-inner">
         <h1 class="report-title">答题报告</h1>
-        <div class="report-meta">
-          <span class="report-meta-item"><i class="fas fa-file-alt"></i>{{ exam_title | default('N/A') }}</span>
+        <div class="report-meta report-meta-right">
+          <span class="report-meta-item"><i class="fas fa-file-alt"></i>{{ exam_title | default(competition_name) | default('N/A') }}</span>
           {% if submitted_at_str %}<span class="report-meta-sep"></span><span class="report-meta-item"><i class="fas fa-calendar-alt"></i>{{ submitted_at_str }}</span>{% endif %}
           {% if user_display_name %}<span class="report-meta-sep"></span><span class="report-meta-item"><i class="fas fa-user"></i>{{ user_display_name }}</span>{% endif %}
         </div>
@@ -194,12 +194,19 @@
               {% if row.choices %}<div style="font-size: var(--small);">{% for opt in row.choices %}<div>{% set kv = opt.get('key', opt) %}{% set tv = opt.get('text', opt) %}<strong>{{ kv }}</strong> {{ tv }}</div>{% endfor %}</div>{% endif %}
             </div>
             <div class="col-md-6 solution-panel">
-              <div class="panel-title"><i class="fas fa-lightbulb me-1"></i>解析</div>
+              <div class="panel-title d-flex align-items-center justify-content-between">
+                <span><i class="fas fa-lightbulb me-1"></i>解析</span>
+                {% if row.solution_text or row.solution_image_url %}
+                <button type="button" class="btn btn-sm btn-outline-secondary solution-toggle" data-bs-toggle="collapse" data-bs-target="#solution-q{{ row.qnum }}" aria-expanded="false" aria-controls="solution-q{{ row.qnum }}">点击详情</button>
+                {% endif %}
+              </div>
               {% if row.solution_text or row.solution_image_url %}
+              <div id="solution-q{{ row.qnum }}" class="solution-content collapse">
                 {% if row.solution_text %}<div style="font-size: var(--small);">{{ row.solution_text | safe }}</div>{% endif %}
                 {% if row.solution_image_url %}<img src="{{ row.solution_image_url }}" class="img-fluid mt-2" alt="解析">{% endif %}
+              </div>
               {% else %}
-                <span style="color: var(--muted);">暂无解析</span>
+              <span style="color: var(--muted);">暂无解析</span>
               {% endif %}
             </div>
           </div>
@@ -209,6 +216,11 @@
     </div>
   </div>
 </div>
+
+{# 悬浮返回顶部按钮（打印时隐藏） #}
+<button type="button" id="reportBackToTop" class="report-back-to-top no-print" title="返回顶部" aria-label="返回顶部">
+  <i class="fas fa-chevron-up"></i>
+</button>
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -228,6 +240,25 @@
   };
   if (typeof initDiagnosticReportCharts === 'function') initDiagnosticReportCharts(data);
 })();
+// 返回顶部按钮
+(function(){
+  var btn = document.getElementById('reportBackToTop');
+  if (!btn) return;
+  function toggle() {
+    if (window.pageYOffset > 300) btn.classList.add('visible'); else btn.classList.remove('visible');
+  }
+  window.addEventListener('scroll', toggle, { passive: true });
+  toggle();
+  btn.addEventListener('click', function(){ window.scrollTo({ top: 0, behavior: 'smooth' }); });
+})();
+// 解析折叠按钮文案切换
+document.querySelectorAll('.solution-toggle').forEach(function(b){
+  var target = document.querySelector(b.getAttribute('data-bs-target'));
+  if (target) {
+    target.addEventListener('show.bs.collapse', function(){ b.textContent = '收起'; });
+    target.addEventListener('hide.bs.collapse', function(){ b.textContent = '点击详情'; });
+  }
+});
 </script>
 {% endblock extra_js %}
 {% endblock %}
