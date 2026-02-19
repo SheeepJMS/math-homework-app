@@ -49,12 +49,14 @@
         <div class="card-header">试卷列表（层级：学科 → 大类 → 具体竞赛 → 年份 试卷）</div>
         <div class="card-body">
             {% for (subject, category), comps_dict in hierarchy.items() %}
-            <div class="mb-4">
-                <div class="text-muted small mb-2">
+            <div class="mb-4 category-group">
+                <div class="text-muted small mb-2 d-flex align-items-center category-toggle" data-bs-toggle="collapse" data-bs-target="#collapse-cat-{{ loop.index }}" role="button" aria-expanded="true">
+                    <i class="fas fa-chevron-down category-chevron me-1" style="transition:transform .2s;"></i>
                     <strong class="text-dark">{{ subject }}</strong>
                     <span class="mx-1">›</span>
                     <strong class="text-dark">{{ category }}</strong>
                 </div>
+                <div class="collapse show" id="collapse-cat-{{ loop.index }}">
                 {% for comp_key, data in comps_dict.items() %}
                 <div class="ms-3 mb-2 exam-comp-group">
                     <div class="fw-bold text-primary mb-1 d-flex align-items-center comp-toggle" data-bs-toggle="collapse" data-bs-target="#collapse-comp-{{ data.comp.id }}" role="button" aria-expanded="true">
@@ -81,6 +83,7 @@
                     </div>
                 </div>
                 {% endfor %}
+                </div>
             </div>
             {% endfor %}
             {% if not hierarchy %}
@@ -112,8 +115,8 @@
   categorySelect.addEventListener('change', refreshContestOptions);
   refreshContestOptions();
 
-  // 竞赛分组收起/展开时旋转 chevron 图标
-  document.querySelectorAll('.exam-comp-group .collapse').forEach(function(el) {
+  // 竞赛分组、大类分组收起/展开时旋转 chevron 图标
+  document.querySelectorAll('.category-group .collapse, .exam-comp-group .collapse').forEach(function(el) {
     el.addEventListener('shown.bs.collapse', function() {
       var id = this.id;
       var btn = document.querySelector('[data-bs-target="#' + id + '"]');
