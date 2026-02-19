@@ -143,6 +143,7 @@
                                 <th>主知识点</th>
                                 <th>次知识点</th>
                                 <th>章节/作业</th>
+                                <th class="text-center" style="width:60px;" title="需要图：红=待补充，绿=已有图">图</th>
                                 <th class="bulk-image-col">题目图</th>
                                 <th class="bulk-image-col">解析图</th>
                                 <th>操作</th>
@@ -174,6 +175,15 @@
                                     <input type="text" class="form-control form-control-sm lesson-input" value="{{ cfg.homework_title if cfg and cfg.homework_title else '' }}" placeholder="输入搜索章节/作业" data-qid="{{ q.id if q else '' }}" style="min-width:140px;" autocomplete="off">
                                     <input type="hidden" class="lesson-id-hidden" value="{{ cfg.homework_assignment_id if cfg and cfg.homework_assignment_id else '' }}">
                                     <div class="search-dropdown lesson-dropdown" style="display:none;"></div>
+                                </td>
+                                <td class="text-center align-middle">
+                                    {% set needs_img = imp_ans and (imp_ans.reserved_1 or '').strip() == '1' %}
+                                    {% set has_img = q and (q.stem_image_url or q.solution_image_url) %}
+                                    {% if needs_img %}
+                                    <span class="badge {{ 'bg-success' if has_img else 'bg-danger' }}" title="{{ '已有题干/解析图' if has_img else '需补充题干图或解析图' }}">{{ '有' if has_img else '缺' }}</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary" title="无图要求">-</span>
+                                    {% endif %}
                                 </td>
                                 <td class="bulk-image-col align-middle" style="width:100px;">
                                     <div class="paste-cell" data-qid="{{ q.id if q else '' }}" data-type="stem" tabindex="0" title="点击后粘贴题干图 Ctrl+V">
