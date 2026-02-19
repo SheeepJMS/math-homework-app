@@ -7,16 +7,17 @@ Create Date: 2025-02-12
 """
 from alembic import op
 import sqlalchemy as sa
-
-
-revision = 'b2c3d4e5f6a7'
-down_revision = 'a1b2c3d4e5f6'
-branch_labels = None
-depends_on = None
+from sqlalchemy import inspect
 
 
 def upgrade():
-    op.add_column('diag_questions', sa.Column('stem_image_url', sa.String(length=512), nullable=True))
+    conn = op.get_bind()
+    insp = inspect(conn)
+    if not insp.has_table('diag_questions'):
+        return
+    cols = [c['name'] for c in insp.get_columns('diag_questions')]
+    if 'stem_image_url' not in cols:
+        op.add_column('diag_questions', sa.Column('stem_image_url', sa.String(length=512), nullable=True))
 
 
 def downgrade():

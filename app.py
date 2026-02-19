@@ -3024,7 +3024,11 @@ if __name__ == '__main__':
         import subprocess
         r = subprocess.run(['flask', 'db', 'upgrade'], capture_output=True, text=True, env={**os.environ, 'FLASK_APP': 'app.py'})
         if r.returncode != 0:
+            # 迁移失败时 stamp 回初始版本后重试（处理表已存在但版本不同步）
             subprocess.run(['flask', 'db', 'stamp', 'b4fefe386c31'], check=False, env={**os.environ, 'FLASK_APP': 'app.py'})
-            subprocess.run(['flask', 'db', 'upgrade'], check=True, env={**os.environ, 'FLASK_APP': 'app.py'})
+            r = subprocess.run(['flask', 'db', 'upgrade'], capture_output=True, text=True, env={**os.environ, 'FLASK_APP': 'app.py'})
+        if r.returncode != 0:
+            print('DB upgrade 失败:', r.stderr or r.stdout)
+            raise SystemExit(1)
         clean_duplicate_quiz_history()  # 自动清理重复答题记录
     app.run(debug=True, host='0.0.0.0', port=5000) 
