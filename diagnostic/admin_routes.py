@@ -551,6 +551,8 @@ def _parse_enhanced_csv(raw):
             for e in row_errors:
                 errors.append((i + 2, e))
             stem_text_val = _col(row, 'stem_text', 'stem')
+            needs_image_val = _col(row, 'needs_image', 'has_image', '有图')
+            needs_image = str(needs_image_val).lower() in ('1', 'yes', 'true', '有', '有图', 'y', '需要')
             rows.append({
                 'comp_name': comp_name,
                 'exam_title': exam_title,
@@ -562,6 +564,7 @@ def _parse_enhanced_csv(raw):
                 'answer_format': _col(row, 'answer_format') or 'mcq',
                 'kp_primary': _col(row, 'kp_primary'),
                 'kp_secondary': _col(row, 'kp_secondary'),
+                'needs_image': needs_image,
                 'reserved_1': _col(row, 'reserved_1'),
                 'reserved_2': _col(row, 'reserved_2'),
                 'reserved_3': _col(row, 'reserved_3'),
@@ -630,6 +633,7 @@ def _write_csv_rows(db, rows, M, force_exam_id=None):
             continue
         updated += 1
         res1, res2, res3 = r.get('reserved_1') or None, r.get('reserved_2') or None, r.get('reserved_3') or None
+        needs_img = bool(r.get('needs_image', False))
         ans_row = db.session.query(DiagQuestionAnswer).filter_by(
             exam_id=exam.id, q_index=q_index
         ).first()
@@ -637,6 +641,7 @@ def _write_csv_rows(db, rows, M, force_exam_id=None):
             ans_row.correct_answer = r['correct_answer'] or None
             ans_row.solution_explain = r['solution_explain'] or None
             ans_row.answer_format = r['answer_format'] or None
+            ans_row.needs_image = needs_img
             ans_row.reserved_1, ans_row.reserved_2, ans_row.reserved_3 = res1, res2, res3
         else:
             db.session.add(DiagQuestionAnswer(
@@ -644,6 +649,7 @@ def _write_csv_rows(db, rows, M, force_exam_id=None):
                 correct_answer=r['correct_answer'] or None,
                 solution_explain=r['solution_explain'] or None,
                 answer_format=r['answer_format'] or None,
+                needs_image=needs_img,
                 reserved_1=res1, reserved_2=res2, reserved_3=res3,
             ))
         kp_row = db.session.query(DiagQuestionKp).filter_by(
@@ -819,7 +825,7 @@ def question_config(id):
     M = _models()
     DiagCompetition, DiagExam, DiagQuestion, DiagExamQuestion, DiagKnowledgePoint = M[0], M[1], M[2], M[3], M[4]
     DiagQuestionPracticeConfig = M[9]
-    DiagQuestionPracticeItem, DiagQuestionKp = M[12], M[11]
+    DiagQuestionAnswer, DiagQuestionPracticeItem, DiagQuestionKp = M[10], M[12], M[11]
     Lesson = M[14]
     question = db.session.get(DiagQuestion, id)
     if question is None:
@@ -863,6 +869,7 @@ def question_config(id):
     primary_kp, secondary_kps = '', []
     csv_practice_items = []
     csv_kp = None
+    needs_image = False
     if exam_link:
         csv_kp = db.session.query(DiagQuestionKp).filter_by(exam_id=exam_link.exam_id, q_index=exam_link.q_index).first()
         if csv_kp and csv_kp.kp_primary:
@@ -872,6 +879,11 @@ def question_config(id):
         csv_practice_items = db.session.query(DiagQuestionPracticeItem).filter_by(
             exam_id=exam_link.exam_id, q_index=exam_link.q_index
         ).order_by(DiagQuestionPracticeItem.item_index).all()
+        csv_answer = db.session.query(DiagQuestionAnswer).filter_by(
+            exam_id=exam_link.exam_id, q_index=exam_link.q_index
+        ).first()
+        if csv_answer and getattr(csv_answer, 'needs_image', False):
+            needs_image = True
     return render_template(
         'admin/diagnostic/question_config.html',
         question=question,
@@ -883,6 +895,7 @@ def question_config(id):
         secondary_kps=','.join(secondary_kps[:2]),
         exam_id=exam_link.exam_id if exam_link else None,
         csv_practice_items=csv_practice_items,
+        needs_image=needs_image,
     )
 
 

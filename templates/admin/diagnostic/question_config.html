@@ -2,6 +2,12 @@
 {% block admin_content %}
 <div class="container">
     <h2 class="mb-4">题目配置 - {{ question.stem_text[:40] }}...</h2>
+    {% if needs_image %}
+    <div class="alert alert-warning d-flex align-items-center" role="alert">
+        <span class="me-2">⚠️</span>
+        <span><strong>该题需补充图片：</strong>请在下方或表格中上传题干图或解析图。</span>
+    </div>
+    {% endif %}
     <div class="card">
         <div class="card-body">
             <form method="post" action="{{ url_for('diagnostic_admin.question_config', id=question.id) }}">

@@ -565,6 +565,7 @@ class DiagQuestionAnswer(db.Model):
     correct_answer = db.Column(db.String(50), nullable=True)
     solution_explain = db.Column(db.Text, nullable=True)
     answer_format = db.Column(db.String(20), nullable=True)
+    needs_image = db.Column(db.Boolean, nullable=True, default=False)  # 1/yes/有/有图=需补充题干图或解析图
     reserved_1 = db.Column(db.String(255), nullable=True)
     reserved_2 = db.Column(db.String(255), nullable=True)
     reserved_3 = db.Column(db.String(255), nullable=True)
