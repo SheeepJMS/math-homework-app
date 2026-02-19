@@ -10,6 +10,12 @@ import sqlalchemy as sa
 from sqlalchemy import inspect
 
 
+revision = 'l2g3h4i5j6k7'
+down_revision = 'k2f3a4b5c6d7'
+branch_labels = None
+depends_on = None
+
+
 def upgrade():
     conn = op.get_bind()
     if not inspect(conn).has_table('diag_question_answers'):

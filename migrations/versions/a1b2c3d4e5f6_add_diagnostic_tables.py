@@ -10,6 +10,12 @@ import sqlalchemy as sa
 from sqlalchemy import inspect
 
 
+revision = 'a1b2c3d4e5f6'
+down_revision = 'b4fefe386c31'
+branch_labels = None
+depends_on = None
+
+
 def _table_exists(conn, name):
     """检查表是否已存在，用于处理迁移历史不一致的情况"""
     return inspect(conn).has_table(name)

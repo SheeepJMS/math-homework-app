@@ -10,6 +10,12 @@ import sqlalchemy as sa
 from sqlalchemy import inspect
 
 
+revision = 'c3d4e5f6a7b8'
+down_revision = 'b2c3d4e5f6a7'
+branch_labels = None
+depends_on = None
+
+
 def upgrade():
     conn = op.get_bind()
     insp = inspect(conn)
