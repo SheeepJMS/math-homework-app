@@ -68,32 +68,14 @@
                     </tbody>
                 </table>
             </div>
-            <form method="post" action="{{ url_for('diagnostic_admin.import_csv_enhanced') }}" enctype="multipart/form-data" class="mt-3">
+            <form method="post" action="{{ url_for('diagnostic_admin.import_csv_enhanced') }}{% if request.args.get('from_exam') %}?from_exam={{ request.args.get('from_exam') }}{% endif %}" class="mt-3">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="action" value="confirm_write">
-                <div class="mb-2">
-                    <input type="file" name="file" accept=".csv" required class="form-control" id="confirmFileInput">
-                    <small class="text-muted">请重新选择同一 CSV 文件以确认导入</small>
-                </div>
+                {% if request.args.get('from_exam') %}<input type="hidden" name="from_exam" value="{{ request.args.get('from_exam') }}">{% endif %}
                 <button type="submit" class="btn btn-success">确认写入</button>
             </form>
         </div>
     </div>
     {% endif %}
 </div>
-<script>
-(function(){
-    var form = document.querySelector('form[action="{{ url_for("diagnostic_admin.import_csv_enhanced") }}"]');
-    if (form && form.querySelector('input[name="action"][value="confirm_write"]')) {
-        form.onsubmit = function() {
-            var fileInput = form.querySelector('input[name="file"]');
-            if (!fileInput || !fileInput.files || !fileInput.files[0]) {
-                alert('请重新选择 CSV 文件');
-                return false;
-            }
-            return true;
-        };
-    }
-})();
-</script>
 {% endblock %}

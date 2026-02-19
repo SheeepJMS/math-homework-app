@@ -162,7 +162,7 @@
                 {% if request.args.get('csv_ok') %}
                 <div class="alert alert-success alert-dismissible fade show" role="alert">
                     <strong>导入成功。</strong>已更新 {{ request.args.get('updated', 0) }} 题的知识点与练习题集。
-                    <span class="d-block small mt-1">列表中「主知识点」会更新；点「查看详情」可看每题完整配置。题号从 0 开始（第1题=0、第2题=1），若某题未更新请核对 CSV 的 q_index。</span>
+                    <span class="d-block small mt-1">列表中「主知识点」会更新；点「查看详情」可看每题完整配置。CSV 的 q_index 从 1 开始（第1题=1、第2题=2）。</span>
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
                 {% endif %}

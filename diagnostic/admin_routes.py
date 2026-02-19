@@ -500,11 +500,101 @@ def _parse_enhanced_csv(raw):
     return rows, errors
 
 
+def _write_csv_rows(db, rows, M):
+    """将解析后的 CSV 行写入数据库，返回成功更新的题数。不提交，由调用方 commit。"""
+    DiagCompetition, DiagExam, DiagExamQuestion = M[0], M[1], M[3]
+    DiagQuestionAnswer, DiagQuestionKp, DiagQuestionPracticeItem, DiagExamQuestionPracticeConfig = M[10], M[11], M[12], M[13]
+    updated = 0
+    for r in rows:
+        comp_name = r['comp_name']
+        exam_title = r['exam_title']
+        exam_id_val = r['exam_id']
+        q_index = r['q_index']
+        if not comp_name and not exam_id_val:
+            continue
+        comp = db.session.query(DiagCompetition).filter(DiagCompetition.name == comp_name).first() if comp_name else None
+        if not comp and exam_id_val:
+            exam = db.session.get(DiagExam, int(exam_id_val)) if str(exam_id_val).isdigit() else None
+            if exam:
+                comp = db.session.get(DiagCompetition, exam.competition_id)
+        if not comp:
+            continue
+        exam = None
+        if exam_id_val and str(exam_id_val).isdigit():
+            exam = db.session.get(DiagExam, int(exam_id_val))
+        if not exam:
+            exam = db.session.query(DiagExam).filter_by(
+                competition_id=comp.id, title=exam_title
+            ).first()
+        if not exam:
+            continue
+        eq = db.session.query(DiagExamQuestion).filter_by(
+            exam_id=exam.id, q_index=q_index
+        ).first()
+        if not eq:
+            continue
+        updated += 1
+        res1, res2, res3 = r.get('reserved_1') or None, r.get('reserved_2') or None, r.get('reserved_3') or None
+        ans_row = db.session.query(DiagQuestionAnswer).filter_by(
+            exam_id=exam.id, q_index=q_index
+        ).first()
+        if ans_row:
+            ans_row.correct_answer = r['correct_answer'] or None
+            ans_row.solution_explain = r['solution_explain'] or None
+            ans_row.answer_format = r['answer_format'] or None
+            ans_row.reserved_1, ans_row.reserved_2, ans_row.reserved_3 = res1, res2, res3
+        else:
+            db.session.add(DiagQuestionAnswer(
+                exam_id=exam.id, q_index=q_index,
+                correct_answer=r['correct_answer'] or None,
+                solution_explain=r['solution_explain'] or None,
+                answer_format=r['answer_format'] or None,
+                reserved_1=res1, reserved_2=res2, reserved_3=res3,
+            ))
+        kp_row = db.session.query(DiagQuestionKp).filter_by(
+            exam_id=exam.id, q_index=q_index
+        ).first()
+        if kp_row:
+            kp_row.kp_primary = r['kp_primary'] or None
+            kp_row.kp_secondary = r['kp_secondary'] or None
+            kp_row.reserved_1, kp_row.reserved_2, kp_row.reserved_3 = res1, res2, res3
+        else:
+            db.session.add(DiagQuestionKp(
+                exam_id=exam.id, q_index=q_index,
+                kp_primary=r['kp_primary'] or None,
+                kp_secondary=r['kp_secondary'] or None,
+                reserved_1=res1, reserved_2=res2, reserved_3=res3,
+            ))
+        cfg_row = db.session.query(DiagExamQuestionPracticeConfig).filter_by(
+            exam_id=exam.id, q_index=q_index
+        ).first()
+        if cfg_row:
+            cfg_row.practice_count_default = r['practice_count_default']
+            cfg_row.reserved_1, cfg_row.reserved_2, cfg_row.reserved_3 = res1, res2, res3
+        else:
+            db.session.add(DiagExamQuestionPracticeConfig(
+                exam_id=exam.id, q_index=q_index,
+                practice_count_default=r['practice_count_default'],
+                reserved_1=res1, reserved_2=res2, reserved_3=res3,
+            ))
+        db.session.query(DiagQuestionPracticeItem).filter_by(
+            exam_id=exam.id, q_index=q_index
+        ).delete()
+        for idx, p in enumerate(r['practice_pool']):
+            db.session.add(DiagQuestionPracticeItem(
+                exam_id=exam.id, q_index=q_index, item_index=idx + 1,
+                stem=p['stem'], choices=p.get('choices'),
+                answer=p.get('answer'), explain=p.get('explain'),
+                source=p.get('source'),
+            ))
+    return updated
+
+
 @diagnostic_admin_bp.route('/import_csv_enhanced', methods=['GET', 'POST'])
 @admin_required
 def import_csv_enhanced():
     """增强版 CSV 导入：答案 + 知识点 + 错题练习集（5-8 题），支持预览与确认写入"""
-    from flask import jsonify
+    from flask import jsonify, session
     db = _db()
     M = _models()
     (DiagCompetition, DiagExam, DiagQuestion, DiagExamQuestion,
@@ -516,135 +606,61 @@ def import_csv_enhanced():
     if request.method == 'GET':
         return render_template('admin/diagnostic/import_enhanced.html')
 
-    if 'file' not in request.files or not request.files['file'].filename:
-        flash('请选择 CSV 文件', 'error')
-        return redirect(url_for('diagnostic_admin.import_csv_enhanced'))
-
-    file = request.files['file']
-    if not file.filename.lower().endswith('.csv'):
-        flash('仅支持 UTF-8 CSV 文件', 'error')
-        return redirect(url_for('diagnostic_admin.import_csv_enhanced'))
-
-    try:
-        raw = file.read().decode('utf-8-sig').strip()
-    except Exception as e:
-        flash('读取文件失败：{}'.format(str(e)), 'error')
-        return redirect(url_for('diagnostic_admin.import_csv_enhanced'))
-
-    rows, parse_errors = _parse_enhanced_csv(raw)
-    if not rows and not parse_errors:
-        flash('CSV 为空或无表头', 'error')
-        return redirect(url_for('diagnostic_admin.import_csv_enhanced'))
-
-    if request.form.get('action') == 'confirm_write':
+    if request.form.get('action') != 'confirm_write':
         if 'file' not in request.files or not request.files['file'].filename:
-            flash('请重新选择 CSV 文件以确认导入', 'error')
+            flash('请选择 CSV 文件', 'error')
+            return redirect(url_for('diagnostic_admin.import_csv_enhanced'))
+        file = request.files['file']
+        if not file.filename.lower().endswith('.csv'):
+            flash('仅支持 UTF-8 CSV 文件', 'error')
             return redirect(url_for('diagnostic_admin.import_csv_enhanced'))
         try:
-            raw = request.files['file'].read().decode('utf-8-sig').strip()
+            raw = file.read().decode('utf-8-sig').strip()
         except Exception as e:
             flash('读取文件失败：{}'.format(str(e)), 'error')
             return redirect(url_for('diagnostic_admin.import_csv_enhanced'))
-        rows, _ = _parse_enhanced_csv(raw)
-        updated = 0
-        for r in rows:
-            comp_name = r['comp_name']
-            exam_title = r['exam_title']
-            exam_id_val = r['exam_id']
-            q_index = r['q_index']
-            if not comp_name and not exam_id_val:
-                continue
-            comp = db.session.query(DiagCompetition).filter(DiagCompetition.name == comp_name).first() if comp_name else None
-            if not comp and exam_id_val:
-                exam = db.session.get(DiagExam, int(exam_id_val)) if str(exam_id_val).isdigit() else None
-                if exam:
-                    comp = db.session.get(DiagCompetition, exam.competition_id)
-            if not comp:
-                continue
-            exam = None
-            if exam_id_val and str(exam_id_val).isdigit():
-                exam = db.session.get(DiagExam, int(exam_id_val))
-            if not exam:
-                exam = db.session.query(DiagExam).filter_by(
-                    competition_id=comp.id, title=exam_title
-                ).first()
-            if not exam:
-                continue
-            eq = db.session.query(DiagExamQuestion).filter_by(
-                exam_id=exam.id, q_index=q_index
-            ).first()
-            if not eq:
-                continue
-            updated += 1
+        rows, parse_errors = _parse_enhanced_csv(raw)
+        if not rows and not parse_errors:
+            flash('CSV 为空或无表头', 'error')
+            return redirect(url_for('diagnostic_admin.import_csv_enhanced'))
 
-            res1, res2, res3 = r.get('reserved_1') or None, r.get('reserved_2') or None, r.get('reserved_3') or None
-            ans_row = db.session.query(DiagQuestionAnswer).filter_by(
-                exam_id=exam.id, q_index=q_index
-            ).first()
-            if ans_row:
-                ans_row.correct_answer = r['correct_answer'] or None
-                ans_row.solution_explain = r['solution_explain'] or None
-                ans_row.answer_format = r['answer_format'] or None
-                ans_row.reserved_1, ans_row.reserved_2, ans_row.reserved_3 = res1, res2, res3
-            else:
-                db.session.add(DiagQuestionAnswer(
-                    exam_id=exam.id, q_index=q_index,
-                    correct_answer=r['correct_answer'] or None,
-                    solution_explain=r['solution_explain'] or None,
-                    answer_format=r['answer_format'] or None,
-                    reserved_1=res1, reserved_2=res2, reserved_3=res3,
-                ))
-            kp_row = db.session.query(DiagQuestionKp).filter_by(
-                exam_id=exam.id, q_index=q_index
-            ).first()
-            if kp_row:
-                kp_row.kp_primary = r['kp_primary'] or None
-                kp_row.kp_secondary = r['kp_secondary'] or None
-                kp_row.reserved_1, kp_row.reserved_2, kp_row.reserved_3 = res1, res2, res3
-            else:
-                db.session.add(DiagQuestionKp(
-                    exam_id=exam.id, q_index=q_index,
-                    kp_primary=r['kp_primary'] or None,
-                    kp_secondary=r['kp_secondary'] or None,
-                    reserved_1=res1, reserved_2=res2, reserved_3=res3,
-                ))
-            cfg_row = db.session.query(DiagExamQuestionPracticeConfig).filter_by(
-                exam_id=exam.id, q_index=q_index
-            ).first()
-            if cfg_row:
-                cfg_row.practice_count_default = r['practice_count_default']
-                cfg_row.reserved_1, cfg_row.reserved_2, cfg_row.reserved_3 = res1, res2, res3
-            else:
-                db.session.add(DiagExamQuestionPracticeConfig(
-                    exam_id=exam.id, q_index=q_index,
-                    practice_count_default=r['practice_count_default'],
-                    reserved_1=res1, reserved_2=res2, reserved_3=res3,
-                ))
-            db.session.query(DiagQuestionPracticeItem).filter_by(
-                exam_id=exam.id, q_index=q_index
-            ).delete()
-            for idx, p in enumerate(r['practice_pool']):
-                db.session.add(DiagQuestionPracticeItem(
-                    exam_id=exam.id, q_index=q_index, item_index=idx + 1,
-                    stem=p['stem'], choices=p.get('choices'),
-                    answer=p.get('answer'), explain=p.get('explain'),
-                    source=p.get('source'),
-                ))
+        from_exam = request.form.get('from_exam') or request.args.get('from_exam')
+        if from_exam and str(from_exam).isdigit():
+            updated = _write_csv_rows(db, rows, M)
+            try:
+                db.session.commit()
+                flash('导入成功，已更新 {} 题。'.format(updated), 'success')
+                return redirect(url_for('diagnostic_admin.exam_detail', id=int(from_exam), csv_ok=1, updated=updated))
+            except Exception as e:
+                db.session.rollback()
+                flash('导入失败：{}'.format(str(e)), 'error')
+                return redirect(url_for('diagnostic_admin.exam_detail', id=int(from_exam), csv_err=1))
+
+        session['csv_import_preview_rows'] = [{k: v for k, v in r.items() if k != 'row'} for r in rows]
+        return render_template('admin/diagnostic/import_enhanced.html',
+            preview=True,
+            rows=rows,
+            parse_errors=parse_errors,
+        )
+
+    if request.form.get('action') == 'confirm_write':
+        rows = session.pop('csv_import_preview_rows', None)
+        if not rows:
+            flash('预览已过期，请重新上传 CSV 文件', 'error')
+            return redirect(url_for('diagnostic_admin.import_csv_enhanced'))
+        updated = _write_csv_rows(db, rows, M)
         try:
             db.session.commit()
             flash('导入成功，已更新 {} 题。'.format(updated), 'success')
+            from_exam = request.args.get('from_exam') or request.form.get('from_exam')
+            if from_exam and str(from_exam).isdigit():
+                return redirect(url_for('diagnostic_admin.exam_detail', id=int(from_exam), csv_ok=1, updated=updated))
             return redirect(url_for('diagnostic_admin.import_csv_enhanced'))
         except Exception as e:
             db.session.rollback()
             flash('写入失败：{}'.format(str(e)), 'error')
+            session['csv_import_preview_rows'] = rows
             return redirect(url_for('diagnostic_admin.import_csv_enhanced'))
-
-    return render_template('admin/diagnostic/import_enhanced.html',
-        preview=True,
-        rows=rows,
-        parse_errors=parse_errors,
-        raw_csv=raw,
-    )
 
 
 @diagnostic_admin_bp.route('/import', methods=['GET', 'POST'])
