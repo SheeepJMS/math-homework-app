@@ -89,12 +89,14 @@
                 <div id="diagAnswerFields" class="mb-3">
                     {% for eq in order %}
                     {% set q = questions[loop.index0] if questions and loop.index0 < questions|length else none %}
+                    {% set imp_ans_ = imported_answers.get(eq.q_index) if imported_answers else none %}
+                    {% set ans_val_ = (imp_ans_.correct_answer or '') if imp_ans_ and imp_ans_.correct_answer else (q.answer_key if q and q.answer_key else '') %}
                     <div class="mb-2 row align-items-center">
                         <div class="col-auto">
                             <label class="col-form-label">第 {{ eq.q_index + 1 }} 题：</label>
                         </div>
                         <div class="col-auto">
-                            <input type="text" class="form-control answer-input" name="answers[]" value="{{ q.answer_key if q and q.answer_key else '' }}" placeholder="A/B/C/D 或填空答案" maxlength="50" style="max-width: 120px;">
+                            <input type="text" class="form-control answer-input" name="answers[]" value="{{ ans_val_ }}" placeholder="A/B/C/D 或填空答案" maxlength="50" style="max-width: 120px;">
                         </div>
                     </div>
                     {% endfor %}
@@ -113,6 +115,7 @@
                                 <th>类型</th>
                                 <th>答案</th>
                                 <th>主知识点</th>
+                                <th>次知识点</th>
                                 <th>章节/作业</th>
                                 <th>操作</th>
                             </tr>
@@ -122,17 +125,22 @@
                             {% set q = questions[loop.index0] if questions and loop.index0 < questions|length else none %}
                             {% set t = q_tags.get(q.id, {}) if q else {} %}
                             {% set cfg = q_config.get(q.id) if q else none %}
+                            {% set imp_ans = imported_answers.get(eq.q_index) if imported_answers else none %}
+                            {% set ans_val = (imp_ans.correct_answer or '') if imp_ans and imp_ans.correct_answer else (q.answer_key if q and q.answer_key else '') %}
                             <tr data-qid="{{ q.id if q else '' }}">
                                 <td>{{ eq.q_index + 1 }}</td>
                                 <td>
-                                    {% if q and q.answer_key %}
-                                    {% if q.answer_key in ['A','B','C','D','E'] %}选择{% else %}填空{% endif %}
+                                    {% if ans_val %}
+                                    {% if ans_val in ['A','B','C','D','E'] %}选择{% else %}填空{% endif %}
                                     {% else %}-{% endif %}
                                 </td>
-                                <td>{{ q.answer_key if q and q.answer_key else '-' }}</td>
+                                <td>{{ ans_val or '-' }}</td>
                                 <td class="position-relative">
                                     <input type="text" class="form-control form-control-sm kp-input" value="{{ t.primary or '' }}" placeholder="输入搜索知识点" data-qid="{{ q.id if q else '' }}" style="min-width:120px;" autocomplete="off">
                                     <div class="search-dropdown kp-dropdown" style="display:none;"></div>
+                                </td>
+                                <td>
+                                    <input type="text" class="form-control form-control-sm kp-secondary-input" value="{{ t.secondary or '' }}" placeholder="次知识点，逗号分隔" data-qid="{{ q.id if q else '' }}" style="min-width:100px;">
                                 </td>
                                 <td class="position-relative">
                                     <input type="text" class="form-control form-control-sm lesson-input" value="{{ cfg.homework_title if cfg and cfg.homework_title else '' }}" placeholder="输入搜索章节/作业" data-qid="{{ q.id if q else '' }}" style="min-width:140px;" autocomplete="off">
@@ -498,10 +506,12 @@
             if (!qid) return;
             var row = btn.closest('tr');
             var kpInput = row.querySelector('.kp-input');
+            var kpSecondaryInput = row.querySelector('.kp-secondary-input');
             var lessonIdInput = row.querySelector('.lesson-id-hidden');
             var fd = new FormData();
             fd.append('csrf_token', document.querySelector('[name="csrf_token"]') ? document.querySelector('[name="csrf_token"]').value : '');
             fd.append('kp_primary', kpInput ? kpInput.value : '');
+            fd.append('kp_secondary', kpSecondaryInput ? kpSecondaryInput.value : '');
             fd.append('homework_assignment_id', lessonIdInput ? lessonIdInput.value : '');
             fd.append('practice_mode', 'bank_by_kp');
             fd.append('random_count', '3');

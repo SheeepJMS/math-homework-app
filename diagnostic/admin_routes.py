@@ -117,7 +117,7 @@ def exam_detail(id):
     db = _db()
     M = _models()
     DiagCompetition, DiagExam, DiagQuestion, DiagExamQuestion, DiagKnowledgePoint = M[0], M[1], M[2], M[3], M[4]
-    DiagQuestionKp, DiagQuestionPracticeConfig, Lesson = M[11], M[9], M[14]
+    DiagQuestionAnswer, DiagQuestionKp, DiagQuestionPracticeConfig, Lesson = M[10], M[11], M[9], M[14]
     exam = db.session.get(DiagExam, id)
     if exam is None:
         abort(404)
@@ -125,6 +125,7 @@ def exam_detail(id):
     questions = [db.session.get(DiagQuestion, eq.question_id) for eq in order]
     kp_list = db.session.query(DiagKnowledgePoint).filter_by(competition_id=exam.competition_id).all()
     lessons = db.session.query(Lesson).order_by(Lesson.title).all()
+    imported_answers = {r.q_index: r for r in db.session.query(DiagQuestionAnswer).filter_by(exam_id=id).all()}
     imported_kp = {r.q_index: r for r in db.session.query(DiagQuestionKp).filter_by(exam_id=id).all()}
     q_tags = {}  # question_id -> {primary: str, secondary: str}
     q_config = {}  # question_id -> config
@@ -149,7 +150,7 @@ def exam_detail(id):
         }
     return render_template('admin/diagnostic/exam_detail.html',
         exam=exam, order=order, questions=questions,
-        kp_list=kp_list, lessons=lessons, q_tags=q_tags, q_config=q_config)
+        imported_answers=imported_answers, kp_list=kp_list, lessons=lessons, q_tags=q_tags, q_config=q_config)
 
 
 @diagnostic_admin_bp.route('/exams/<int:id>/publish', methods=['POST'])
