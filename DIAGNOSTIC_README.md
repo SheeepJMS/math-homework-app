@@ -19,7 +19,7 @@
 - `templates/diagnostic/practice.html` - 练习包页
 - `templates/admin/diagnostic/exams.html` - 诊断试卷列表（创建/删除/发布）
 - `templates/admin/diagnostic/exam_detail.html` - 卷子详情与题目顺序
-- `templates/admin/diagnostic/import.html` - CSV 导入页
+- `templates/admin/diagnostic/import_enhanced.html` - CSV 导入页
 - `templates/admin/diagnostic/question_config.html` - 单题配置（知识点、练习来源、随机题数、压轴题）
 
 ### 数据库
@@ -63,7 +63,8 @@ flask db upgrade
 | `/diagnostic/report/<attempt_id>` | 报告页 |
 | `/diagnostic/practice/<practice_set_id>` | 练习包页 |
 | `/admin/diagnostic/exams` | 诊断试卷列表 |
-| `/admin/diagnostic/import` | 导入 CSV |
+| `/admin/diagnostic/import` | 重定向至增强导入 |
+| `/admin/diagnostic/import_csv_enhanced` | CSV 导入（答案+知识点+练习集） |
 | `/admin/diagnostic/exams/<id>` | 卷子详情 |
 | `/admin/diagnostic/questions/<id>` | 单题配置（知识点、练习来源、随机题数、压轴题） |
 | `/admin/diagnostic/search/kp` | 知识点搜索（JSON，仅后台用） |

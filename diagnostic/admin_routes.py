@@ -117,7 +117,7 @@ def exam_detail(id):
     db = _db()
     M = _models()
     DiagCompetition, DiagExam, DiagQuestion, DiagExamQuestion, DiagKnowledgePoint = M[0], M[1], M[2], M[3], M[4]
-    DiagQuestionTag, DiagQuestionPracticeConfig, Lesson = M[5], M[9], M[10]
+    DiagQuestionTag, DiagQuestionPracticeConfig, Lesson = M[5], M[9], M[14]
     exam = db.session.get(DiagExam, id)
     if exam is None:
         abort(404)
@@ -395,16 +395,8 @@ def upload_solution_images(id):
 @diagnostic_admin_bp.route('/import/sample')
 @admin_required
 def import_csv_sample():
-    """下载示例 CSV（UTF-8）"""
-    sample_path = os.path.join(current_app.static_folder or 'static', 'diagnostic', 'diagnostic_import_sample.csv')
-    if not os.path.isfile(sample_path):
-        abort(404)
-    return send_file(
-        sample_path,
-        mimetype='text/csv',
-        as_attachment=True,
-        download_name='diagnostic_import_sample.csv',
-    )
+    """重定向到增强版模板（旧入口保留兼容）"""
+    return redirect(url_for('diagnostic_admin.import_csv_enhanced_sample'))
 
 
 @diagnostic_admin_bp.route('/import_csv_enhanced/sample')
@@ -658,152 +650,12 @@ def import_csv_enhanced():
 @diagnostic_admin_bp.route('/import', methods=['GET', 'POST'])
 @admin_required
 def import_csv():
-    db = _db()
-    (DiagCompetition, DiagExam, DiagQuestion, DiagExamQuestion, DiagKnowledgePoint,
-     DiagQuestionTag, DiagBankQuestion, DiagBankQuestionTag, DiagQuestionBankLink,
-     DiagQuestionPracticeConfig, *_) = _models()
-
-    if request.method == 'GET':
-        return render_template('admin/diagnostic/import.html')
-
-    if 'file' not in request.files or not request.files['file'].filename:
-        flash('请选择 CSV 文件', 'error')
-        return redirect(url_for('diagnostic_admin.import_csv'))
-
-    file = request.files['file']
-    if not file.filename.lower().endswith('.csv'):
-        flash('仅支持 UTF-8 CSV 文件', 'error')
-        return redirect(url_for('diagnostic_admin.import_csv'))
-
-    try:
-        raw = file.read().decode('utf-8-sig').strip()
-        reader = csv.DictReader(io.StringIO(raw))
-        rows = list(reader)
-    except Exception as e:
-        flash('解析 CSV 失败：{}'.format(str(e)), 'error')
-        return redirect(url_for('diagnostic_admin.import_csv'))
-
-    if not rows:
-        flash('CSV 为空或无表头', 'error')
-        return redirect(url_for('diagnostic_admin.import_csv'))
-
-    def col(r, *keys, default=''):
-        for k in keys:
-            if k in r and (r[k] or '').strip():
-                return (r[k] or '').strip()
-        return default
-
-    created_exams = 0
-    updated_questions = 0
-    from_exam_id = request.form.get('from_exam') or request.args.get('from_exam')
-    from_exam_id = int(from_exam_id) if from_exam_id and str(from_exam_id).isdigit() else None
-    exam_from_page = db.session.get(DiagExam, from_exam_id) if from_exam_id else None
-
-    for row_index, row in enumerate(rows):
-        if exam_from_page:
-            exam = exam_from_page
-            comp = db.session.get(DiagCompetition, exam.competition_id)
-        else:
-            comp_name = col(row, 'competition', 'competition_name', '竞赛')
-            exam_title = col(row, 'exam_title', 'exam_title', '试卷标题')
-            if not comp_name or not exam_title:
-                continue
-            comp = db.session.query(DiagCompetition).filter_by(name=comp_name).first()
-            if not comp:
-                comp = DiagCompetition(name=comp_name)
-                db.session.add(comp)
-                db.session.flush()
-            exam = db.session.query(DiagExam).filter_by(competition_id=comp.id, title=exam_title).first()
-            if not exam:
-                time_limit = col(row, 'time_limit_sec', 'time_limit')
-                exam = DiagExam(
-                    competition_id=comp.id,
-                    title=exam_title,
-                    time_limit_sec=int(time_limit) if time_limit.isdigit() else None,
-                    is_published=False,
-                )
-                db.session.add(exam)
-                db.session.flush()
-                created_exams += 1
-
-        q_index_val = col(row, 'q_index', 'question_index', '题号')
-        if q_index_val == '' or q_index_val is None:
-            q_index = row_index
-        else:
-            try:
-                q_index = int(q_index_val)
-            except ValueError:
-                q_index = row_index
-        eq = db.session.query(DiagExamQuestion).filter(DiagExamQuestion.exam_id == exam.id, DiagExamQuestion.q_index == q_index).first()
-        if not eq:
-            continue
-        q = db.session.get(DiagQuestion, eq.question_id)
-        if not q:
-            continue
-        updated_questions += 1
-
-        kp_primary = col(row, 'kp_primary_id', 'kp_primary')
-        if kp_primary:
-            if not db.session.get(DiagKnowledgePoint, kp_primary):
-                db.session.add(DiagKnowledgePoint(kp_id=kp_primary, competition_id=comp.id, name_cn=kp_primary))
-                db.session.flush()
-            if not db.session.query(DiagQuestionTag).filter_by(question_id=q.id, kp_id=kp_primary).first():
-                db.session.add(DiagQuestionTag(question_id=q.id, kp_id=kp_primary, weight=1.0))
-        for sec in (col(row, 'kp_secondary_ids', 'kp_secondary') or '').split(','):
-            sec = sec.strip()
-            if not sec:
-                continue
-            if not db.session.get(DiagKnowledgePoint, sec):
-                db.session.add(DiagKnowledgePoint(kp_id=sec, competition_id=comp.id, name_cn=sec))
-                db.session.flush()
-            if not db.session.query(DiagQuestionTag).filter_by(question_id=q.id, kp_id=sec).first():
-                db.session.add(DiagQuestionTag(question_id=q.id, kp_id=sec, weight=0.5))
-
-        practice_count_default = int(col(row, 'practice_count_default', 'practice_count') or 3)
-        config = db.session.query(DiagQuestionPracticeConfig).filter_by(question_id=q.id).first()
-        if not config:
-            db.session.add(DiagQuestionPracticeConfig(
-                question_id=q.id, practice_mode='bank_by_kp', random_count=min(10, max(1, practice_count_default))
-            ))
-            db.session.flush()
-
-        bank_ids = []
-        for i in range(1, 4):
-            p_stem = col(row, 'bank_p{}_stem'.format(i), 'p{}_stem'.format(i))
-            p_choices = col(row, 'bank_p{}_choices'.format(i), 'p{}_choices'.format(i))
-            p_answer = col(row, 'bank_p{}_answer'.format(i), 'p{}_answer'.format(i))
-            if not p_stem:
-                continue
-            bq = DiagBankQuestion(
-                competition_id=comp.id,
-                stem_text=p_stem,
-                choices_json=p_choices or None,
-                answer_key=p_answer or None,
-            )
-            db.session.add(bq)
-            db.session.flush()
-            bank_ids.append((bq.id, i))
-            if kp_primary:
-                if not db.session.query(DiagBankQuestionTag).filter_by(bank_question_id=bq.id, kp_id=kp_primary).first():
-                    db.session.add(DiagBankQuestionTag(bank_question_id=bq.id, kp_id=kp_primary, weight=1.0))
-        for bqid, link_order in bank_ids:
-            if not db.session.query(DiagQuestionBankLink).filter_by(question_id=q.id, bank_question_id=bqid).first():
-                db.session.add(DiagQuestionBankLink(question_id=q.id, bank_question_id=bqid, link_order=link_order))
-
-    try:
-        db.session.commit()
-        flash('导入成功：创建试卷 {} 个，更新 {} 题的知识点与练习题集。'.format(created_exams, updated_questions), 'success')
-        from_exam = request.form.get('from_exam') or request.args.get('from_exam')
-        if from_exam and str(from_exam).isdigit():
-            return redirect(url_for('diagnostic_admin.exam_detail', id=int(from_exam), csv_ok=1, updated=updated_questions))
-        return redirect(url_for('diagnostic_admin.import_csv'))
-    except Exception as e:
-        db.session.rollback()
-        flash('导入失败：{}'.format(str(e)), 'error')
-        from_exam = request.form.get('from_exam') or request.args.get('from_exam')
-        if from_exam and str(from_exam).isdigit():
-            return redirect(url_for('diagnostic_admin.exam_detail', id=int(from_exam), csv_err=1))
-        return redirect(url_for('diagnostic_admin.import_csv'))
+    """重定向到增强版导入（旧入口保留兼容）"""
+    from_exam = request.args.get('from_exam') or request.form.get('from_exam')
+    target = url_for('diagnostic_admin.import_csv_enhanced')
+    if from_exam:
+        target += '?from_exam=' + str(from_exam)
+    return redirect(target)
 
 
 @diagnostic_admin_bp.route('/questions/<int:id>/config_save', methods=['POST'])
@@ -852,7 +704,7 @@ def question_config(id):
     M = _models()
     DiagCompetition, DiagExam, DiagQuestion, DiagExamQuestion, DiagKnowledgePoint = M[0], M[1], M[2], M[3], M[4]
     DiagQuestionTag, DiagBankQuestion, DiagBankQuestionTag, DiagQuestionBankLink, DiagQuestionPracticeConfig = M[5], M[6], M[7], M[8], M[9]
-    Lesson, HomeworkQuestion = M[10], M[11]
+    Lesson, HomeworkQuestion = M[14], M[15]
     question = db.session.get(DiagQuestion, id)
     if question is None:
         abort(404)
@@ -960,7 +812,7 @@ def search_kp():
 def search_lessons():
     from flask import jsonify
     db = _db()
-    Lesson = _models()[10]
+    Lesson = _models()[14]
     q = (request.args.get('q') or '').strip()[:50]
     query = db.session.query(Lesson)
     if q:

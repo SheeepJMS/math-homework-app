@@ -11,7 +11,7 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn {{ 'btn-warning' if exam.is_published else 'btn-success' }}">{% if exam.is_published %}取消发布{% else %}发布{% endif %}</button>
             </form>
-            <a href="{{ url_for('diagnostic_admin.import_csv') }}?from_exam={{ exam.id }}" class="btn btn-outline-info me-2">上传 CSV 导入知识点</a>
+            <a href="{{ url_for('diagnostic_admin.import_csv_enhanced') }}?from_exam={{ exam.id }}" class="btn btn-outline-info me-2">上传 CSV 导入</a>
             <a href="{{ url_for('diagnostic_admin.exams') }}" class="btn btn-outline-secondary">返回列表</a>
         </div>
     </div>
@@ -175,7 +175,7 @@
                 {% if request.args.get('csv_ok') or request.args.get('csv_err') %}
                 <script>document.addEventListener('DOMContentLoaded', function(){ var el = document.getElementById('csvImportSection'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); });</script>
                 {% endif %}
-                <form id="diagCsvForm" method="post" action="{{ url_for('diagnostic_admin.import_csv') }}?from_exam={{ exam.id }}" enctype="multipart/form-data">
+                <form id="diagCsvForm" method="post" action="{{ url_for('diagnostic_admin.import_csv_enhanced') }}?from_exam={{ exam.id }}" enctype="multipart/form-data">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="from_exam" value="{{ exam.id }}">
                     <input type="file" name="file" accept=".csv" id="diagCsvFileInput" style="display:none;">
@@ -185,7 +185,7 @@
                     </div>
                     <button type="submit" class="btn btn-primary btn-sm" id="diagCsvSubmitBtn" disabled>导入 CSV</button>
                 </form>
-                <p class="text-muted small mb-0 mt-1"><strong>从本页导入：</strong>只需填 <code>q_index</code>（题号，从 0 开始：第1题=0，第2题=1）+ 知识点等列，无需与竞赛/试卷标题一致。列说明见 <a href="{{ url_for('diagnostic_admin.import_csv') }}" target="_blank">导入页</a>。</p>
+                <p class="text-muted small mb-0 mt-1"><strong>从本页导入：</strong>在 CSV 中填 <code>exam_id={{ exam.id }}</code> 或对应的 competition_name + exam_title，以及 <code>q_index</code>（题号从 1 开始）。列说明见 <a href="{{ url_for('diagnostic_admin.import_csv_enhanced') }}" target="_blank">导入页</a>。</p>
             </div>
             {% endif %}
         </div>
