@@ -620,13 +620,24 @@ def attempt(attempt_id):
 
 def _grade_attempt(attempt_id):
     db = _get_db()
-    from app import DiagAttemptAnswer, DiagQuestion
+    from app import DiagAttempt, DiagAttemptAnswer, DiagQuestion, DiagExamQuestion, DiagQuestionAnswer
+    att = db.session.get(DiagAttempt, attempt_id)
+    if not att:
+        return
     answers = db.session.query(DiagAttemptAnswer).filter_by(attempt_id=attempt_id).all()
+    qidx_map = {}
+    for eq in db.session.query(DiagExamQuestion).filter_by(exam_id=att.exam_id).all():
+        qidx_map[eq.question_id] = eq.q_index
+    imported = {r.q_index: r for r in db.session.query(DiagQuestionAnswer).filter_by(exam_id=att.exam_id).all()}
     for aa in answers:
         q = db.session.get(DiagQuestion, aa.question_id)
-        if not q:
-            continue
-        key = (q.answer_key or '').strip().upper()
+        q_index = qidx_map.get(aa.question_id)
+        imp = imported.get(q_index) if q_index is not None else None
+        key = None
+        if imp and imp.correct_answer:
+            key = (imp.correct_answer or '').strip().upper()
+        elif q:
+            key = (q.answer_key or '').strip().upper()
         ans = (aa.answer or '').strip().upper()
         aa.is_correct = (key == ans) if key else None
 
@@ -634,7 +645,8 @@ def _grade_attempt(attempt_id):
 def _build_practice_set(attempt_id):
     db = _get_db()
     from app import (
-        DiagAttempt, DiagAttemptAnswer, DiagQuestion, DiagQuestionTag, DiagQuestionPracticeConfig,
+        DiagAttempt, DiagAttemptAnswer, DiagQuestion, DiagExamQuestion, DiagQuestionTag,
+        DiagQuestionPracticeConfig, DiagQuestionPracticeItem, DiagExamQuestionPracticeConfig,
         DiagBankQuestion, DiagBankQuestionTag, DiagQuestionBankLink, DiagPracticeSet, DiagPracticeSetItem,
     )
     from sqlalchemy.sql import func
@@ -652,8 +664,35 @@ def _build_practice_set(attempt_id):
     db.session.flush()
     seen = set()
     idx = 0
+    qid_to_qindex = {}
+    for eq in db.session.query(DiagExamQuestion).filter_by(exam_id=att.exam_id).all():
+        qid_to_qindex[eq.question_id] = eq.q_index
 
     for qid in wrong_question_ids:
+        q_index = qid_to_qindex.get(qid)
+        csv_items = []
+        if q_index is not None:
+            csv_items = db.session.query(DiagQuestionPracticeItem).filter_by(
+                exam_id=att.exam_id, q_index=q_index
+            ).order_by(DiagQuestionPracticeItem.item_index).all()
+        if csv_items:
+            cfg = db.session.query(DiagExamQuestionPracticeConfig).filter_by(
+                exam_id=att.exam_id, q_index=q_index
+            ).first()
+            count = cfg.practice_count_default if cfg else 3
+            count = min(count, len(csv_items))
+            sample = random.sample(csv_items, count)
+            for pi in sample:
+                key = ('csv_practice', pi.id)
+                if key not in seen:
+                    seen.add(key)
+                    db.session.add(DiagPracticeSetItem(
+                        practice_set_id=ps.id, source_type='csv_practice',
+                        source_question_id=pi.id, q_index=idx
+                    ))
+                    idx += 1
+            continue
+
         config = db.session.query(DiagQuestionPracticeConfig).filter_by(question_id=qid).first()
         mode = (config.practice_mode if config else None) or 'bank_by_kp'
         count = (config.random_count if config else 3) if config else 3
@@ -1024,9 +1063,10 @@ def _parse_choices(choices_json):
 
 
 def _build_report_data(att, user, db):
-    """组装报告数据结构，缺失字段安全降级为 N/A 或空。"""
+    """组装报告数据结构，缺失字段安全降级为 N/A 或空。优先使用 CSV 导入的答案/解析/知识点。"""
     from sqlalchemy import func
-    from app import DiagAttempt, DiagAttemptAnswer, DiagExamQuestion, DiagQuestion, DiagQuestionTag, DiagKnowledgePoint, DiagPracticeSetItem
+    from app import (DiagAttempt, DiagAttemptAnswer, DiagExamQuestion, DiagQuestion, DiagQuestionTag,
+                     DiagKnowledgePoint, DiagPracticeSetItem, DiagQuestionAnswer, DiagQuestionKp)
     exam = att.exam
     competition = getattr(exam, 'competition', None) if exam else None
     answers = db.session.query(DiagAttemptAnswer).filter_by(attempt_id=att.id).order_by(DiagAttemptAnswer.question_id).all()
@@ -1088,6 +1128,8 @@ def _build_report_data(att, user, db):
             DiagAttemptAnswer.time_spent_ms.isnot(None)
         ).group_by(DiagAttemptAnswer.question_id).all():
             avg_time_by_q[r.question_id] = float(r.avg_ms or 0)
+    imported_answers = {r.q_index: r for r in db.session.query(DiagQuestionAnswer).filter_by(exam_id=att.exam_id).all()}
+    imported_kp = {r.q_index: r for r in db.session.query(DiagQuestionKp).filter_by(exam_id=att.exam_id).all()}
     for i, eq in enumerate(order):
         q = q_map.get(eq.question_id)
         aa = answers_dict.get(eq.question_id)
@@ -1102,13 +1144,26 @@ def _build_report_data(att, user, db):
         tags = db.session.query(DiagQuestionTag).filter_by(question_id=eq.question_id).order_by(DiagQuestionTag.manual_override.desc()).all()
         primary_kp = None
         secondary_kps = []
+        imp_ans = imported_answers.get(eq.q_index)
+        imp_kp = imported_kp.get(eq.q_index)
+        if imp_kp and imp_kp.kp_primary:
+            primary_kp = imp_kp.kp_primary
+            secondary_kps = [x.strip() for x in (imp_kp.kp_secondary or '').replace('；', ',').split(',') if x.strip()]
+            kp_id = 'imported:' + (imp_kp.kp_primary or '')
+            if kp_id not in kp_stats:
+                kp_stats[kp_id] = {'kp_name': imp_kp.kp_primary, 'wrong_count': 0, 'n_questions': 0, 'total_time_ms': 0}
+            kp_stats[kp_id]['n_questions'] += 1
+            kp_stats[kp_id]['total_time_ms'] += my_ms
+            if not is_blank and not is_correct:
+                kp_stats[kp_id]['wrong_count'] += 1
         for idx, t in enumerate(tags):
             kp = db.session.get(DiagKnowledgePoint, t.kp_id)
             kp_name = (kp.name_cn or kp.name_en or t.kp_id) if kp else str(t.kp_id)
-            if idx == 0:
-                primary_kp = kp_name
-            else:
-                secondary_kps.append(kp_name)
+            if not (imp_kp and imp_kp.kp_primary):
+                if not primary_kp:
+                    primary_kp = kp_name
+                elif idx > 0:
+                    secondary_kps.append(kp_name)
             kp_id = t.kp_id
             if kp_id not in kp_stats:
                 kp_stats[kp_id] = {'kp_name': kp_name, 'wrong_count': 0, 'n_questions': 0, 'total_time_ms': 0}
@@ -1118,17 +1173,19 @@ def _build_report_data(att, user, db):
                 kp_stats[kp_id]['wrong_count'] += 1
         if tags and not primary_kp:
             primary_kp = (tags[0].kp_id,)
+        correct_ans = (imp_ans.correct_answer or '').strip() if imp_ans and imp_ans.correct_answer else ((q.answer_key or '').strip() if q else '')
+        solution_txt = (imp_ans.solution_explain or '') if imp_ans and imp_ans.solution_explain else (q.solution_text if q else '')
         pq = {
             'qnum': i + 1,
             'is_correct': is_correct,
             'is_blank': is_blank,
             'time_sec': time_sec,
             'user_answer': (aa.answer or '').strip() if aa else '',
-            'correct_answer': (q.answer_key or '').strip() if q else '',
+            'correct_answer': correct_ans,
             'kp_primary_name': primary_kp or 'N/A',
             'kp_secondary_names': secondary_kps,
             'error_tag': getattr(aa, 'error_tag', None) or 'unknown',
-            'solution_text': q.solution_text if q else '',
+            'solution_text': solution_txt,
             'solution_image_url': getattr(q, 'solution_image_url', None) if q else None,
             'stem_text': q.stem_text if q else '',
             'stem_image_url': getattr(q, 'stem_image_url', None) if q else None,
@@ -1219,11 +1276,40 @@ def report(attempt_id):
 
 
 def _practice_questions_from_items(db, items):
-    from app import DiagBankQuestion
+    from app import DiagBankQuestion, DiagQuestionPracticeItem
     from app import Question as HomeworkQuestion
+    from types import SimpleNamespace
     questions = []
     for it in items:
-        if it.source_type == 'bank':
+        if it.source_type == 'csv_practice':
+            pi = db.session.get(DiagQuestionPracticeItem, it.source_question_id)
+            if not pi:
+                continue
+            choices = []
+            if pi.choices:
+                try:
+                    raw = json.loads(pi.choices)
+                    if isinstance(raw, dict):
+                        choices = [{'key': k, 'text': v} for k, v in raw.items()]
+                    elif isinstance(raw, list):
+                        choices = raw
+                except Exception:
+                    if ')' in (pi.choices or ''):
+                        for part in (pi.choices or '').split():
+                            if ')' in part:
+                                k = part.split(')')[0].strip()
+                                v = part.split(')', 1)[1].strip() if ')' in part else part
+                                choices.append({'key': k, 'text': v})
+            if not choices:
+                choices = [{'key': c, 'text': c} for c in ('A', 'B', 'C', 'D', 'E')]
+            fake_q = SimpleNamespace(stem_text=pi.stem, stem_image_url=None, content=pi.stem)
+            questions.append({
+                'item': it, 'source': 'csv_practice', 'question': fake_q,
+                'choices': choices,
+                'correct_answer': (pi.answer or '').strip() if pi else None,
+                'solution_text': pi.explain if pi else None,
+            })
+        elif it.source_type == 'bank':
             q = db.session.get(DiagBankQuestion, it.source_question_id)
             choices = []
             if q and q.choices_json:

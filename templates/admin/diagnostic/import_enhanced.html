@@ -1,0 +1,99 @@
+{% extends "admin/base.html" %}
+{% block admin_content %}
+<div class="container">
+    <h2 class="mb-4">诊断 CSV 增强导入</h2>
+    <p class="text-muted">一次性导入：<strong>每题答案 + 解析 + 知识点（一级/二级）+ 错题练习集（5–8 题）+ 默认练习数量</strong>。题目原题与图片仍按原流程在试卷详情页上传，CSV 仅补充结构化数据。</p>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="post" action="{{ url_for('diagnostic_admin.import_csv_enhanced') }}" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="file" name="file" accept=".csv" id="importFile" class="form-control mb-3">
+                <button type="submit" class="btn btn-primary">上传并预览</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>下载模板</span>
+            <a href="{{ url_for('diagnostic_admin.import_csv_enhanced_sample') }}" class="btn btn-outline-primary btn-sm" download>下载增强版 CSV 模板</a>
+        </div>
+        <div class="card-body small">
+            <p class="mb-1"><strong>定位列：</strong> competition_name / exam_title / exam_id（优先）, q_index（题号从 1 开始）</p>
+            <p class="mb-1"><strong>答案与解析：</strong> correct_answer, solution_explain, answer_format（mcq|numeric|text）</p>
+            <p class="mb-1"><strong>知识点：</strong> kp_primary, kp_secondary（逗号或分号分隔）</p>
+            <p class="mb-1"><strong>预留列：</strong> reserved_1, reserved_2, reserved_3（供未来扩展标签等）</p>
+            <p class="mb-1"><strong>练习：</strong> practice_count_default（默认 3）, practice_pool_size（5–8 校验）</p>
+            <p class="mb-0"><strong>练习题（每题 5–8 道）：</strong> p1_stem, p1_choices, p1_answer, p1_explain, p1_source … p8_*</p>
+        </div>
+    </div>
+
+    {% if preview and rows %}
+    <div class="card mb-4">
+        <div class="card-header">预览（共 {{ rows | length }} 行）</div>
+        <div class="card-body">
+            {% if parse_errors %}
+            <div class="alert alert-warning mb-3">
+                <strong>校验提示：</strong>
+                {% for row_idx, msg in parse_errors[:10] %}
+                <div>第 {{ row_idx }} 行: {{ msg }}</div>
+                {% endfor %}
+                {% if parse_errors | length > 10 %}<div>… 共 {{ parse_errors | length }} 条</div>{% endif %}
+            </div>
+            {% endif %}
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>行</th>
+                            <th>竞赛/试卷</th>
+                            <th>q_index</th>
+                            <th>答案</th>
+                            <th>知识点</th>
+                            <th>练习数</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in rows %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td>{{ r.comp_name }} / {{ r.exam_title or r.exam_id or '—' }}</td>
+                            <td>{{ r.q_index }}</td>
+                            <td>{{ r.correct_answer or '—' }}</td>
+                            <td>{{ r.kp_primary or '—' }}{% if r.kp_secondary %}；{{ r.kp_secondary }}{% endif %}</td>
+                            <td>{{ r.practice_count_default }}（题库 {{ r.practice_pool | length }} 道）</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <form method="post" action="{{ url_for('diagnostic_admin.import_csv_enhanced') }}" enctype="multipart/form-data" class="mt-3">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="confirm_write">
+                <div class="mb-2">
+                    <input type="file" name="file" accept=".csv" required class="form-control" id="confirmFileInput">
+                    <small class="text-muted">请重新选择同一 CSV 文件以确认导入</small>
+                </div>
+                <button type="submit" class="btn btn-success">确认写入</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+</div>
+<script>
+(function(){
+    var form = document.querySelector('form[action="{{ url_for("diagnostic_admin.import_csv_enhanced") }}"]');
+    if (form && form.querySelector('input[name="action"][value="confirm_write"]')) {
+        form.onsubmit = function() {
+            var fileInput = form.querySelector('input[name="file"]');
+            if (!fileInput || !fileInput.files || !fileInput.files[0]) {
+                alert('请重新选择 CSV 文件');
+                return false;
+            }
+            return true;
+        };
+    }
+})();
+</script>
+{% endblock %}

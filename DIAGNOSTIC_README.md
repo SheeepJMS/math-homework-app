@@ -73,6 +73,49 @@ flask db upgrade
 
 ## 四、CSV 导入列说明
 
+### 4.1 增强版 CSV 导入（推荐）
+
+**入口**：诊断管理 → 增强导入 CSV；或 `/admin/diagnostic/import_csv_enhanced`
+
+**流程**：题目原题与图片仍在试卷详情页上传；CSV 仅补充答案、解析、知识点、错题练习集。
+
+**步骤**：
+1. 在后台创建试卷并上传题目图片（按 q_index 顺序）
+2. 下载增强版模板：`/admin/diagnostic/import_csv_enhanced/sample`
+3. 填写 CSV 后上传 → 预览校验 → 确认写入
+
+**列说明**：
+
+| 列名 | 说明 |
+|------|------|
+| **定位** | |
+| competition_name | 竞赛名称（与 DiagCompetition.name 匹配） |
+| exam_title | 试卷标题 |
+| exam_id | 试卷 ID（有则优先，可省略 competition_name/exam_title） |
+| q_index | 题号，从 1 开始 |
+| **答案与解析** | |
+| correct_answer | 正确答案（A/B/C/D 或数值/文本） |
+| solution_explain | 解析文本 |
+| answer_format | 可选：mcq / numeric / text |
+| **知识点** | |
+| kp_primary | 一级分类 |
+| kp_secondary | 二级分类（逗号或分号分隔） |
+| **预留** | |
+| reserved_1, reserved_2, reserved_3 | 供未来扩展标签等 |
+| **练习** | |
+| practice_count_default | 默认抽题数（默认 3） |
+| practice_pool_size | 练习池大小（5–8，用于校验） |
+| **练习题（每题 5–8 道）** | |
+| p1_stem … p8_stem | 题干 |
+| p1_choices … p8_choices | 选项（JSON 或 "A)… B)…" 文本） |
+| p1_answer … p8_answer | 答案 |
+| p1_explain … p8_explain | 解析 |
+| p1_source … p8_source | 可选：generated / manual / homework_bank |
+
+**校验规则**：至少 5 道练习题（stem+answer），practice_count_default ≤ 练习题数。
+
+### 4.2 旧版 CSV 导入
+
 - **试卷**：`competition` / `competition_name`、`exam_title`、`time_limit_sec`（可选）
 - **题目**：`q_index`、`stem_text` / `stem`、`choices_json` 或 `choice_A`…、`answer_key` / `answer`、`solution_text` / `solution`、`kp_primary_id`、`kp_secondary_ids`（逗号分隔）、`practice_count_default`（默认 3）
 - **题库（每题最多 3 道）**：`bank_p1_stem`、`bank_p1_choices`、`bank_p1_answer`，以及 `bank_p2_*`、`bank_p3_*`

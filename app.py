@@ -557,6 +557,67 @@ class DiagQuestionBankLink(db.Model):
     bank_question = db.relationship('DiagBankQuestion', backref=db.backref('diagnostic_links', lazy=True))
 
 
+class DiagQuestionAnswer(db.Model):
+    """CSV 导入的每题答案与解析（按 exam+q_index 匹配）"""
+    __tablename__ = 'diag_question_answers'
+    exam_id = db.Column(db.Integer, db.ForeignKey('diag_exams.id', ondelete='CASCADE'), primary_key=True)
+    q_index = db.Column(db.Integer, primary_key=True)
+    correct_answer = db.Column(db.String(50), nullable=True)
+    solution_explain = db.Column(db.Text, nullable=True)
+    answer_format = db.Column(db.String(20), nullable=True)
+    reserved_1 = db.Column(db.String(255), nullable=True)
+    reserved_2 = db.Column(db.String(255), nullable=True)
+    reserved_3 = db.Column(db.String(255), nullable=True)
+    extra_json = db.Column(db.Text, nullable=True)
+    exam = db.relationship('DiagExam', backref=db.backref('imported_answers', lazy=True))
+
+
+class DiagQuestionKp(db.Model):
+    """CSV 导入的每题知识点（自由文本）"""
+    __tablename__ = 'diag_question_kp'
+    exam_id = db.Column(db.Integer, db.ForeignKey('diag_exams.id', ondelete='CASCADE'), primary_key=True)
+    q_index = db.Column(db.Integer, primary_key=True)
+    kp_primary = db.Column(db.String(120), nullable=True)
+    kp_secondary = db.Column(db.Text, nullable=True)
+    reserved_1 = db.Column(db.String(255), nullable=True)
+    reserved_2 = db.Column(db.String(255), nullable=True)
+    reserved_3 = db.Column(db.String(255), nullable=True)
+    extra_json = db.Column(db.Text, nullable=True)
+    exam = db.relationship('DiagExam', backref=db.backref('imported_kp', lazy=True))
+
+
+class DiagQuestionPracticeItem(db.Model):
+    """CSV 导入的错题练习集（每题 5-8 道）"""
+    __tablename__ = 'diag_question_practice_items'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    exam_id = db.Column(db.Integer, db.ForeignKey('diag_exams.id', ondelete='CASCADE'), nullable=False)
+    q_index = db.Column(db.Integer, nullable=False)
+    item_index = db.Column(db.Integer, nullable=False)
+    stem = db.Column(db.Text, nullable=False)
+    choices = db.Column(db.Text, nullable=True)
+    answer = db.Column(db.String(50), nullable=True)
+    explain = db.Column(db.Text, nullable=True)
+    source = db.Column(db.String(32), nullable=True)
+    reserved_1 = db.Column(db.String(255), nullable=True)
+    reserved_2 = db.Column(db.String(255), nullable=True)
+    reserved_3 = db.Column(db.String(255), nullable=True)
+    extra_json = db.Column(db.Text, nullable=True)
+    exam = db.relationship('DiagExam', backref=db.backref('practice_items_imported', lazy=True))
+
+
+class DiagExamQuestionPracticeConfig(db.Model):
+    """CSV 导入的每题默认练习数量"""
+    __tablename__ = 'diag_exam_question_practice_config'
+    exam_id = db.Column(db.Integer, db.ForeignKey('diag_exams.id', ondelete='CASCADE'), primary_key=True)
+    q_index = db.Column(db.Integer, primary_key=True)
+    practice_count_default = db.Column(db.Integer, nullable=False, default=3)
+    reserved_1 = db.Column(db.String(255), nullable=True)
+    reserved_2 = db.Column(db.String(255), nullable=True)
+    reserved_3 = db.Column(db.String(255), nullable=True)
+    extra_json = db.Column(db.Text, nullable=True)
+    exam = db.relationship('DiagExam', backref=db.backref('practice_config_imported', lazy=True))
+
+
 class DiagQuestionPracticeConfig(db.Model):
     __tablename__ = 'diag_question_practice_config'
     question_id = db.Column(db.Integer, db.ForeignKey('diag_questions.id'), primary_key=True)

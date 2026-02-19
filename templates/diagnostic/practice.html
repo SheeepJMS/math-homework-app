@@ -22,12 +22,12 @@
 </div>
 {% for row in result_rows %}
 <div class="card practice-card">
-    <div class="card-header">第 {{ loop.index }} 题 {% if row.source == 'bank' %}(题库){% else %}(作业){% endif %}</div>
+    <div class="card-header">第 {{ loop.index }} 题 {% if row.source == 'bank' %}(题库){% elif row.source == 'csv_practice' %}(巩固){% else %}(作业){% endif %}</div>
     <div class="card-body">
         {% if row.question %}
         <div class="mb-2">
             {% if row.source == 'bank' and row.question.stem_image_url %}<img src="{{ row.question.stem_image_url }}" class="img-fluid mb-2" alt="题目">{% endif %}
-            {% if row.source == 'bank' %}{{ row.question.stem_text | safe }}{% else %}{{ row.question.content | default('—') }}{% endif %}
+            {% if row.source == 'bank' or row.source == 'csv_practice' %}{{ row.question.stem_text | safe }}{% else %}{{ row.question.content | default('—') }}{% endif %}
         </div>
         <div class="result-row {% if row.is_correct %}correct{% else %}wrong{% endif %}">
             <p class="mb-1">你的答案：<strong>{{ row.user_answer }}</strong></p>
@@ -52,12 +52,12 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     {% for item in questions %}
     <div class="card practice-card">
-        <div class="card-header">第 {{ loop.index }} 题 {% if item.source == 'bank' %}(题库){% else %}(作业){% endif %}</div>
+        <div class="card-header">第 {{ loop.index }} 题 {% if item.source == 'bank' %}(题库){% elif item.source == 'csv_practice' %}(巩固){% else %}(作业){% endif %}</div>
         <div class="card-body">
             {% if item.question %}
             <div class="mb-3">
-                {% if item.source == 'bank' %}
-                    {% if item.question.stem_image_url %}<img src="{{ item.question.stem_image_url }}" class="img-fluid mb-2" alt="题目">{% endif %}
+                {% if item.source == 'bank' or item.source == 'csv_practice' %}
+                    {% if item.source == 'bank' and item.question.stem_image_url %}<img src="{{ item.question.stem_image_url }}" class="img-fluid mb-2" alt="题目">{% endif %}
                     {{ item.question.stem_text | safe }}
                 {% else %}
                     {{ item.question.content | default('—') }}

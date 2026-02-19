@@ -16,6 +16,14 @@
             </form>
         </div>
     </div>
+    <div class="card mb-4">
+        <div class="card-header">增强版导入（推荐）</div>
+        <div class="card-body">
+            <p class="mb-2">支持一次性导入：<strong>每题答案 + 解析 + 知识点 + 错题练习集（5–8 题）</strong>。</p>
+            <a href="{{ url_for('diagnostic_admin.import_csv_enhanced') }}" class="btn btn-primary">增强版 CSV 导入</a>
+            <a href="{{ url_for('diagnostic_admin.import_csv_enhanced_sample') }}" class="btn btn-outline-secondary btn-sm ms-2">下载模板</a>
+        </div>
+    </div>
     <div class="card">
         <div class="card-header">CSV 列说明（仅用于知识点与练习题集）</div>
         <div class="card-body small">

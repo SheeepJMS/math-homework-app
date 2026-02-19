@@ -5,7 +5,8 @@
         <h2>诊断试卷管理</h2>
         <div>
             <a href="{{ url_for('diagnostic_admin.competitions') }}" class="btn btn-outline-secondary me-2">竞赛与分值设置</a>
-            <a href="{{ url_for('diagnostic_admin.import_csv') }}" class="btn btn-primary">导入 CSV</a>
+            <a href="{{ url_for('diagnostic_admin.import_csv_enhanced') }}" class="btn btn-primary me-2">增强导入 CSV</a>
+            <a href="{{ url_for('diagnostic_admin.import_csv') }}" class="btn btn-outline-primary">导入 CSV（旧）</a>
         </div>
     </div>
 
