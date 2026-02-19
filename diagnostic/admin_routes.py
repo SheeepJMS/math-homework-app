@@ -500,34 +500,40 @@ def _parse_enhanced_csv(raw):
     return rows, errors
 
 
-def _write_csv_rows(db, rows, M):
-    """将解析后的 CSV 行写入数据库，返回成功更新的题数。不提交，由调用方 commit。"""
+def _write_csv_rows(db, rows, M, force_exam_id=None):
+    """将解析后的 CSV 行写入数据库，返回成功更新的题数。不提交，由调用方 commit。
+    force_exam_id: 若提供（如从试卷详情页上传），则所有行强制使用该试卷，忽略 CSV 的 competition_name/exam_title。"""
     DiagCompetition, DiagExam, DiagExamQuestion = M[0], M[1], M[3]
     DiagQuestionAnswer, DiagQuestionKp, DiagQuestionPracticeItem, DiagExamQuestionPracticeConfig = M[10], M[11], M[12], M[13]
     updated = 0
+    forced_exam = None
+    if force_exam_id and str(force_exam_id).isdigit():
+        forced_exam = db.session.get(DiagExam, int(force_exam_id))
     for r in rows:
-        comp_name = r['comp_name']
-        exam_title = r['exam_title']
-        exam_id_val = r['exam_id']
+        exam = forced_exam
         q_index = r['q_index']
-        if not comp_name and not exam_id_val:
-            continue
-        comp = db.session.query(DiagCompetition).filter(DiagCompetition.name == comp_name).first() if comp_name else None
-        if not comp and exam_id_val:
-            exam = db.session.get(DiagExam, int(exam_id_val)) if str(exam_id_val).isdigit() else None
-            if exam:
-                comp = db.session.get(DiagCompetition, exam.competition_id)
-        if not comp:
-            continue
-        exam = None
-        if exam_id_val and str(exam_id_val).isdigit():
-            exam = db.session.get(DiagExam, int(exam_id_val))
-        if not exam:
-            exam = db.session.query(DiagExam).filter_by(
-                competition_id=comp.id, title=exam_title
-            ).first()
-        if not exam:
-            continue
+        if exam is None:
+            comp_name = r['comp_name']
+            exam_title = r['exam_title']
+            exam_id_val = r['exam_id']
+            if not comp_name and not exam_id_val:
+                continue
+            comp = db.session.query(DiagCompetition).filter(DiagCompetition.name == comp_name).first() if comp_name else None
+            if not comp and exam_id_val:
+                exam = db.session.get(DiagExam, int(exam_id_val)) if str(exam_id_val).isdigit() else None
+                if exam:
+                    comp = db.session.get(DiagCompetition, exam.competition_id)
+            if not comp and exam is None:
+                continue
+            if exam is None:
+                if exam_id_val and str(exam_id_val).isdigit():
+                    exam = db.session.get(DiagExam, int(exam_id_val))
+                if not exam and comp:
+                    exam = db.session.query(DiagExam).filter_by(
+                        competition_id=comp.id, title=exam_title
+                    ).first()
+            if not exam:
+                continue
         eq = db.session.query(DiagExamQuestion).filter_by(
             exam_id=exam.id, q_index=q_index
         ).first()
@@ -626,7 +632,7 @@ def import_csv_enhanced():
 
         from_exam = request.form.get('from_exam') or request.args.get('from_exam')
         if from_exam and str(from_exam).isdigit():
-            updated = _write_csv_rows(db, rows, M)
+            updated = _write_csv_rows(db, rows, M, force_exam_id=int(from_exam))
             try:
                 db.session.commit()
                 flash('导入成功，已更新 {} 题。'.format(updated), 'success')
@@ -648,7 +654,9 @@ def import_csv_enhanced():
         if not rows:
             flash('预览已过期，请重新上传 CSV 文件', 'error')
             return redirect(url_for('diagnostic_admin.import_csv_enhanced'))
-        updated = _write_csv_rows(db, rows, M)
+        from_exam_confirm = request.args.get('from_exam') or request.form.get('from_exam')
+        force_id = int(from_exam_confirm) if from_exam_confirm and str(from_exam_confirm).isdigit() else None
+        updated = _write_csv_rows(db, rows, M, force_exam_id=force_id)
         try:
             db.session.commit()
             flash('导入成功，已更新 {} 题。'.format(updated), 'success')
