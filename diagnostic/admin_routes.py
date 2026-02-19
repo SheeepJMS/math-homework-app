@@ -632,8 +632,9 @@ def _write_csv_rows(db, rows, M, force_exam_id=None):
         elif not eq:
             continue
         updated += 1
-        res1, res2, res3 = r.get('reserved_1') or None, r.get('reserved_2') or None, r.get('reserved_3') or None
         needs_img = bool(r.get('needs_image', False))
+        res1 = '1' if needs_img else (r.get('reserved_1') or None)
+        res2, res3 = r.get('reserved_2') or None, r.get('reserved_3') or None
         ans_row = db.session.query(DiagQuestionAnswer).filter_by(
             exam_id=exam.id, q_index=q_index
         ).first()
@@ -641,7 +642,6 @@ def _write_csv_rows(db, rows, M, force_exam_id=None):
             ans_row.correct_answer = r['correct_answer'] or None
             ans_row.solution_explain = r['solution_explain'] or None
             ans_row.answer_format = r['answer_format'] or None
-            ans_row.needs_image = needs_img
             ans_row.reserved_1, ans_row.reserved_2, ans_row.reserved_3 = res1, res2, res3
         else:
             db.session.add(DiagQuestionAnswer(
@@ -649,7 +649,6 @@ def _write_csv_rows(db, rows, M, force_exam_id=None):
                 correct_answer=r['correct_answer'] or None,
                 solution_explain=r['solution_explain'] or None,
                 answer_format=r['answer_format'] or None,
-                needs_image=needs_img,
                 reserved_1=res1, reserved_2=res2, reserved_3=res3,
             ))
         kp_row = db.session.query(DiagQuestionKp).filter_by(
@@ -882,7 +881,7 @@ def question_config(id):
         csv_answer = db.session.query(DiagQuestionAnswer).filter_by(
             exam_id=exam_link.exam_id, q_index=exam_link.q_index
         ).first()
-        if csv_answer and getattr(csv_answer, 'needs_image', False):
+        if csv_answer and (csv_answer.reserved_1 or '').strip() == '1':
             needs_image = True
     return render_template(
         'admin/diagnostic/question_config.html',
