@@ -45,6 +45,29 @@ def admin_required(f):
     return wrapped
 
 
+def _exam_image_status(db):
+    """返回 {exam_id: 'ok'|'need'}：绿色=图齐全，红色=有题需补图"""
+    from app import DiagExamQuestion, DiagQuestionAnswer, DiagQuestion
+    status = {}
+    needs_img = db.session.query(DiagQuestionAnswer).filter(
+        (DiagQuestionAnswer.reserved_1 or '').strip() == '1'
+    ).all()
+    for ans in needs_img:
+        eq = db.session.query(DiagExamQuestion).filter_by(
+            exam_id=ans.exam_id, q_index=ans.q_index
+        ).first()
+        if not eq:
+            continue
+        q = db.session.get(DiagQuestion, eq.question_id)
+        has_img = q and (q.stem_image_url or q.solution_image_url)
+        eid = ans.exam_id
+        if eid not in status:
+            status[eid] = 'ok'
+        if not has_img:
+            status[eid] = 'need'
+    return status
+
+
 @diagnostic_admin_bp.route('/exams')
 @admin_required
 def exams():
@@ -56,6 +79,7 @@ def exams():
     # 层级：学科 → 大类 → 具体竞赛 → [试卷(年份+标题)]
     from collections import OrderedDict
     hierarchy = OrderedDict()
+    exam_image_status = _exam_image_status(db)
     for c in comps:
         sub_key = (c.subject or '未分类', c.category or '未分类')
         if sub_key not in hierarchy:
@@ -72,6 +96,7 @@ def exams():
     return render_template('admin/diagnostic/exams.html',
         hierarchy=hierarchy,
         existing_comps=existing_comps,
+        exam_image_status=exam_image_status,
     )
 
 
@@ -165,6 +190,40 @@ def exam_publish(id):
     db.session.commit()
     flash('已{}发布'.format('' if exam.is_published else '取消'), 'success')
     return redirect(url_for('diagnostic_admin.exam_detail', id=id))
+
+
+@diagnostic_admin_bp.route('/competitions/<int:comp_id>/bulk_publish', methods=['POST'])
+@admin_required
+def competition_bulk_publish(comp_id):
+    """该竞赛下全部年份试卷一键发布"""
+    db = _db()
+    DiagCompetition, DiagExam = _models()[0], _models()[1]
+    comp = db.session.get(DiagCompetition, comp_id)
+    if comp is None:
+        abort(404)
+    exams = db.session.query(DiagExam).filter_by(competition_id=comp_id).all()
+    for e in exams:
+        e.is_published = True
+    db.session.commit()
+    flash('已发布「{}」下 {} 份试卷'.format(comp.name, len(exams)), 'success')
+    return redirect(url_for('diagnostic_admin.exams'))
+
+
+@diagnostic_admin_bp.route('/competitions/<int:comp_id>/bulk_unpublish', methods=['POST'])
+@admin_required
+def competition_bulk_unpublish(comp_id):
+    """该竞赛下全部年份试卷一键取消发布"""
+    db = _db()
+    DiagCompetition, DiagExam = _models()[0], _models()[1]
+    comp = db.session.get(DiagCompetition, comp_id)
+    if comp is None:
+        abort(404)
+    exams = db.session.query(DiagExam).filter_by(competition_id=comp_id).all()
+    for e in exams:
+        e.is_published = False
+    db.session.commit()
+    flash('已取消发布「{}」下 {} 份试卷'.format(comp.name, len(exams)), 'success')
+    return redirect(url_for('diagnostic_admin.exams'))
 
 
 @diagnostic_admin_bp.route('/exams/<int:id>/delete', methods=['POST'])
