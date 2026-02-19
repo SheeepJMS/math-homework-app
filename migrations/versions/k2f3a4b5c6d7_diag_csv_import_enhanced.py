@@ -17,9 +17,13 @@ depends_on = None
 
 
 def _create(name, fn):
+    conn = op.get_bind()
+    s = conn.begin_nested()
     try:
         fn()
+        s.commit()
     except ProgrammingError as e:
+        s.rollback()
         if 'already exists' not in str(e).lower():
             raise
 

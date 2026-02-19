@@ -16,9 +16,13 @@ depends_on = None
 
 
 def upgrade():
+    conn = op.get_bind()
+    s = conn.begin_nested()
     try:
         op.add_column('diag_users', sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.text('true')))
+        s.commit()
     except ProgrammingError as e:
+        s.rollback()
         if 'already exists' not in str(e).lower():
             raise
 

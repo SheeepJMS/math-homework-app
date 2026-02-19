@@ -16,9 +16,13 @@ depends_on = None
 
 
 def upgrade():
+    conn = op.get_bind()
+    s = conn.begin_nested()
     try:
         op.add_column('diag_competitions', sa.Column('blank_bonus', sa.Integer(), nullable=True, server_default=sa.text('0')))
+        s.commit()
     except ProgrammingError as e:
+        s.rollback()
         if 'already exists' not in str(e).lower():
             raise
 

@@ -16,9 +16,13 @@ depends_on = None
 
 
 def _add(col):
+    conn = op.get_bind()
+    s = conn.begin_nested()
     try:
         op.add_column('diag_competitions', col)
+        s.commit()
     except ProgrammingError as e:
+        s.rollback()
         if 'already exists' not in str(e).lower():
             raise
 
