@@ -728,6 +728,7 @@ def question_config(id):
     M = _models()
     DiagCompetition, DiagExam, DiagQuestion, DiagExamQuestion, DiagKnowledgePoint = M[0], M[1], M[2], M[3], M[4]
     DiagQuestionTag, DiagBankQuestion, DiagBankQuestionTag, DiagQuestionBankLink, DiagQuestionPracticeConfig = M[5], M[6], M[7], M[8], M[9]
+    DiagQuestionPracticeItem = M[12]
     Lesson, HomeworkQuestion = M[14], M[15]
     question = db.session.get(DiagQuestion, id)
     if question is None:
@@ -780,6 +781,11 @@ def question_config(id):
         else:
             secondary_kps.append(t.kp_id)
     exam_link = db.session.query(DiagExamQuestion).filter(DiagExamQuestion.question_id == id).first()
+    csv_practice_items = []
+    if exam_link:
+        csv_practice_items = db.session.query(DiagQuestionPracticeItem).filter_by(
+            exam_id=exam_link.exam_id, q_index=exam_link.q_index
+        ).order_by(DiagQuestionPracticeItem.item_index).all()
     bank_items = []
     for link in db.session.query(DiagQuestionBankLink).filter_by(question_id=id).order_by(DiagQuestionBankLink.link_order).all():
         bq = db.session.get(DiagBankQuestion, link.bank_question_id)
@@ -804,6 +810,7 @@ def question_config(id):
         primary_kp=primary_kp,
         secondary_kps=','.join(secondary_kps[:2]),
         exam_id=exam_link.exam_id if exam_link else None,
+        csv_practice_items=csv_practice_items,
         bank_items=bank_items,
         hw_curated_list=hw_curated_list,
     )

@@ -57,7 +57,17 @@
     <div class="card mt-4">
         <div class="card-header">已关联的错题/练习题内容</div>
         <div class="card-body small">
-            {% if bank_items %}
+            {% if csv_practice_items %}
+            <p class="text-muted mb-2">以下为 CSV 增强导入（p1_stem 等列）的错题练习集，作答错题后会推送给学生练习：</p>
+            <ol class="mb-0">
+                {% for item in csv_practice_items %}
+                <li class="mb-2">
+                    <span class="fw-bold">题干：</span>{{ (item.stem or '')[:200] }}{% if (item.stem or '')|length > 200 %}...{% endif %}
+                    {% if item.answer %}<span class="ms-2">答案：{{ item.answer }}</span>{% endif %}
+                </li>
+                {% endfor %}
+            </ol>
+            {% elif bank_items %}
             <p class="text-muted mb-2">以下为 CSV 或「固定 3 题」模式导入的题库小题，作答错题后会推送给学生练习：</p>
             <ol class="mb-0">
                 {% for order, bq in bank_items %}
@@ -79,7 +89,7 @@
             {% elif config and config.practice_mode == 'homework_assignment_random' %}
             <p class="text-muted mb-0">从所选作业题集中随机抽取题目作为练习。未固定具体题号。</p>
             {% else %}
-            <p class="text-muted mb-0">暂无关联的错题/练习题。可通过 CSV 导入 bank_p1_stem 等列，或选择「固定使用导入的 3 题」后重新导入。</p>
+            <p class="text-muted mb-0">暂无关联的错题/练习题。可通过 CSV 增强导入（p1_stem、p2_stem 等列）或选择「固定使用导入的 3 题」后重新导入。</p>
             {% endif %}
         </div>
     </div>
