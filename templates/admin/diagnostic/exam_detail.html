@@ -11,7 +11,6 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn {{ 'btn-warning' if exam.is_published else 'btn-success' }}">{% if exam.is_published %}取消发布{% else %}发布{% endif %}</button>
             </form>
-            <a href="{{ url_for('diagnostic_admin.import_csv_enhanced') }}?from_exam={{ exam.id }}" class="btn btn-outline-info me-2">上传 CSV 导入</a>
             <a href="{{ url_for('diagnostic_admin.exams') }}" class="btn btn-outline-secondary">返回列表</a>
         </div>
     </div>
@@ -85,24 +84,43 @@
         </div>
     </div>
 
-    <!-- 批量上传：CSV 创建题目 -->
-    <div class="card mb-4 upload-mode-card" data-mode="bulk" style="display:none;">
-        <div class="card-header bg-info text-white">
-            <h5 class="mb-0">批量上传：CSV 创建题目</h5>
+    <!-- 统一 CSV 导入（放于主体区域，支持拖拽/粘贴） -->
+    <div class="card mb-4">
+        <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">CSV 导入</h5>
+            <a href="{{ url_for('diagnostic_admin.csv_format') }}" target="_blank" class="btn btn-light btn-sm">查看格式说明</a>
         </div>
         <div class="card-body">
-            <p class="text-muted small">选择批量模式时，用 CSV 一次性创建所有题目（需含 <code>stem_text</code> 列）。创建后可下方列表中为每题粘贴题目图、解析图。</p>
-            <form id="diagBulkCsvForm" method="post" action="{{ url_for('diagnostic_admin.import_csv_enhanced') }}?from_exam={{ exam.id }}" enctype="multipart/form-data">
+            <div class="mb-3">
+                <p class="text-muted small mb-1"><strong>说明：</strong></p>
+                <ul class="text-muted small mb-0 ps-3">
+                    <li><strong>逐个模式</strong>（先粘贴试题图）：CSV 不采用 stem_text，只导入答案、解析、知识点、错题练习题。</li>
+                    <li><strong>批量模式</strong>（无题目时）：CSV 含 stem_text 可创建题目，导入答案、解析、知识点、题库等全部内容。</li>
+                </ul>
+            </div>
+            <form id="unifiedCsvForm" method="post" action="{{ url_for('diagnostic_admin.import_csv_enhanced') }}?from_exam={{ exam.id }}" enctype="multipart/form-data">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="from_exam" value="{{ exam.id }}">
-                <input type="file" name="file" accept=".csv" id="diagBulkCsvFileInput" style="display:none;">
-                <div class="csv-drop-zone border border-2 border-dashed rounded p-4 mb-2 text-center bulk-csv-zone" id="diagBulkCsvDropZone" style="min-height:100px; cursor:pointer;">
-                    <span class="text-muted" id="diagBulkCsvPlaceholder">将 CSV 拖拽到此处或点击选择，需含 stem_text、correct_answer、solution_explain 等列</span>
-                    <span class="d-none text-primary fw-bold" id="diagBulkCsvFileName"></span>
+                <input type="file" name="file" accept=".csv" id="unifiedCsvFileInput" style="display:none;">
+                <div class="csv-drop-zone border border-2 border-dashed rounded p-4 mb-3 text-center" id="unifiedCsvDropZone" style="min-height:120px; cursor:pointer; background:#f8f9fa;">
+                    <span class="text-muted d-block mb-1" id="unifiedCsvPlaceholder">将 CSV 文件拖拽到此处，或点击选择文件</span>
+                    <span class="d-none text-primary fw-bold" id="unifiedCsvFileName"></span>
                 </div>
-                <button type="submit" class="btn btn-info" id="diagBulkCsvSubmitBtn" disabled>导入 CSV 创建题目</button>
+                <div class="mb-3">
+                    <label class="form-label small text-muted">或在此粘贴 CSV 内容（Ctrl+V）</label>
+                    <textarea id="unifiedCsvPaste" class="form-control font-monospace small" rows="5" placeholder="粘贴 CSV 表格内容于此..." style="font-size:12px;"></textarea>
+                </div>
+                <div class="d-flex gap-2 align-items-center">
+                    <button type="submit" class="btn btn-info" id="unifiedCsvSubmitBtn">导入 CSV</button>
+                    <a href="{{ url_for('diagnostic_admin.import_csv_enhanced_sample') }}" class="btn btn-outline-secondary btn-sm">下载模板</a>
+                </div>
             </form>
         </div>
+    </div>
+
+    <!-- 批量模式：提示（题目创建后下方可粘贴图片） -->
+    <div class="upload-mode-card" data-mode="bulk" style="display:none;">
+        <p class="text-muted small mb-3">批量模式：上方 CSV 导入后创建题目，下方题目列表中可粘贴题干图、解析图。</p>
     </div>
 
     <!-- 题目列表与 CSV 导入（答案、知识点、题库均通过 CSV 录入） -->
@@ -199,36 +217,23 @@
                 {% endif %}
             </div>
 
-            <div class="mt-4 border-top pt-3" id="csvImportSection">
-                <h6>CSV 导入（答案、解析、知识点、错题练习题）</h6>
+            {% if request.args.get('csv_ok') or request.args.get('csv_err') %}
+            <div class="mt-3" id="csvResultSection">
                 {% if request.args.get('csv_ok') %}
                 <div class="alert alert-success alert-dismissible fade show" role="alert">
-                    <strong>导入成功。</strong>已更新 {{ request.args.get('updated', 0) }} 题的知识点与练习题集。
-                    <span class="d-block small mt-1">列表中「主知识点」会更新；点「查看详情」可看每题完整配置。CSV 的 q_index 从 1 开始（第1题=1、第2题=2）。</span>
+                    <strong>导入成功。</strong>已更新 {{ request.args.get('updated', 0) }} 题。
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
                 {% endif %}
                 {% if request.args.get('csv_err') %}
                 <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                    <strong>导入失败。</strong>请查看页面顶部错误提示或检查 CSV 格式。
+                    <strong>导入失败。</strong>请检查 CSV 格式，<a href="{{ url_for('diagnostic_admin.csv_format') }}" target="_blank">查看格式说明</a>。
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
                 {% endif %}
-                {% if request.args.get('csv_ok') or request.args.get('csv_err') %}
-                <script>document.addEventListener('DOMContentLoaded', function(){ var el = document.getElementById('csvImportSection'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); });</script>
-                {% endif %}
-                <form id="diagCsvForm" method="post" action="{{ url_for('diagnostic_admin.import_csv_enhanced') }}?from_exam={{ exam.id }}" enctype="multipart/form-data">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="hidden" name="from_exam" value="{{ exam.id }}">
-                    <input type="file" name="file" accept=".csv" id="diagCsvFileInput" style="display:none;">
-                    <div class="csv-drop-zone border border-2 border-dashed rounded p-3 mb-2 text-center" id="diagCsvDropZone" style="min-height:80px; cursor:pointer;">
-                        <span class="text-muted" id="diagCsvPlaceholder">将 CSV 文件拖拽到此处，或点击选择文件</span>
-                        <span class="d-none text-primary fw-bold" id="diagCsvFileName"></span>
-                    </div>
-                    <button type="submit" class="btn btn-primary btn-sm" id="diagCsvSubmitBtn" disabled>导入 CSV</button>
-                </form>
-                <p class="text-muted small mb-0 mt-1"><strong>从本页导入：</strong>在 CSV 中填 <code>exam_id={{ exam.id }}</code> 或对应的 competition_name + exam_title，以及 <code>q_index</code>（题号从 1 开始）。<strong>逐个模式</strong>不采用 stem_text，只导入答案、解析、知识点、题库；<strong>批量模式</strong>已通过上方 CSV 创建。列说明见 <a href="{{ url_for('diagnostic_admin.import_csv_enhanced') }}" target="_blank">导入页</a>。</p>
+                <script>document.addEventListener('DOMContentLoaded', function(){ var el = document.getElementById('unifiedCsvForm'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); });</script>
             </div>
+            {% endif %}
             {% else %}
             <p class="text-muted mb-0">暂无题目。逐个模式请先完成第一步粘贴试题；批量模式请先在上方选择批量上传并导入 CSV 创建题目。</p>
             {% endif %}
@@ -494,69 +499,62 @@ body.mode-one #bulkImageConfirmSection { display: none !important; }
         attachLessonSearch(inp, hid);
     });
 
-    // CSV 拖拽导入
+    // 统一 CSV 导入：拖拽、点击、粘贴
     (function() {
-        var zone = document.getElementById('diagCsvDropZone');
-        var input = document.getElementById('diagCsvFileInput');
-        var placeholder = document.getElementById('diagCsvPlaceholder');
-        var fileName = document.getElementById('diagCsvFileName');
-        var submitBtn = document.getElementById('diagCsvSubmitBtn');
-        if (!zone || !input) return;
+        var zone = document.getElementById('unifiedCsvDropZone');
+        var fileInput = document.getElementById('unifiedCsvFileInput');
+        var pasteArea = document.getElementById('unifiedCsvPaste');
+        var placeholder = document.getElementById('unifiedCsvPlaceholder');
+        var fileName = document.getElementById('unifiedCsvFileName');
+        var submitBtn = document.getElementById('unifiedCsvSubmitBtn');
+        var form = document.getElementById('unifiedCsvForm');
+        if (!form) return;
+        function updateSubmitState() {
+            var hasFile = fileInput.files && fileInput.files[0];
+            var hasPaste = pasteArea && pasteArea.value.trim().length > 0;
+            if (submitBtn) submitBtn.disabled = !hasFile && !hasPaste;
+        }
         function setFile(file) {
-            if (file && file.name && (file.name.toLowerCase().endsWith('.csv') || file.type === 'text/csv')) {
+            if (file && (file.name.toLowerCase().endsWith('.csv') || file.type === 'text/csv' || file.type === 'text/plain')) {
                 var dt = new DataTransfer();
                 dt.items.add(file);
-                input.files = dt.files;
-                placeholder.classList.add('d-none');
-                fileName.textContent = file.name;
-                fileName.classList.remove('d-none');
-                submitBtn.disabled = false;
+                fileInput.files = dt.files;
+                if (placeholder) placeholder.classList.add('d-none');
+                if (fileName) { fileName.textContent = file.name || 'pasted.csv'; fileName.classList.remove('d-none'); }
+                if (pasteArea) pasteArea.value = '';
             }
+            updateSubmitState();
         }
-        zone.addEventListener('click', function() { input.click(); });
-        zone.addEventListener('dragover', function(e) { e.preventDefault(); e.stopPropagation(); zone.classList.add('bg-light'); });
-        zone.addEventListener('dragleave', function(e) { e.preventDefault(); zone.classList.remove('bg-light'); });
-        zone.addEventListener('drop', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            zone.classList.remove('bg-light');
-            var f = e.dataTransfer.files[0];
-            if (f) setFile(f);
+        if (zone) {
+            zone.addEventListener('click', function() { fileInput.click(); });
+            zone.addEventListener('dragover', function(e) { e.preventDefault(); zone.classList.add('bg-light'); });
+            zone.addEventListener('dragleave', function(e) { zone.classList.remove('bg-light'); });
+            zone.addEventListener('drop', function(e) {
+                e.preventDefault();
+                zone.classList.remove('bg-light');
+                if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+            });
+        }
+        if (fileInput) fileInput.addEventListener('change', function() {
+            if (fileInput.files && fileInput.files[0]) setFile(fileInput.files[0]);
+            else updateSubmitState();
         });
-        input.addEventListener('change', function() {
-            if (input.files && input.files[0]) setFile(input.files[0]);
-        });
-    })();
-
-    // 批量模式：CSV 拖拽
-    (function() {
-        var zone = document.getElementById('diagBulkCsvDropZone');
-        var input = document.getElementById('diagBulkCsvFileInput');
-        var ph = document.getElementById('diagBulkCsvPlaceholder');
-        var fn = document.getElementById('diagBulkCsvFileName');
-        var btn = document.getElementById('diagBulkCsvSubmitBtn');
-        if (!zone || !input) return;
-        function setFile(file) {
-            if (file && file.name && file.name.toLowerCase().endsWith('.csv')) {
-                var dt = new DataTransfer();
-                dt.items.add(file);
-                input.files = dt.files;
-                ph.classList.add('d-none');
-                fn.textContent = file.name;
-                fn.classList.remove('d-none');
-                btn.disabled = false;
+        if (pasteArea) pasteArea.addEventListener('input', updateSubmitState);
+        updateSubmitState();
+        form.addEventListener('submit', function(e) {
+            var pasted = pasteArea && pasteArea.value.trim();
+            if (pasted && (!fileInput.files || !fileInput.files[0])) {
+                e.preventDefault();
+                var blob = new Blob([pasted], { type: 'text/csv;charset=utf-8' });
+                var fd = new FormData();
+                fd.append('csrf_token', form.querySelector('input[name="csrf_token"]').value);
+                fd.append('from_exam', form.querySelector('input[name="from_exam"]').value);
+                fd.append('file', blob, 'pasted.csv');
+                if (submitBtn) submitBtn.disabled = true;
+                fetch(form.action, { method: 'POST', body: fd, redirect: 'follow' })
+                    .then(function(r) { window.location.href = r.url; })
+                    .catch(function() { if (submitBtn) submitBtn.disabled = false; alert('导入失败'); });
             }
-        }
-        zone.addEventListener('click', function() { input.click(); });
-        zone.addEventListener('dragover', function(e) { e.preventDefault(); zone.classList.add('bg-light'); });
-        zone.addEventListener('dragleave', function(e) { zone.classList.remove('bg-light'); });
-        zone.addEventListener('drop', function(e) {
-            e.preventDefault();
-            zone.classList.remove('bg-light');
-            if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
-        });
-        input.addEventListener('change', function() {
-            if (input.files && input.files[0]) setFile(input.files[0]);
         });
     })();
 

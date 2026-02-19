@@ -464,6 +464,13 @@ def import_csv_sample():
     return redirect(url_for('diagnostic_admin.import_csv_enhanced_sample'))
 
 
+@diagnostic_admin_bp.route('/csv_format')
+@admin_required
+def csv_format():
+    """CSV 格式说明页"""
+    return render_template('admin/diagnostic/csv_format.html')
+
+
 @diagnostic_admin_bp.route('/import_csv_enhanced/sample')
 @admin_required
 def import_csv_enhanced_sample():

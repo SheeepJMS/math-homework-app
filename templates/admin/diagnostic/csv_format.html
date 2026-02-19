@@ -1,0 +1,41 @@
+{% extends "admin/base.html" %}
+{% block admin_content %}
+<div class="container">
+    <h2 class="mb-4">诊断 CSV 格式说明</h2>
+    <p class="text-muted mb-4">编码需为 <strong>UTF-8</strong>。从试卷详情页导入时，填 <code>exam_id</code> 或 <code>competition_name</code>+<code>exam_title</code>，以及 <code>q_index</code>（题号从 1 开始）。</p>
+
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>下载模板</span>
+            <a href="{{ url_for('diagnostic_admin.import_csv_enhanced_sample') }}" class="btn btn-outline-primary btn-sm">下载 CSV 模板</a>
+        </div>
+        <div class="card-body">
+            <h6 class="mb-3">列说明</h6>
+            <table class="table table-sm table-bordered">
+                <thead><tr><th>列名</th><th>说明</th></tr></thead>
+                <tbody>
+                    <tr><td><code>competition_name</code></td><td>竞赛名称（与 DiagCompetition.name 匹配）</td></tr>
+                    <tr><td><code>exam_title</code></td><td>试卷标题</td></tr>
+                    <tr><td><code>exam_id</code></td><td>试卷 ID（有则优先，可省略 competition_name/exam_title）</td></tr>
+                    <tr><td><code>q_index</code></td><td>题号，从 1 开始</td></tr>
+                    <tr><td><code>stem_text</code></td><td><strong>题干文本</strong>，批量模式（无题目时）必填以创建题目；逐个模式不采用</td></tr>
+                    <tr><td><code>correct_answer</code></td><td>正确答案（A/B/C/D/E 或数值/文本）</td></tr>
+                    <tr><td><code>solution_explain</code></td><td>解析文本</td></tr>
+                    <tr><td><code>answer_format</code></td><td>可选：mcq / numeric / text</td></tr>
+                    <tr><td><code>kp_primary</code></td><td>一级知识点</td></tr>
+                    <tr><td><code>kp_secondary</code></td><td>二级知识点（逗号或分号分隔）</td></tr>
+                    <tr><td><code>reserved_1</code> ~ <code>reserved_3</code></td><td>预留扩展</td></tr>
+                    <tr><td><code>practice_count_default</code></td><td>默认抽题数（默认 3）</td></tr>
+                    <tr><td><code>practice_pool_size</code></td><td>练习池大小（5–8 校验）</td></tr>
+                    <tr><td><code>p1_stem</code> … <code>p8_stem</code></td><td>错题练习题题干</td></tr>
+                    <tr><td><code>p1_choices</code> … <code>p8_choices</code></td><td>选项（JSON 或 "A)… B)…" 文本）</td></tr>
+                    <tr><td><code>p1_answer</code> … <code>p8_answer</code></td><td>答案</td></tr>
+                    <tr><td><code>p1_explain</code> … <code>p8_explain</code></td><td>解析</td></tr>
+                    <tr><td><code>p1_source</code> … <code>p8_source</code></td><td>可选：generated / manual / homework_bank</td></tr>
+                </tbody>
+            </table>
+            <p class="text-muted small mb-0"><strong>校验：</strong>每题至少 5 道练习题（stem+answer），practice_count_default ≤ 练习题数。</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
