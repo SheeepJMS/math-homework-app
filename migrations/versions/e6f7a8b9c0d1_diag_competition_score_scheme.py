@@ -7,7 +7,7 @@ Create Date: 2025-02-12
 """
 from alembic import op
 import sqlalchemy as sa
-
+from sqlalchemy.exc import ProgrammingError
 
 revision = 'e6f7a8b9c0d1'
 down_revision = 'd5e6f7a8b9c0'
@@ -16,7 +16,11 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column('diag_competitions', sa.Column('score_scheme', sa.Text(), nullable=True))
+    try:
+        op.add_column('diag_competitions', sa.Column('score_scheme', sa.Text(), nullable=True))
+    except ProgrammingError as e:
+        if 'already exists' not in str(e).lower():
+            raise
 
 
 def downgrade():

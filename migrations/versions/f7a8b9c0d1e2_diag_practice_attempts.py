@@ -7,7 +7,7 @@ Create Date: 2025-02-12
 """
 from alembic import op
 import sqlalchemy as sa
-
+from sqlalchemy.exc import ProgrammingError
 
 revision = 'f7a8b9c0d1e2'
 down_revision = 'e6f7a8b9c0d1'
@@ -16,8 +16,9 @@ depends_on = None
 
 
 def upgrade():
-    op.create_table(
-        'diag_practice_attempts',
+    try:
+        op.create_table(
+            'diag_practice_attempts',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('practice_set_id', sa.Integer(), nullable=False),
         sa.Column('user_id', sa.Integer(), nullable=False),
@@ -26,7 +27,10 @@ def upgrade():
         sa.ForeignKeyConstraint(['practice_set_id'], ['diag_practice_sets.id']),
         sa.ForeignKeyConstraint(['user_id'], ['diag_users.id']),
         sa.PrimaryKeyConstraint('id')
-    )
+        )
+    except ProgrammingError as e:
+        if 'already exists' not in str(e).lower():
+            raise
 
 
 def downgrade():

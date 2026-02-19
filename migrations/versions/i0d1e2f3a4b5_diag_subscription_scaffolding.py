@@ -9,7 +9,7 @@ Default values ensure existing users unaffected (allow_all mode).
 """
 from alembic import op
 import sqlalchemy as sa
-
+from sqlalchemy.exc import ProgrammingError
 
 revision = 'i0d1e2f3a4b5'
 down_revision = 'h9c0d1e2f3a4'
@@ -17,14 +17,22 @@ branch_labels = None
 depends_on = None
 
 
+def _run(fn):
+    try:
+        fn()
+    except ProgrammingError as e:
+        if 'already exists' not in str(e).lower():
+            raise
+
+
 def upgrade():
     # A) diag_users: email, email_verified (nullable, optional for future)
-    op.add_column('diag_users', sa.Column('email', sa.String(255), nullable=True))
-    op.add_column('diag_users', sa.Column('email_verified', sa.Boolean(), nullable=False, server_default=sa.text('false')))
-    op.create_index('ix_diag_users_email', 'diag_users', ['email'], unique=True)
+    _run(lambda: op.add_column('diag_users', sa.Column('email', sa.String(255), nullable=True)))
+    _run(lambda: op.add_column('diag_users', sa.Column('email_verified', sa.Boolean(), nullable=False, server_default=sa.text('false'))))
+    _run(lambda: op.create_index('ix_diag_users_email', 'diag_users', ['email'], unique=True))
 
     # A) diag_password_reset_tokens
-    op.create_table('diag_password_reset_tokens',
+    _run(lambda: op.create_table('diag_password_reset_tokens',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('user_id', sa.Integer(), nullable=False),
         sa.Column('token', sa.String(64), nullable=False),
@@ -33,11 +41,11 @@ def upgrade():
         sa.ForeignKeyConstraint(['user_id'], ['diag_users.id'], ondelete='CASCADE'),
         sa.PrimaryKeyConstraint('id'),
         sa.UniqueConstraint('token')
-    )
-    op.create_index('ix_diag_password_reset_tokens_token', 'diag_password_reset_tokens', ['token'], unique=True)
+    ))
+    _run(lambda: op.create_index('ix_diag_password_reset_tokens_token', 'diag_password_reset_tokens', ['token'], unique=True))
 
     # B) diag_subscriptions
-    op.create_table('diag_subscriptions',
+    _run(lambda: op.create_table('diag_subscriptions',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('user_id', sa.Integer(), nullable=False),
         sa.Column('plan', sa.String(32), nullable=False, server_default=sa.text("'legacy_active'")),
@@ -51,11 +59,11 @@ def upgrade():
         sa.Column('updated_at', sa.DateTime(), server_default=sa.func.now()),
         sa.ForeignKeyConstraint(['user_id'], ['diag_users.id'], ondelete='CASCADE'),
         sa.PrimaryKeyConstraint('id')
-    )
-    op.create_index('ix_diag_subscriptions_user_id', 'diag_subscriptions', ['user_id'], unique=True)
+    ))
+    _run(lambda: op.create_index('ix_diag_subscriptions_user_id', 'diag_subscriptions', ['user_id'], unique=True))
 
     # D) diag_support_tickets
-    op.create_table('diag_support_tickets',
+    _run(lambda: op.create_table('diag_support_tickets',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('user_id', sa.Integer(), nullable=False),
         sa.Column('category', sa.String(64), nullable=True),
@@ -65,10 +73,10 @@ def upgrade():
         sa.Column('created_at', sa.DateTime(), server_default=sa.func.now()),
         sa.ForeignKeyConstraint(['user_id'], ['diag_users.id'], ondelete='CASCADE'),
         sa.PrimaryKeyConstraint('id')
-    )
+    ))
 
     # E) diag_auth_audit
-    op.create_table('diag_auth_audit',
+    _run(lambda: op.create_table('diag_auth_audit',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('user_id', sa.Integer(), nullable=False),
         sa.Column('event', sa.String(32), nullable=False),
@@ -77,9 +85,9 @@ def upgrade():
         sa.Column('created_at', sa.DateTime(), server_default=sa.func.now()),
         sa.ForeignKeyConstraint(['user_id'], ['diag_users.id'], ondelete='CASCADE'),
         sa.PrimaryKeyConstraint('id')
-    )
-    op.create_index('ix_diag_auth_audit_user_id', 'diag_auth_audit', ['user_id'])
-    op.create_index('ix_diag_auth_audit_created_at', 'diag_auth_audit', ['created_at'])
+    ))
+    _run(lambda: op.create_index('ix_diag_auth_audit_user_id', 'diag_auth_audit', ['user_id']))
+    _run(lambda: op.create_index('ix_diag_auth_audit_created_at', 'diag_auth_audit', ['created_at']))
 
 
 def downgrade():
