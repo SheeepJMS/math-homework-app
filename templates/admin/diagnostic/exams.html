@@ -1,6 +1,7 @@
 {% extends "admin/base.html" %}
 {% block admin_content %}
 <div class="container">
+    <input type="hidden" id="pageCsrfToken" value="{{ csrf_token() }}">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>诊断试卷管理</h2>
         <div>
@@ -62,48 +63,64 @@
                     <div class="fw-bold text-primary mb-1 d-flex align-items-center comp-toggle" data-bs-toggle="collapse" data-bs-target="#collapse-comp-{{ data.comp.id }}" role="button" aria-expanded="false">
                         <i class="fas fa-chevron-down comp-chevron me-1" style="transition:transform .2s; transform:rotate(-90deg);"></i>
                         {{ data.comp.name }}
-                        <span class="ms-2" onclick="event.stopPropagation();">
-                            <form method="post" action="{{ url_for('diagnostic_admin.competition_bulk_publish', comp_id=data.comp.id) }}" class="d-inline" onsubmit="return confirm('确定发布该竞赛下全部 {{ data.exams|length }} 份试卷？');">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="submit" class="btn btn-sm btn-success py-0 px-1">一键发布</button>
-                            </form>
-                            <form method="post" action="{{ url_for('diagnostic_admin.competition_bulk_unpublish', comp_id=data.comp.id) }}" class="d-inline ms-1" onsubmit="return confirm('确定取消该竞赛下全部 {{ data.exams|length }} 份试卷的发布？');">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="submit" class="btn btn-sm btn-outline-secondary py-0 px-1">一键取消</button>
-                            </form>
-                        </span>
                     </div>
                     <div class="collapse" id="collapse-comp-{{ data.comp.id }}">
+                    <div class="d-flex align-items-center justify-content-between ms-3 mb-1">
+                        <div class="text-muted small">
+                            共 {{ data.exams|length }} 份试卷
+                        </div>
+                        {% set published_count = (data.exams|selectattr('is_published')|list|length) %}
+                        {% set all_published = (data.exams|length > 0) and (published_count == (data.exams|length)) %}
+                        <div onclick="event.stopPropagation();">
+                            {% if all_published %}
+                            <form method="post" action="{{ url_for('diagnostic_admin.competition_bulk_unpublish', comp_id=data.comp.id) }}" class="d-inline" onsubmit="return confirm('确定取消发布该竞赛下全部 {{ data.exams|length }} 份试卷？');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-secondary py-0 px-2">一键取消发布</button>
+                            </form>
+                            {% else %}
+                            <form method="post" action="{{ url_for('diagnostic_admin.competition_bulk_publish', comp_id=data.comp.id) }}" class="d-inline" onsubmit="return confirm('确定发布该竞赛下全部 {{ data.exams|length }} 份试卷？');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-success py-0 px-2">一键发布</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </div>
                     <ul class="list-unstyled ms-3">
                         {% for exam in data.exams %}
                         <li class="d-flex align-items-center py-1 border-bottom">
                             <span class="me-2">{% if exam.year %}{{ exam.year }}年{% endif %}</span>
                             <a href="{{ url_for('diagnostic_admin.exam_detail', id=exam.id) }}">{{ exam.title }}</a>
-                            {% if exam.is_published %}<span class="badge bg-success ms-2">已发布</span>{% else %}<span class="badge bg-secondary ms-2">未发布</span>{% endif %}
+                            {% if exam.is_published %}
+                              <span class="badge bg-success ms-2 js-pub-badge" data-exam-id="{{ exam.id }}">已发布</span>
+                              <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 ms-1 js-toggle-publish" data-exam-id="{{ exam.id }}" data-published="1">取消发布</button>
+                            {% else %}
+                              <span class="badge bg-secondary ms-2 js-pub-badge" data-exam-id="{{ exam.id }}">未发布</span>
+                              <button type="button" class="btn btn-sm btn-success py-0 px-2 ms-1 js-toggle-publish" data-exam-id="{{ exam.id }}" data-published="0">发布</button>
+                            {% endif %}
                             {% set img_status = exam_image_status.get(exam.id) %}
-                            {% if img_status == 'need' %}<span class="badge bg-danger ms-1" title="有题目需补充题干/解析图">需补图</span>{% elif img_status == 'ok' %}<span class="badge bg-success ms-1" title="需图的题目均已上传">图OK</span>{% endif %}
+                            {% if img_status == 'need' %}<span class="badge bg-danger ms-1 text-nowrap" title="有题目需补充题干/解析图">需补图</span>{% endif %}
                             {% set up = exam_upload_progress.get(exam.id) %}
                             {% set total = up.get('total', 0) if up else 0 %}
                             {% set stem = up.get('stem', 0) if up else 0 %}
                             {% set sol = up.get('solution', 0) if up else 0 %}
                             {# 题目图状态 #}
                             {% if total == 0 %}
-                              <span class="badge bg-secondary ms-1" title="暂无题目">题目未</span>
-                              <span class="badge bg-secondary ms-1" title="暂无题目">解析未</span>
+                              <span class="badge bg-secondary ms-1 text-nowrap" title="暂无题目">题目未</span>
+                              <span class="badge bg-secondary ms-1 text-nowrap" title="暂无题目">解析未</span>
                             {% else %}
                               {% if stem >= total %}
-                                <span class="badge bg-success ms-1" title="题目图已上传：{{ stem }}/{{ total }}">题目已</span>
+                                <span class="badge bg-success ms-1 text-nowrap" title="题目图已上传：{{ stem }}/{{ total }}">题目OK</span>
                               {% elif stem == 0 %}
-                                <span class="badge bg-secondary ms-1" title="题目图未上传：{{ stem }}/{{ total }}">题目未</span>
+                                <span class="badge bg-secondary ms-1 text-nowrap" title="题目图未上传：{{ stem }}/{{ total }}">题目未</span>
                               {% else %}
-                                <span class="badge bg-warning text-dark ms-1" title="题目图部分上传：{{ stem }}/{{ total }}">题目{{ stem }}/{{ total }}</span>
+                                <span class="badge bg-warning text-dark ms-1 text-nowrap" title="题目图部分上传：{{ stem }}/{{ total }}">题目{{ stem }}/{{ total }}</span>
                               {% endif %}
                               {% if sol >= total %}
-                                <span class="badge bg-success ms-1" title="解析图已上传：{{ sol }}/{{ total }}">解析已</span>
+                                <span class="badge bg-success ms-1 text-nowrap" title="解析图已上传：{{ sol }}/{{ total }}">解析已</span>
                               {% elif sol == 0 %}
-                                <span class="badge bg-secondary ms-1" title="解析图未上传：{{ sol }}/{{ total }}">解析未</span>
+                                <span class="badge bg-secondary ms-1 text-nowrap" title="解析图未上传：{{ sol }}/{{ total }}">解析未</span>
                               {% else %}
-                                <span class="badge bg-warning text-dark ms-1" title="解析图部分上传：{{ sol }}/{{ total }}">解析{{ sol }}/{{ total }}</span>
+                                <span class="badge bg-warning text-dark ms-1 text-nowrap" title="解析图部分上传：{{ sol }}/{{ total }}">解析{{ sol }}/{{ total }}</span>
                               {% endif %}
                             {% endif %}
                             <div class="ms-auto">
@@ -202,6 +219,58 @@
       if (!el) return;
       try { new bootstrap.Collapse(el, { toggle: false }).show(); } catch (e) {}
     });
+  });
+
+  // 3) 单份试卷发布/取消发布：Ajax 即时切换，不跳转不弹窗
+  function getCsrfToken(){
+    var el = document.getElementById('pageCsrfToken');
+    return el ? el.value : '';
+  }
+  document.addEventListener('click', async function(e){
+    var btn = e.target.closest('.js-toggle-publish');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    var examId = btn.dataset.examId;
+    if (!examId) return;
+    var cur = btn.dataset.published === '1';
+    var next = !cur;
+    btn.disabled = true;
+    var oldText = btn.textContent;
+    btn.textContent = '处理中…';
+    try {
+      var r = await fetch('/admin/diagnostic/exams/' + examId + '/set_publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+        body: JSON.stringify({ is_published: next })
+      });
+      var j = await r.json();
+      if (!j || !j.success) throw new Error((j && j.message) || '更新失败');
+      var isPub = !!j.is_published;
+      btn.dataset.published = isPub ? '1' : '0';
+      // 更新按钮样式与文字
+      if (isPub) {
+        btn.classList.remove('btn-success');
+        btn.classList.add('btn-outline-secondary');
+        btn.textContent = '取消发布';
+      } else {
+        btn.classList.remove('btn-outline-secondary');
+        btn.classList.add('btn-success');
+        btn.textContent = '发布';
+      }
+      // 更新徽章
+      var badge = document.querySelector('.js-pub-badge[data-exam-id=\"' + examId + '\"]');
+      if (badge) {
+        badge.textContent = isPub ? '已发布' : '未发布';
+        badge.classList.remove('bg-success', 'bg-secondary');
+        badge.classList.add(isPub ? 'bg-success' : 'bg-secondary');
+      }
+    } catch (err) {
+      // 静默失败：恢复按钮文字
+      btn.textContent = oldText;
+    } finally {
+      btn.disabled = false;
+    }
   });
 })();
 </script>

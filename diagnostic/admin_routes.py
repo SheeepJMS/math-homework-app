@@ -220,6 +220,24 @@ def exam_publish(id):
     return redirect(url_for('diagnostic_admin.exam_detail', id=id))
 
 
+@diagnostic_admin_bp.route('/exams/<int:id>/set_publish', methods=['POST'])
+@admin_required
+def exam_set_publish(id):
+    """列表页 Ajax：设置试卷发布状态（不跳转）"""
+    from flask import jsonify
+    db = _db()
+    _, DiagExam, *_ = _models()
+    exam = db.session.get(DiagExam, id)
+    if exam is None:
+        abort(404)
+    data = request.get_json(silent=True) or {}
+    val = data.get('is_published')
+    is_pub = True if val in (True, 'true', '1', 1, 'yes', 'on') else False
+    exam.is_published = is_pub
+    db.session.commit()
+    return jsonify({'success': True, 'is_published': bool(exam.is_published)})
+
+
 @diagnostic_admin_bp.route('/competitions/<int:comp_id>/bulk_publish', methods=['POST'])
 @admin_required
 def competition_bulk_publish(comp_id):
