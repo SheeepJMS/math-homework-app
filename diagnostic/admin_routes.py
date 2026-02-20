@@ -49,8 +49,9 @@ def _exam_image_status(db):
     """返回 {exam_id: 'ok'|'need'}：绿色=图齐全，红色=有题需补图"""
     from app import DiagExamQuestion, DiagQuestionAnswer, DiagQuestion
     status = {}
+    # 注意：reserved_1 是 SQLAlchemy 列对象，不能在 filter 里对它调用 .strip()
     needs_img = db.session.query(DiagQuestionAnswer).filter(
-        (DiagQuestionAnswer.reserved_1 or '').strip() == '1'
+        DiagQuestionAnswer.reserved_1 == '1'
     ).all()
     for ans in needs_img:
         eq = db.session.query(DiagExamQuestion).filter_by(
