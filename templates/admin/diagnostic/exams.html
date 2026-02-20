@@ -82,6 +82,30 @@
                             {% if exam.is_published %}<span class="badge bg-success ms-2">已发布</span>{% else %}<span class="badge bg-secondary ms-2">未发布</span>{% endif %}
                             {% set img_status = exam_image_status.get(exam.id) %}
                             {% if img_status == 'need' %}<span class="badge bg-danger ms-1" title="有题目需补充题干/解析图">需补图</span>{% elif img_status == 'ok' %}<span class="badge bg-success ms-1" title="需图的题目均已上传">图OK</span>{% endif %}
+                            {% set up = exam_upload_progress.get(exam.id) %}
+                            {% set total = up.get('total', 0) if up else 0 %}
+                            {% set stem = up.get('stem', 0) if up else 0 %}
+                            {% set sol = up.get('solution', 0) if up else 0 %}
+                            {# 题目图状态 #}
+                            {% if total == 0 %}
+                              <span class="badge bg-secondary ms-1" title="暂无题目">题目未</span>
+                              <span class="badge bg-secondary ms-1" title="暂无题目">解析未</span>
+                            {% else %}
+                              {% if stem >= total %}
+                                <span class="badge bg-success ms-1" title="题目图已上传：{{ stem }}/{{ total }}">题目已</span>
+                              {% elif stem == 0 %}
+                                <span class="badge bg-secondary ms-1" title="题目图未上传：{{ stem }}/{{ total }}">题目未</span>
+                              {% else %}
+                                <span class="badge bg-warning text-dark ms-1" title="题目图部分上传：{{ stem }}/{{ total }}">题目{{ stem }}/{{ total }}</span>
+                              {% endif %}
+                              {% if sol >= total %}
+                                <span class="badge bg-success ms-1" title="解析图已上传：{{ sol }}/{{ total }}">解析已</span>
+                              {% elif sol == 0 %}
+                                <span class="badge bg-secondary ms-1" title="解析图未上传：{{ sol }}/{{ total }}">解析未</span>
+                              {% else %}
+                                <span class="badge bg-warning text-dark ms-1" title="解析图部分上传：{{ sol }}/{{ total }}">解析{{ sol }}/{{ total }}</span>
+                              {% endif %}
+                            {% endif %}
                             <div class="ms-auto">
                                 <a href="{{ url_for('diagnostic_admin.exam_detail', id=exam.id) }}" class="btn btn-sm btn-outline-primary">详情</a>
                                 <form method="post" action="{{ url_for('diagnostic_admin.exam_delete', id=exam.id) }}" class="d-inline ms-1" onsubmit="return confirm('确定删除？');">
@@ -107,11 +131,11 @@
 <script src="{{ url_for('static', filename='diagnostic/contest_names.js') }}"></script>
 <script>
 (function(){
-  if (typeof CONTEST_BY_CATEGORY === 'undefined') return;
+  // 1) 新建试卷：具体竞赛下拉提示（可选）
   var categorySelect = document.querySelector('select[name="category"]');
   var datalist = document.getElementById('contestDatalist');
   var compInput = document.getElementById('compNameInput');
-  if (!categorySelect || !datalist) return;
+  if (typeof CONTEST_BY_CATEGORY !== 'undefined' && categorySelect && datalist) {
 
   function refreshContestOptions(){
     var cat = categorySelect.value;
@@ -126,6 +150,7 @@
   }
   categorySelect.addEventListener('change', refreshContestOptions);
   refreshContestOptions();
+  }
 
   // 竞赛分组、大类分组收起/展开时旋转 chevron 图标
   document.querySelectorAll('.category-group .collapse, .exam-comp-group .collapse').forEach(function(el) {
@@ -144,6 +169,38 @@
         var chevron = btn.querySelector('.comp-chevron');
         if (chevron) chevron.style.transform = 'rotate(-90deg)';
       }
+    });
+  });
+
+  // 2) 记忆展开状态：返回列表后保持原展开
+  var KEY = 'diag_admin_exams_open';
+  function loadOpenIds() {
+    try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { return []; }
+  }
+  function saveOpenIds(ids) {
+    try { localStorage.setItem(KEY, JSON.stringify(ids)); } catch (e) {}
+  }
+  function addOpen(id) {
+    var ids = loadOpenIds();
+    if (ids.indexOf(id) === -1) { ids.push(id); saveOpenIds(ids); }
+  }
+  function removeOpen(id) {
+    var ids = loadOpenIds().filter(function(x){ return x !== id; });
+    saveOpenIds(ids);
+  }
+  document.querySelectorAll('.category-group .collapse, .exam-comp-group .collapse').forEach(function(el) {
+    el.addEventListener('shown.bs.collapse', function(){ if (this.id) addOpen(this.id); });
+    el.addEventListener('hidden.bs.collapse', function(){ if (this.id) removeOpen(this.id); });
+  });
+  // 页面加载时恢复
+  document.addEventListener('DOMContentLoaded', function(){
+    var ids = loadOpenIds();
+    if (!ids.length) return;
+    if (!window.bootstrap || !bootstrap.Collapse) return;
+    ids.forEach(function(id){
+      var el = document.getElementById(id);
+      if (!el) return;
+      try { new bootstrap.Collapse(el, { toggle: false }).show(); } catch (e) {}
     });
   });
 })();

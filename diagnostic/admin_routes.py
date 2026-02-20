@@ -69,6 +69,31 @@ def _exam_image_status(db):
     return status
 
 
+def _exam_upload_progress(db):
+    """返回 {exam_id: {total:int, stem:int, solution:int}} 用于列表显示上传进度。"""
+    from app import DiagExamQuestion, DiagQuestion
+    from sqlalchemy import func, case
+    # exam_id -> counts
+    rows = db.session.query(
+        DiagExamQuestion.exam_id.label('exam_id'),
+        func.count(DiagExamQuestion.question_id).label('total'),
+        func.sum(case(((DiagQuestion.stem_image_url.isnot(None)) & (DiagQuestion.stem_image_url != ''), 1), else_=0)).label('stem'),
+        func.sum(case(((DiagQuestion.solution_image_url.isnot(None)) & (DiagQuestion.solution_image_url != ''), 1), else_=0)).label('solution'),
+    ).join(
+        DiagQuestion, DiagExamQuestion.question_id == DiagQuestion.id
+    ).group_by(
+        DiagExamQuestion.exam_id
+    ).all()
+    out = {}
+    for r in rows:
+        out[int(r.exam_id)] = {
+            'total': int(r.total or 0),
+            'stem': int(r.stem or 0),
+            'solution': int(r.solution or 0),
+        }
+    return out
+
+
 @diagnostic_admin_bp.route('/exams')
 @admin_required
 def exams():
@@ -81,6 +106,7 @@ def exams():
     from collections import OrderedDict
     hierarchy = OrderedDict()
     exam_image_status = _exam_image_status(db)
+    exam_upload_progress = _exam_upload_progress(db)
     for c in comps:
         sub_key = (c.subject or '未分类', c.category or '未分类')
         if sub_key not in hierarchy:
@@ -98,6 +124,7 @@ def exams():
         hierarchy=hierarchy,
         existing_comps=existing_comps,
         exam_image_status=exam_image_status,
+        exam_upload_progress=exam_upload_progress,
     )
 
 

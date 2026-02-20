@@ -23,8 +23,10 @@
                 <label class="btn btn-outline-primary" for="modeOneByOne">逐个上传</label>
                 <input type="radio" class="btn-check" name="uploadMode" id="modeBulk" value="bulk" {% if not order %}checked{% endif %}>
                 <label class="btn btn-outline-secondary" for="modeBulk">批量上传</label>
+                <input type="radio" class="btn-check" name="uploadMode" id="modePdf" value="pdf">
+                <label class="btn btn-outline-dark" for="modePdf">PDF 截取导入</label>
             </div>
-            <span class="text-muted small ms-2">二选一，避免同时使用</span>
+            <span class="text-muted small ms-2">三选一，避免同时使用</span>
         </div>
     </div>
 
@@ -121,6 +123,56 @@
     <!-- 批量模式：提示（题目创建后下方可粘贴图片） -->
     <div class="upload-mode-card" data-mode="bulk" style="display:none;">
         <p class="text-muted small mb-3">批量模式：上方 CSV 导入后创建题目，下方题目列表中可粘贴题干图、解析图。</p>
+    </div>
+
+    <!-- PDF 截取导入（最小闭环：题目图） -->
+    <div class="card mb-4 upload-mode-card" data-mode="pdf" id="pdfSliceCard">
+        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">PDF 截取导入（题目图）</h5>
+            <span class="small text-white-50">每页可增减/拖拽横线；第一条线以上忽略；默认跨页续接，勾选“页尾截断”可断开</span>
+        </div>
+        <div class="card-body">
+            <p class="text-muted small mb-2">
+                {% if order %}
+                当前试卷已有题目顺序：导入后将按题号顺序写入题目图（覆盖写入题干图）。
+                {% else %}
+                当前试卷暂无题目：导入后将按切片顺序自动创建题目并写入题目图。
+                {% endif %}
+            </p>
+            <div class="row g-2 align-items-end mb-3">
+                <div class="col-md-4">
+                    <label class="form-label">选择 PDF（试题卷）</label>
+                    <div class="pdf-drop-zone" id="pdfDropZone" tabindex="0">
+                        <div class="text-muted small" id="pdfDropHint">拖拽 PDF 到这里，或点击选择文件</div>
+                        <div class="text-primary fw-bold d-none" id="pdfDropFileName"></div>
+                        <input type="file" class="form-control d-none" id="pdfFileInput" accept="application/pdf">
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">清晰度</label>
+                    <select class="form-select" id="pdfScale">
+                        <option value="1.5">1.5x</option>
+                        <option value="2" selected>2x</option>
+                        <option value="3">3x</option>
+                    </select>
+                </div>
+                <div class="col-md-6 d-flex gap-2">
+                    <button type="button" class="btn btn-outline-secondary" id="pdfClearAllBtn" disabled>清空所有横线</button>
+                    <button type="button" class="btn btn-outline-secondary" id="pdfAutoFirstLineBtn" disabled>为每页添加默认首线</button>
+                    <button type="button" class="btn btn-primary ms-auto" id="pdfSlicePreviewBtn" disabled>生成切片预览</button>
+                    <button type="button" class="btn btn-success" id="pdfImportBtn" disabled>确认导入题目图</button>
+                </div>
+            </div>
+
+            <div class="alert alert-warning py-2 small mb-3" id="pdfSliceInfo" style="display:none;"></div>
+
+            <div id="pdfPagesContainer" class="pdf-pages"></div>
+
+            <div class="mt-3" id="pdfSlicesPreviewWrap" style="display:none;">
+                <h6 class="mb-2">切片预览（按题号顺序）：</h6>
+                <div id="pdfSlicesPreview" class="pdf-slices-preview"></div>
+            </div>
+        </div>
     </div>
 
     <!-- 题目列表与 CSV 导入（答案、知识点、题库均通过 CSV 录入） -->
@@ -281,6 +333,10 @@
 .diag-paste-area:focus { outline: none; border-color: #0d6efd; }
 body.mode-bulk .upload-mode-card[data-mode="one"] { display: none !important; }
 body.mode-one .upload-mode-card[data-mode="bulk"] { display: none !important; }
+body.mode-one .upload-mode-card[data-mode="pdf"] { display: none !important; }
+body.mode-bulk .upload-mode-card[data-mode="pdf"] { display: none !important; }
+body.mode-pdf .upload-mode-card[data-mode="one"] { display: none !important; }
+body.mode-pdf .upload-mode-card[data-mode="bulk"] { display: none !important; }
 body.mode-one .bulk-image-col { display: none !important; }
 body.mode-one #bulkImageConfirmSection { display: none !important; }
 .paste-cell { border: 1px dashed #ccc; min-height: 50px; padding: 4px; text-align: center; cursor: pointer; font-size: 0.8rem; background: #fafafa; }
@@ -294,22 +350,420 @@ body.mode-one #bulkImageConfirmSection { display: none !important; }
 .search-dropdown .search-item { padding: 6px 10px; cursor: pointer; font-size: 0.9rem; border-bottom: 1px solid #eee; }
 .search-dropdown .search-item:last-child { border-bottom: none; }
 .search-dropdown .search-item:hover { background: #f0f7ff; }
+
+.pdf-pages { display:flex; flex-direction:column; gap:16px; }
+.pdf-page { border:1px solid #e5e5e5; border-radius:8px; padding:10px; background:#fff; }
+.pdf-page .page-header { display:flex; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap; }
+.pdf-page .page-header .btn { padding-top:2px; padding-bottom:2px; }
+.pdf-canvas-wrap { position:relative; display:inline-block; max-width:100%; overflow:auto; border:1px solid #eee; border-radius:6px; }
+.pdf-canvas-wrap canvas { display:block; }
+.pdf-overlay { position:absolute; left:0; top:0; right:0; bottom:0; }
+.pdf-line { position:absolute; left:0; right:0; height:2px; background:#dc3545; cursor:ns-resize; }
+.pdf-line::after { content:''; position:absolute; right:6px; top:-6px; width:10px; height:10px; border-radius:50%; background:#dc3545; }
+.pdf-drop-zone { border: 2px dashed #adb5bd; border-radius: 10px; padding: 14px; background: #f8f9fa; cursor: pointer; min-height: 56px; display:flex; align-items:center; justify-content:center; text-align:center; }
+.pdf-drop-zone:focus { outline: none; border-color: #212529; background: #fff; }
+.pdf-drop-zone.dragover { background: #eef2ff; border-color: #0d6efd; }
+.pdf-slices-preview { display:flex; flex-wrap:wrap; gap:10px; }
+.pdf-slice-thumb { width:140px; border:1px solid #ddd; border-radius:6px; overflow:hidden; background:#fff; }
+.pdf-slice-thumb img { width:100%; height:auto; display:block; }
+.pdf-slice-thumb .cap { font-size:12px; padding:4px 6px; border-top:1px solid #eee; background:#fafafa; }
 </style>
 
+<!-- PDF.js（前端渲染与裁切） -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.js"></script>
 <script>
 (function() {
     const examId = {{ exam.id }};
     const hasQuestions = {{ 'true' if order else 'false' }};
-    const initMode = hasQuestions ? 'one' : 'bulk';
+    const questionIdOrder = {{ order|map(attribute='question_id')|list|tojson if order else '[]' }};
+    const initMode = hasQuestions ? 'one' : 'pdf';
     document.body.classList.add('mode-' + initMode);
     document.getElementById('modeOneByOne').checked = (initMode === 'one');
     document.getElementById('modeBulk').checked = (initMode === 'bulk');
+    document.getElementById('modePdf').checked = (initMode === 'pdf');
     document.getElementById('modeOneByOne').addEventListener('change', function() {
-        if (this.checked) { document.body.classList.remove('mode-bulk'); document.body.classList.add('mode-one'); }
+        if (this.checked) { document.body.classList.remove('mode-bulk'); document.body.classList.remove('mode-pdf'); document.body.classList.add('mode-one'); }
     });
     document.getElementById('modeBulk').addEventListener('change', function() {
-        if (this.checked) { document.body.classList.remove('mode-one'); document.body.classList.add('mode-bulk'); }
+        if (this.checked) { document.body.classList.remove('mode-one'); document.body.classList.remove('mode-pdf'); document.body.classList.add('mode-bulk'); }
     });
+    document.getElementById('modePdf').addEventListener('change', function() {
+        if (this.checked) { document.body.classList.remove('mode-one'); document.body.classList.remove('mode-bulk'); document.body.classList.add('mode-pdf'); }
+    });
+    // 初始模式如果是 one/bulk，需要确保移除其它 class
+    if (initMode === 'one') { document.body.classList.remove('mode-bulk'); document.body.classList.remove('mode-pdf'); }
+    if (initMode === 'bulk') { document.body.classList.remove('mode-one'); document.body.classList.remove('mode-pdf'); }
+    if (initMode === 'pdf') { document.body.classList.remove('mode-one'); document.body.classList.remove('mode-bulk'); }
+
+    // -------------------------
+    // PDF 截取导入（题目图，最小闭环）
+    // - 每页可增减/拖拽横线
+    // - 第一条线以上忽略，第一题从第一条线下方开始
+    // - 默认跨页续接；勾选“页尾截断”则断开续接
+    // - 生成切片后，按题号顺序调用 upload_question_images_bulk 写入 stem_image_url
+    // -------------------------
+    const pdfFileInput = document.getElementById('pdfFileInput');
+    const pdfDropZone = document.getElementById('pdfDropZone');
+    const pdfDropHint = document.getElementById('pdfDropHint');
+    const pdfDropFileName = document.getElementById('pdfDropFileName');
+    const pdfPagesContainer = document.getElementById('pdfPagesContainer');
+    const pdfScaleSel = document.getElementById('pdfScale');
+    const pdfClearAllBtn = document.getElementById('pdfClearAllBtn');
+    const pdfAutoFirstLineBtn = document.getElementById('pdfAutoFirstLineBtn');
+    const pdfSlicePreviewBtn = document.getElementById('pdfSlicePreviewBtn');
+    const pdfImportBtn = document.getElementById('pdfImportBtn');
+    const pdfSliceInfo = document.getElementById('pdfSliceInfo');
+    const pdfSlicesPreviewWrap = document.getElementById('pdfSlicesPreviewWrap');
+    const pdfSlicesPreview = document.getElementById('pdfSlicesPreview');
+    let pdfDoc = null;
+    let pdfPages = [];   // [{canvas, wrapEl, lines:[y], breakAfter:bool}]
+    let pdfSlices = [];  // [dataURL]
+
+    function pdfSetBtnsEnabled(enabled) {
+        [pdfClearAllBtn, pdfAutoFirstLineBtn, pdfSlicePreviewBtn, pdfImportBtn].forEach((btn) => {
+            if (btn) btn.disabled = !enabled;
+        });
+    }
+    function pdfShowInfo(msg, level) {
+        if (!pdfSliceInfo) return;
+        pdfSliceInfo.style.display = 'block';
+        pdfSliceInfo.className = 'alert py-2 small ' + (level === 'error' ? 'alert-danger' : level === 'ok' ? 'alert-success' : 'alert-warning');
+        pdfSliceInfo.textContent = msg;
+    }
+    function pdfHideInfo() { if (pdfSliceInfo) pdfSliceInfo.style.display = 'none'; }
+    function pdfClearUI() {
+        pdfPages = [];
+        pdfSlices = [];
+        if (pdfPagesContainer) pdfPagesContainer.innerHTML = '';
+        if (pdfSlicesPreview) pdfSlicesPreview.innerHTML = '';
+        if (pdfSlicesPreviewWrap) pdfSlicesPreviewWrap.style.display = 'none';
+        pdfHideInfo();
+        pdfSetBtnsEnabled(false);
+    }
+    function pdfEnsureWorker() {
+        if (!window.pdfjsLib) return;
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.js';
+    }
+    function pdfRenderLines(pageIdx) {
+        const p = pdfPages[pageIdx];
+        if (!p) return;
+        const overlay = p.wrapEl.querySelector('.pdf-overlay');
+        if (!overlay) return;
+        overlay.innerHTML = '';
+        p.lines.sort((a,b)=>a-b).forEach((y, li) => {
+            const line = document.createElement('div');
+            line.className = 'pdf-line';
+            line.style.top = y + 'px';
+            line.dataset.pageIdx = String(pageIdx);
+            line.dataset.lineIdx = String(li);
+            overlay.appendChild(line);
+        });
+    }
+    function pdfAddLine(pageIdx, y) {
+        const p = pdfPages[pageIdx];
+        if (!p) return;
+        const h = p.canvas.height;
+        const yy = Math.max(0, Math.min(h - 2, Math.round(y)));
+        p.lines.push(yy);
+        p.lines = Array.from(new Set(p.lines)).sort((a,b)=>a-b);
+        pdfRenderLines(pageIdx);
+    }
+    function pdfRemoveLastLine(pageIdx) {
+        const p = pdfPages[pageIdx];
+        if (!p) return;
+        if (p.lines.length <= 1) return;
+        p.lines.pop();
+        pdfRenderLines(pageIdx);
+    }
+    (function attachPdfLineDrag(){
+        let dragging = null;
+        document.addEventListener('mousedown', function(e){
+            const el = e.target.closest('.pdf-line');
+            if (!el) return;
+            const pageIdx = parseInt(el.dataset.pageIdx, 10);
+            const lineIdx = parseInt(el.dataset.lineIdx, 10);
+            const p = pdfPages[pageIdx];
+            if (!p) return;
+            dragging = { pageIdx, lineIdx, startY: e.clientY, origY: p.lines[lineIdx] };
+            e.preventDefault();
+        });
+        document.addEventListener('mousemove', function(e){
+            if (!dragging) return;
+            const p = pdfPages[dragging.pageIdx];
+            if (!p) return;
+            const dy = e.clientY - dragging.startY;
+            const newY = dragging.origY + dy;
+            const h = p.canvas.height;
+            p.lines[dragging.lineIdx] = Math.max(0, Math.min(h - 2, Math.round(newY)));
+            pdfRenderLines(dragging.pageIdx);
+        });
+        document.addEventListener('mouseup', function(){
+            if (!dragging) return;
+            const p = pdfPages[dragging.pageIdx];
+            if (p) {
+                p.lines = Array.from(new Set(p.lines)).sort((a,b)=>a-b);
+                pdfRenderLines(dragging.pageIdx);
+            }
+            dragging = null;
+        });
+    })();
+
+    function pdfCropCanvas(srcCanvas, y1, y2) {
+        const w = srcCanvas.width;
+        const h = srcCanvas.height;
+        const top = Math.max(0, Math.min(h, Math.round(y1)));
+        const bottom = Math.max(0, Math.min(h, Math.round(y2)));
+        const hh = Math.max(1, bottom - top);
+        const c = document.createElement('canvas');
+        c.width = w;
+        c.height = hh;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(srcCanvas, 0, top, w, hh, 0, 0, w, hh);
+        return c;
+    }
+    function pdfJoinCanvases(parts) {
+        if (!parts || parts.length === 0) return null;
+        if (parts.length === 1) return parts[0];
+        const w = Math.max(...parts.map(p => p.width));
+        const h = parts.reduce((acc, p) => acc + p.height, 0);
+        const c = document.createElement('canvas');
+        c.width = w;
+        c.height = h;
+        const ctx = c.getContext('2d');
+        let y = 0;
+        parts.forEach((p) => { ctx.drawImage(p, 0, y); y += p.height; });
+        return c;
+    }
+
+    function pdfBuildSlices() {
+        pdfSlices = [];
+        let carryParts = [];
+        for (let i = 0; i < pdfPages.length; i++) {
+            const p = pdfPages[i];
+            const lines = (p.lines || []).slice().sort((a,b)=>a-b);
+            if (!lines.length) continue;
+            const H = p.canvas.height;
+            const first = Math.max(0, Math.min(H - 2, lines[0]));
+            const cuts = [first, ...lines.slice(1)];
+            const slices = [];
+            for (let k = 0; k < cuts.length; k++) {
+                const start = cuts[k] + 2;
+                const end = (k + 1 < cuts.length) ? cuts[k + 1] : H;
+                if (end - start >= 8) slices.push(pdfCropCanvas(p.canvas, start, end));
+            }
+            if (!slices.length) continue;
+
+            if (carryParts.length) {
+                carryParts.push(slices[0]);
+                if (slices.length === 1) {
+                    if (p.breakAfter || i === pdfPages.length - 1) {
+                        const joinedOnly = pdfJoinCanvases(carryParts);
+                        if (joinedOnly) pdfSlices.push(joinedOnly.toDataURL('image/png'));
+                        carryParts = [];
+                    }
+                } else {
+                    for (let kk = 1; kk < slices.length; kk++) {
+                        const isLast = (kk === slices.length - 1);
+                        if (isLast && !p.breakAfter && i < pdfPages.length - 1) {
+                            const joinedPrev = pdfJoinCanvases(carryParts);
+                            if (joinedPrev) pdfSlices.push(joinedPrev.toDataURL('image/png'));
+                            carryParts = [slices[kk]];
+                        } else {
+                            const joinedPrev2 = pdfJoinCanvases(carryParts);
+                            if (joinedPrev2) pdfSlices.push(joinedPrev2.toDataURL('image/png'));
+                            carryParts = [];
+                            pdfSlices.push(slices[kk].toDataURL('image/png'));
+                        }
+                    }
+                }
+            } else {
+                for (let k2 = 0; k2 < slices.length; k2++) {
+                    const isLast2 = (k2 === slices.length - 1);
+                    if (isLast2 && !p.breakAfter && i < pdfPages.length - 1) carryParts = [slices[k2]];
+                    else pdfSlices.push(slices[k2].toDataURL('image/png'));
+                }
+            }
+        }
+        if (carryParts.length) {
+            const joinedTail = pdfJoinCanvases(carryParts);
+            if (joinedTail) pdfSlices.push(joinedTail.toDataURL('image/png'));
+        }
+        return pdfSlices;
+    }
+
+    function pdfRenderSlicePreview() {
+        if (!pdfSlicesPreview || !pdfSlicesPreviewWrap) return;
+        pdfSlicesPreview.innerHTML = '';
+        pdfSlicesPreviewWrap.style.display = 'block';
+        const maxShow = Math.min(pdfSlices.length, 80);
+        for (let i = 0; i < maxShow; i++) {
+            const div = document.createElement('div');
+            div.className = 'pdf-slice-thumb';
+            div.innerHTML = '<img src="' + pdfSlices[i] + '"><div class="cap">第 ' + (i+1) + ' 题</div>';
+            pdfSlicesPreview.appendChild(div);
+        }
+        if (pdfSlices.length > maxShow) {
+            const more = document.createElement('div');
+            more.className = 'text-muted small';
+            more.textContent = '仅预览前 ' + maxShow + ' 题（共 ' + pdfSlices.length + ' 题切片）';
+            pdfSlicesPreview.appendChild(more);
+        }
+    }
+
+    async function pdfImportSlices() {
+        if (!pdfSlices.length) { pdfShowInfo('请先生成切片预览。', 'error'); return; }
+        if (pdfImportBtn) pdfImportBtn.disabled = true;
+        try {
+            // 1) 若已有题目顺序：按题号覆盖写入 stem_image_url
+            if (questionIdOrder && questionIdOrder.length > 0) {
+                const n = Math.min(pdfSlices.length, questionIdOrder.length);
+                if (pdfSlices.length !== questionIdOrder.length) {
+                    pdfShowInfo('切片数(' + pdfSlices.length + ') 与试卷题数(' + questionIdOrder.length + ') 不一致，将只写入前 ' + n + ' 题。', 'warn');
+                }
+                const items = [];
+                for (let i = 0; i < n; i++) items.push({ question_id: questionIdOrder[i], stem_image: pdfSlices[i] });
+                const r = await fetch('/admin/diagnostic/exams/' + examId + '/upload_question_images_bulk', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name="csrf_token"]') ? document.querySelector('[name="csrf_token"]').value : '' },
+                    body: JSON.stringify({ items: items })
+                });
+                const j = await r.json();
+                if (j && j.success) { pdfShowInfo(j.message || '导入成功', 'ok'); window.location.reload(); }
+                else { throw new Error((j && j.message) || '导入失败'); }
+            } else {
+                // 2) 若暂无题目：按切片顺序创建题目（逐张对应一题）
+                const fd = new FormData();
+                const csrfEl = document.querySelector('[name="csrf_token"]');
+                fd.append('csrf_token', csrfEl ? csrfEl.value : '');
+                pdfSlices.forEach((dataUrl) => fd.append('files[]', dataUrl));
+                const r = await fetch('/admin/diagnostic/exams/' + examId + '/upload_question_images', { method: 'POST', body: fd });
+                const j = await r.json();
+                if (j && j.success) { pdfShowInfo(j.message || '导入成功', 'ok'); window.location.reload(); }
+                else { throw new Error((j && j.message) || '导入失败'); }
+            }
+        } catch (e) {
+            pdfShowInfo('导入失败：' + (e && e.message ? e.message : String(e)), 'error');
+        } finally {
+            if (pdfImportBtn) pdfImportBtn.disabled = false;
+        }
+    }
+
+    async function pdfRenderDoc(file) {
+        pdfClearUI();
+        if (!file) return;
+        if (!window.pdfjsLib) { throw new Error('PDF.js 未加载（可能网络被拦截）。请刷新页面或检查网络。'); }
+        if (!pdfPagesContainer) { throw new Error('PDF 容器不存在，请刷新页面。'); }
+        // 这里用 disableWorker=true，避免 worker 脚本在某些环境下被拦导致“无反应”
+        pdfShowInfo('正在加载 PDF，请稍等…', 'warn');
+        pdfEnsureWorker();
+        const buf = await file.arrayBuffer();
+        pdfDoc = await window.pdfjsLib.getDocument({ data: buf, disableWorker: true }).promise;
+        const scale = parseFloat(pdfScaleSel && pdfScaleSel.value ? pdfScaleSel.value : '2') || 2;
+        for (let pnum = 1; pnum <= pdfDoc.numPages; pnum++) {
+            const page = await pdfDoc.getPage(pnum);
+            const viewport = page.getViewport({ scale: scale });
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+
+            const pageEl = document.createElement('div');
+            pageEl.className = 'pdf-page';
+            pageEl.innerHTML =
+              '<div class="page-header">' +
+              '<span class="fw-bold">第 ' + pnum + ' 页</span>' +
+              '<button type="button" class="btn btn-sm btn-outline-danger" data-act="addLine">+线</button>' +
+              '<button type="button" class="btn btn-sm btn-outline-secondary" data-act="removeLine">-线</button>' +
+              '<div class="form-check ms-2">' +
+                '<input class="form-check-input" type="checkbox" data-act="breakAfter" id="break-' + pnum + '">' +
+                '<label class="form-check-label small" for="break-' + pnum + '">页尾截断</label>' +
+              '</div>' +
+              '<span class="text-muted small ms-auto">拖动红线调整位置</span>' +
+              '</div>' +
+              '<div class="pdf-canvas-wrap"><canvas></canvas><div class="pdf-overlay"></div></div>';
+
+            const c = pageEl.querySelector('canvas');
+            c.width = canvas.width; c.height = canvas.height;
+            c.getContext('2d').drawImage(canvas, 0, 0);
+            pdfPagesContainer.appendChild(pageEl);
+            const pageIdx = pdfPages.length;
+            pdfPages.push({ canvas: c, wrapEl: pageEl, lines: [Math.min(c.height - 2, 80)], breakAfter: false });
+            pdfRenderLines(pageIdx);
+
+            pageEl.addEventListener('click', function(ev){
+                const btn = ev.target.closest('button[data-act]');
+                if (!btn) return;
+                const act = btn.dataset.act;
+                if (act === 'addLine') pdfAddLine(pageIdx, pdfPages[pageIdx].lines[pdfPages[pageIdx].lines.length - 1] + 120);
+                if (act === 'removeLine') pdfRemoveLastLine(pageIdx);
+            });
+            const breakCb = pageEl.querySelector('input[data-act="breakAfter"]');
+            if (breakCb) breakCb.addEventListener('change', function(){ pdfPages[pageIdx].breakAfter = !!this.checked; });
+        }
+        pdfSetBtnsEnabled(true);
+        pdfShowInfo('PDF 已加载，共 ' + pdfDoc.numPages + ' 页。请调整每页第一条横线到“题目开始处”。', 'warn');
+    }
+
+    if (pdfFileInput) {
+        pdfFileInput.addEventListener('change', function(){
+            const f = this.files && this.files[0];
+            if (!f) return;
+            if (pdfDropHint && pdfDropFileName) {
+                pdfDropHint.classList.add('d-none');
+                pdfDropFileName.textContent = f.name || 'selected.pdf';
+                pdfDropFileName.classList.remove('d-none');
+            }
+            pdfRenderDoc(f).catch(function(e){
+                pdfShowInfo('PDF 加载失败：' + (e && e.message ? e.message : String(e)), 'error');
+            });
+        });
+    }
+
+    // 拖拽/点击选择 PDF
+    function pdfSetFile(file) {
+        if (!file) return;
+        if (!String(file.name || '').toLowerCase().endsWith('.pdf')) {
+            pdfShowInfo('请上传 PDF 文件。', 'error');
+            return;
+        }
+        if (pdfFileInput) {
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            pdfFileInput.files = dt.files;
+            // 触发 change
+            const evt = new Event('change', { bubbles: true });
+            pdfFileInput.dispatchEvent(evt);
+        } else {
+            pdfRenderDoc(file);
+        }
+    }
+    if (pdfDropZone) {
+        pdfDropZone.addEventListener('click', function() { if (pdfFileInput) pdfFileInput.click(); });
+        pdfDropZone.addEventListener('dragover', function(e) { e.preventDefault(); pdfDropZone.classList.add('dragover'); });
+        pdfDropZone.addEventListener('dragleave', function() { pdfDropZone.classList.remove('dragover'); });
+        pdfDropZone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            pdfDropZone.classList.remove('dragover');
+            const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+            if (f) pdfSetFile(f);
+        });
+    }
+    if (pdfClearAllBtn) pdfClearAllBtn.addEventListener('click', function(){
+        pdfPages.forEach((p, idx) => { p.lines = [Math.min(p.canvas.height - 2, 80)]; pdfRenderLines(idx); });
+        pdfShowInfo('已清空横线（保留默认首线）。', 'warn');
+    });
+    if (pdfAutoFirstLineBtn) pdfAutoFirstLineBtn.addEventListener('click', function(){
+        pdfPages.forEach((p, idx) => { if (!p.lines.length) p.lines = [Math.min(p.canvas.height - 2, 80)]; pdfRenderLines(idx); });
+        pdfShowInfo('已为每页补齐默认首线。', 'warn');
+    });
+    if (pdfSlicePreviewBtn) pdfSlicePreviewBtn.addEventListener('click', function(){
+        const slices = pdfBuildSlices();
+        pdfRenderSlicePreview();
+        pdfShowInfo('已生成切片：' + slices.length + ' 题。请确认数量与题号匹配后再导入。', 'warn');
+    });
+    if (pdfImportBtn) pdfImportBtn.addEventListener('click', pdfImportSlices);
+
     let diagExamImages = [];
     const pasteArea = document.getElementById('diagExamPasteArea');
     const previewContainer = document.getElementById('diagExamPreviewContainer');
