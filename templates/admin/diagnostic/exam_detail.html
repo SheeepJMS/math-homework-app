@@ -376,7 +376,8 @@ body.mode-one #bulkImageConfirmSection { display: none !important; }
     const examId = {{ exam.id }};
     const hasQuestions = {{ 'true' if order else 'false' }};
     const questionIdOrder = {{ order|map(attribute='question_id')|list|tojson if order else '[]' }};
-    const initMode = hasQuestions ? 'one' : 'pdf';
+    // 默认进入详情页：逐个上传（最符合常用流程）
+    const initMode = 'one';
     document.body.classList.add('mode-' + initMode);
     document.getElementById('modeOneByOne').checked = (initMode === 'one');
     document.getElementById('modeBulk').checked = (initMode === 'bulk');

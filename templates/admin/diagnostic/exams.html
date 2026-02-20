@@ -92,10 +92,8 @@
                             <a href="{{ url_for('diagnostic_admin.exam_detail', id=exam.id) }}">{{ exam.title }}</a>
                             {% if exam.is_published %}
                               <span class="badge bg-success ms-2 js-pub-badge" data-exam-id="{{ exam.id }}">已发布</span>
-                              <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 ms-1 js-toggle-publish" data-exam-id="{{ exam.id }}" data-published="1">取消发布</button>
                             {% else %}
                               <span class="badge bg-secondary ms-2 js-pub-badge" data-exam-id="{{ exam.id }}">未发布</span>
-                              <button type="button" class="btn btn-sm btn-success py-0 px-2 ms-1 js-toggle-publish" data-exam-id="{{ exam.id }}" data-published="0">发布</button>
                             {% endif %}
                             {% set img_status = exam_image_status.get(exam.id) %}
                             {% if img_status == 'need' %}<span class="badge bg-danger ms-1 text-nowrap" title="有题目需补充题干/解析图">需补图</span>{% endif %}
@@ -123,7 +121,12 @@
                                 <span class="badge bg-warning text-dark ms-1 text-nowrap" title="解析图部分上传：{{ sol }}/{{ total }}">解析{{ sol }}/{{ total }}</span>
                               {% endif %}
                             {% endif %}
-                            <div class="ms-auto">
+                            <div class="ms-auto d-flex align-items-center gap-1">
+                                {% if exam.is_published %}
+                                  <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 js-toggle-publish" data-exam-id="{{ exam.id }}" data-published="1">取消发布</button>
+                                {% else %}
+                                  <button type="button" class="btn btn-sm btn-success py-0 px-2 js-toggle-publish" data-exam-id="{{ exam.id }}" data-published="0">发布</button>
+                                {% endif %}
                                 <a href="{{ url_for('diagnostic_admin.exam_detail', id=exam.id) }}" class="btn btn-sm btn-outline-primary">详情</a>
                                 <form method="post" action="{{ url_for('diagnostic_admin.exam_delete', id=exam.id) }}" class="d-inline ms-1" onsubmit="return confirm('确定删除？');">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
