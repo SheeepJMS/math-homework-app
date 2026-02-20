@@ -47,11 +47,14 @@
     </div>
 
     <div class="card">
-        <div class="card-header">试卷列表（层级：学科 → 大类 → 具体竞赛 → 年份 试卷）</div>
+        <div class="card-header d-flex align-items-center justify-content-between">
+            <span>试卷列表（层级：学科 → 大类 → 具体竞赛 → 年份 试卷）</span>
+            <span class="text-muted small">已发布 {{ published_exams }} / 共 {{ total_exams }}</span>
+        </div>
         <div class="card-body">
             {% for (subject, category), comps_dict in hierarchy.items() %}
             <div class="mb-4 category-group">
-                <div class="text-muted small mb-2 d-flex align-items-center category-toggle" data-bs-toggle="collapse" data-bs-target="#collapse-cat-{{ loop.index }}" role="button" aria-expanded="false">
+                <div class="text-muted small mb-2 d-flex align-items-center category-toggle" data-collapse-target="#collapse-cat-{{ loop.index }}" role="button" aria-expanded="false">
                     <i class="fas fa-chevron-down category-chevron me-1" style="transition:transform .2s; transform:rotate(-90deg);"></i>
                     <strong class="text-dark">{{ subject }}</strong>
                     <span class="mx-1">›</span>
@@ -60,7 +63,7 @@
                 <div class="collapse" id="collapse-cat-{{ loop.index }}">
                 {% for comp_key, data in comps_dict.items() %}
                 <div class="ms-3 mb-2 exam-comp-group">
-                    <div class="fw-bold text-primary mb-1 d-flex align-items-center comp-toggle" data-bs-toggle="collapse" data-bs-target="#collapse-comp-{{ data.comp.id }}" role="button" aria-expanded="false">
+                    <div class="fw-bold text-primary mb-1 d-flex align-items-center comp-toggle" data-collapse-target="#collapse-comp-{{ data.comp.id }}" role="button" aria-expanded="false">
                         <i class="fas fa-chevron-down comp-chevron me-1" style="transition:transform .2s; transform:rotate(-90deg);"></i>
                         {{ data.comp.name }}
                     </div>
@@ -114,11 +117,11 @@
                                 <span class="badge bg-warning text-dark ms-1 text-nowrap" title="题目图部分上传：{{ stem }}/{{ total }}">题目{{ stem }}/{{ total }}</span>
                               {% endif %}
                               {% if sol >= total %}
-                                <span class="badge bg-success ms-1 text-nowrap" title="解析图已上传：{{ sol }}/{{ total }}">解析已</span>
+                                <span class="badge bg-success ms-1 text-nowrap" title="解析OK（解析图或解析文本）：{{ sol }}/{{ total }}">解析OK</span>
                               {% elif sol == 0 %}
-                                <span class="badge bg-secondary ms-1 text-nowrap" title="解析图未上传：{{ sol }}/{{ total }}">解析未</span>
+                                <span class="badge bg-secondary ms-1 text-nowrap" title="解析未（无解析图且无解析文本）：{{ sol }}/{{ total }}">解析未</span>
                               {% else %}
-                                <span class="badge bg-warning text-dark ms-1 text-nowrap" title="解析图部分上传：{{ sol }}/{{ total }}">解析{{ sol }}/{{ total }}</span>
+                                <span class="badge bg-warning text-dark ms-1 text-nowrap" title="解析部分OK（解析图或解析文本）：{{ sol }}/{{ total }}">解析{{ sol }}/{{ total }}</span>
                               {% endif %}
                             {% endif %}
                             <div class="ms-auto d-flex align-items-center gap-1">
@@ -172,26 +175,6 @@
   refreshContestOptions();
   }
 
-  // 竞赛分组、大类分组收起/展开时旋转 chevron 图标
-  document.querySelectorAll('.category-group .collapse, .exam-comp-group .collapse').forEach(function(el) {
-    el.addEventListener('shown.bs.collapse', function() {
-      var id = this.id;
-      var btn = document.querySelector('[data-bs-target="#' + id + '"]');
-      if (btn) {
-        var chevron = btn.querySelector('.comp-chevron');
-        if (chevron) chevron.style.transform = 'rotate(0)';
-      }
-    });
-    el.addEventListener('hidden.bs.collapse', function() {
-      var id = this.id;
-      var btn = document.querySelector('[data-bs-target="#' + id + '"]');
-      if (btn) {
-        var chevron = btn.querySelector('.comp-chevron');
-        if (chevron) chevron.style.transform = 'rotate(-90deg)';
-      }
-    });
-  });
-
   // 2) 记忆展开状态：返回列表后保持原展开
   var KEY = 'diag_admin_exams_open';
   function loadOpenIds() {
@@ -208,21 +191,112 @@
     var ids = loadOpenIds().filter(function(x){ return x !== id; });
     saveOpenIds(ids);
   }
-  document.querySelectorAll('.category-group .collapse, .exam-comp-group .collapse').forEach(function(el) {
-    el.addEventListener('shown.bs.collapse', function(){ if (this.id) addOpen(this.id); });
-    el.addEventListener('hidden.bs.collapse', function(){ if (this.id) removeOpen(this.id); });
+
+  function setChevron(btn, expanded){
+    if (!btn) return;
+    var chev = btn.querySelector(btn.classList.contains('category-toggle') ? '.category-chevron' : '.comp-chevron');
+    if (chev) chev.style.transform = expanded ? 'rotate(0)' : 'rotate(-90deg)';
+    btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+  }
+
+  function getCollapseEl(btn){
+    if (!btn) return null;
+    var sel = btn.getAttribute('data-collapse-target') || '';
+    if (!sel) return null;
+    return document.querySelector(sel);
+  }
+
+  function isShown(el){
+    return !!(el && el.classList.contains('show'));
+  }
+
+  function getCollapseInstance(el){
+    if (!el) return null;
+    if (!(window.bootstrap && bootstrap.Collapse)) return null;
+    try {
+      if (typeof bootstrap.Collapse.getOrCreateInstance === 'function') {
+        return bootstrap.Collapse.getOrCreateInstance(el, { toggle: false });
+      }
+      var inst = (typeof bootstrap.Collapse.getInstance === 'function') ? bootstrap.Collapse.getInstance(el) : null;
+      if (!inst) inst = new bootstrap.Collapse(el, { toggle: false });
+      return inst;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function showCollapse(el){
+    if (!el) return;
+    if (window.bootstrap && bootstrap.Collapse) {
+      var inst = getCollapseInstance(el);
+      if (inst) { try { inst.show(); return; } catch (e) {} }
+    } else {
+      el.classList.add('show');
+      return;
+    }
+    // fallback：bootstrap 存在但实例化失败时
+    el.classList.add('show');
+  }
+
+  function hideCollapse(el){
+    if (!el) return;
+    if (window.bootstrap && bootstrap.Collapse) {
+      var inst = getCollapseInstance(el);
+      if (inst) { try { inst.hide(); return; } catch (e) {} }
+    } else {
+      el.classList.remove('show');
+      return;
+    }
+    // fallback：bootstrap 存在但实例化失败时
+    el.classList.remove('show');
+  }
+
+  // 点击标题展开/收起（不依赖 bootstrap 的 data-API）
+  document.querySelectorAll('.category-toggle, .comp-toggle').forEach(function(btn){
+    btn.addEventListener('click', function(e){
+      e.preventDefault();
+      var el = getCollapseEl(btn);
+      if (!el) return;
+      var id = el.id || '';
+      var open = isShown(el);
+      if (open) hideCollapse(el); else showCollapse(el);
+      // 无 bootstrap 时不会触发 shown/hidden 事件，这里手动同步
+      if (!(window.bootstrap && bootstrap.Collapse)) {
+        var nowOpen = isShown(el);
+        setChevron(btn, nowOpen);
+        if (id) { nowOpen ? addOpen(id) : removeOpen(id); }
+      }
+    });
   });
-  // 页面加载时恢复
-  document.addEventListener('DOMContentLoaded', function(){
+
+  // 有 bootstrap 时，用事件来同步 chevron 与 localStorage（含动画完成后状态）
+  document.querySelectorAll('.category-group .collapse, .exam-comp-group .collapse').forEach(function(el) {
+    el.addEventListener('shown.bs.collapse', function() {
+      var id = this.id;
+      var btn = document.querySelector('[data-collapse-target="#' + id + '"]');
+      setChevron(btn, true);
+      if (id) addOpen(id);
+    });
+    el.addEventListener('hidden.bs.collapse', function() {
+      var id = this.id;
+      var btn = document.querySelector('[data-collapse-target="#' + id + '"]');
+      setChevron(btn, false);
+      if (id) removeOpen(id);
+    });
+  });
+
+  // 页面加载时恢复展开状态
+  (function restoreOpen(){
     var ids = loadOpenIds();
     if (!ids.length) return;
-    if (!window.bootstrap || !bootstrap.Collapse) return;
     ids.forEach(function(id){
       var el = document.getElementById(id);
       if (!el) return;
-      try { new bootstrap.Collapse(el, { toggle: false }).show(); } catch (e) {}
+      showCollapse(el);
+      var btn = document.querySelector('[data-collapse-target="#' + id + '"]');
+      setChevron(btn, true);
     });
-  });
+  })();
 
   // 3) 单份试卷发布/取消发布：Ajax 即时切换，不跳转不弹窗
   function getCsrfToken(){

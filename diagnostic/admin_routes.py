@@ -70,17 +70,27 @@ def _exam_image_status(db):
 
 
 def _exam_upload_progress(db):
-    """返回 {exam_id: {total:int, stem:int, solution:int}} 用于列表显示上传进度。"""
-    from app import DiagExamQuestion, DiagQuestion
+    """返回 {exam_id: {total:int, stem:int, solution:int}} 用于列表显示上传进度。
+
+    solution 统计口径：解析图 或 CSV 解析文本（二者任一存在即算 OK）。
+    """
+    from app import DiagExamQuestion, DiagQuestion, DiagQuestionAnswer
     from sqlalchemy import func, case
     # exam_id -> counts
     rows = db.session.query(
         DiagExamQuestion.exam_id.label('exam_id'),
         func.count(DiagExamQuestion.question_id).label('total'),
         func.sum(case(((DiagQuestion.stem_image_url.isnot(None)) & (DiagQuestion.stem_image_url != ''), 1), else_=0)).label('stem'),
-        func.sum(case(((DiagQuestion.solution_image_url.isnot(None)) & (DiagQuestion.solution_image_url != ''), 1), else_=0)).label('solution'),
+        func.sum(case((
+            ((DiagQuestion.solution_image_url.isnot(None)) & (DiagQuestion.solution_image_url != '')) |
+            ((DiagQuestionAnswer.solution_explain.isnot(None)) & (DiagQuestionAnswer.solution_explain != '')),
+            1
+        ), else_=0)).label('solution'),
     ).join(
         DiagQuestion, DiagExamQuestion.question_id == DiagQuestion.id
+    ).outerjoin(
+        DiagQuestionAnswer,
+        (DiagQuestionAnswer.exam_id == DiagExamQuestion.exam_id) & (DiagQuestionAnswer.q_index == DiagExamQuestion.q_index)
     ).group_by(
         DiagExamQuestion.exam_id
     ).all()
@@ -107,6 +117,8 @@ def exams():
     hierarchy = OrderedDict()
     exam_image_status = _exam_image_status(db)
     exam_upload_progress = _exam_upload_progress(db)
+    total_exams = db.session.query(DiagExam.id).count()
+    published_exams = db.session.query(DiagExam.id).filter(DiagExam.is_published == True).count()
     for c in comps:
         sub_key = (c.subject or '未分类', c.category or '未分类')
         if sub_key not in hierarchy:
@@ -125,6 +137,8 @@ def exams():
         existing_comps=existing_comps,
         exam_image_status=exam_image_status,
         exam_upload_progress=exam_upload_progress,
+        total_exams=total_exams,
+        published_exams=published_exams,
     )
 
 
