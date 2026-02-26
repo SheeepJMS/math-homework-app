@@ -173,14 +173,34 @@ def _sample_report_mock():
     total_q = 25
     correct = 18
     blank = 2
+    wrong = max(0, total_q - correct - blank)
     total_time_sec = 28 * 60
     avg_time = round(total_time_sec / total_q, 0)
+    # 图表数据（示例）
+    radar_labels = ['代数', '几何', '数论', '概率', '组合', '函数']
+    radar_values = [78, 70, 58, 62, 66, 73]
+    line_x = [str(i) for i in range(1, total_q + 1)]
+    line_y = [86, 82, 80, 62, 74, 71, 79, 77, 58, 75, 81, 83, 78, 72, 69, 55, 76, 80, 82, 79, 73, 70, 68, 74, 78]
+    bar_labels = line_x[:]
+    bar_time = [52, 64, 49, 95, 63, 78, 56, 61, 110, 58, 60, 62, 70, 67, 74, 120, 59, 55, 66, 72, 71, 68, 75, 62, 57]
+    detail_rows = []
+    correct_set = set([1, 2, 3, 5, 6, 7, 8, 10, 11, 12, 14, 17, 18, 19, 20, 22, 24, 25])
+    blank_set = set([13, 21])
+    for i in range(1, total_q + 1):
+        is_blank = i in blank_set
+        is_correct = (i in correct_set) and not is_blank
+        detail_rows.append({
+            'qnum': i,
+            'is_blank': is_blank,
+            'is_correct': is_correct,
+        })
     return {
         'exam_title': 'Gauss 7 2025（示例）',
         'submitted_at_str': datetime.utcnow().strftime('%Y-%m-%d'),
         'user_display_name': '示例学员',
         'total_questions': total_q,
         'correct_count': correct,
+        'wrong_count': wrong,
         'blank_count': blank,
         'accuracy_percent': round(100 * correct / total_q, 1),
         'total_time_sec': int(total_time_sec),
@@ -188,6 +208,25 @@ def _sample_report_mock():
         'avg_time_sec': int(avg_time),
         'slow_wrong_qnums': [4, 9, 16],
         'practice_summary': {'exists': True, 'count': 10, 'est_minutes': 12},
+        'answer_analysis': {
+            'fast_wrong_qnums': [9],
+            'slow_wrong_qnums': [4, 16],
+            'common_errors': [
+                {'tag': '读题遗漏', 'count': 3},
+                {'tag': '计算失误', 'count': 2},
+                {'tag': '概念不清', 'count': 2},
+            ],
+        },
+        'chart': {
+            'chart_radar_labels': radar_labels,
+            'chart_radar_values': radar_values,
+            'chart_line_x': line_x,
+            'chart_line_y': line_y,
+            'chart_bar_labels': bar_labels,
+            'chart_bar_time': bar_time,
+            'has_custom_score_scheme': False,
+        },
+        'detail_rows': detail_rows,
         'kp_weak_top': [
             {'kp_name': '代数（方程与变量）', 'wrong_count': 4, 'n_questions': 8},
             {'kp_name': '概率', 'wrong_count': 3, 'n_questions': 6},
@@ -296,7 +335,92 @@ def login():
 def sample_report():
     """示例报告：用于营销展示模板，不依赖数据库。"""
     user = get_diag_user_from_cookie()
-    return render_template('diagnostic/sample_report.html', user=user, sample_report=_sample_report_mock())
+    s = _sample_report_mock()
+
+    # 构造 report.html 所需的完整字段（示例数据）
+    total = int(s.get('total_questions') or 0)
+    correct = int(s.get('correct_count') or 0)
+    blank = int(s.get('blank_count') or 0)
+    wrong = max(0, total - correct - blank)
+    total_time_sec = int(s.get('total_time_sec') or 0)
+    avg_time_sec = int(s.get('avg_time_sec') or (round(total_time_sec / total, 0) if total else 0))
+    avg_time_ms = int(avg_time_sec * 1000)
+
+    kp_weak_top = s.get('kp_weak_top') or []
+    kp_has_data = True if kp_weak_top else False
+
+    # 逐题详情（示例）：提供原题/解析文本，避免空白
+    detail_rows = []
+    for r in (s.get('detail_rows') or []):
+        qnum = int(r.get('qnum') or 0)
+        is_blank = bool(r.get('is_blank'))
+        is_correct = bool(r.get('is_correct'))
+        speed = '慢' if qnum in (s.get('slow_wrong_qnums') or []) else ('快' if qnum in ((s.get('answer_analysis') or {}).get('fast_wrong_qnums') or []) else '中')
+        kp_primary_name = (kp_weak_top[0].get('kp_name') if kp_weak_top else '代数')
+        kp_secondary_names = ['概念', '读题', '计算'][:2]
+        detail_rows.append({
+            'qnum': qnum,
+            'points': 1,
+            'is_blank': is_blank,
+            'is_correct': is_correct,
+            'speed': speed,
+            'kp_primary_name': kp_primary_name,
+            'kp_secondary_names': kp_secondary_names,
+            'error_tag': '读题遗漏' if (not is_correct and not is_blank and qnum in (4, 9)) else ('计算失误' if (not is_correct and not is_blank) else 'unknown'),
+            'user_answer': ('—' if is_blank else ('A' if is_correct else 'C')),
+            'correct_answer': 'B',
+            'time_sec': int((s.get('chart') or {}).get('chart_bar_time', [avg_time_sec] * total)[qnum - 1]) if qnum >= 1 and (s.get('chart') or {}).get('chart_bar_time') else avg_time_sec,
+            'avg_time_ms': avg_time_ms,
+            'avg_score_percent': int((s.get('chart') or {}).get('chart_line_y', [75] * total)[qnum - 1]) if qnum >= 1 and (s.get('chart') or {}).get('chart_line_y') else 75,
+            'stem_image_url': None,
+            'stem_text': f'示例题目 {qnum}：这是一道用于展示报告结构的题干文本（可替换为真实题干/截图）。',
+            'solution_text': f'示例解析：给出关键思路与步骤（第 {qnum} 题）。',
+            'solution_image_url': None,
+        })
+
+    # slow_wrong / fast_wrong 用于摘要文案
+    slow_wrong = [{'qnum': x} for x in (s.get('slow_wrong_qnums') or [])]
+    fast_wrong = [{'qnum': x} for x in ((s.get('answer_analysis') or {}).get('fast_wrong_qnums') or [])]
+
+    ch = s.get('chart') or {}
+    return render_template(
+        'diagnostic/report.html',
+        user=user,
+        admin_view=False,
+        exam_title=s.get('exam_title'),
+        competition_name='N/A',
+        submitted_at_str=s.get('submitted_at_str'),
+        user_display_name=s.get('user_display_name'),
+        # 顶部指标
+        has_custom_score_scheme=False,
+        score=0,
+        score_max=0,
+        score_percent=0,
+        correct_count=correct,
+        total_questions=total,
+        blank_count=blank,
+        accuracy_percent=s.get('accuracy_percent'),
+        total_time_sec=total_time_sec,
+        avg_time_sec=avg_time_sec,
+        # 摘要/练习包
+        kp_has_data=kp_has_data,
+        kp_weak_top=kp_weak_top,
+        slow_wrong=slow_wrong,
+        fast_wrong=fast_wrong,
+        practice_summary=s.get('practice_summary') or {'exists': True, 'count': 10, 'est_minutes': 12},
+        practice_set=None,
+        # 图表
+        chart_radar_labels=ch.get('chart_radar_labels') or [],
+        chart_radar_values=ch.get('chart_radar_values') or [],
+        chart_line_x=ch.get('chart_line_x') or [],
+        chart_line_y=ch.get('chart_line_y') or [],
+        chart_bar_labels=ch.get('chart_bar_labels') or [],
+        chart_bar_time=ch.get('chart_bar_time') or [],
+        chart_bar_correct=[],
+        # 逐题
+        detail_rows=detail_rows,
+        chart_bar_labels_slow_indices=[],
+    )
 
 
 @diagnostic_bp.route('/legal/terms')
