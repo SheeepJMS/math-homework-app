@@ -1,0 +1,17 @@
+{% extends "diagnostic/base.html" %}
+{% block title %}示例报告 - 诊断系统{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='diagnostic/sample_report_preview.css') }}">
+{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <div class="srp-page-note">
+    <div class="srp-page-note-title">示例报告（演示）</div>
+    <div class="srp-page-note-sub">以下内容为示例数据，仅用于展示报告样式与呈现结构。</div>
+  </div>
+  {% include 'diagnostic/_sample_report_preview.html' %}
+  <div class="mt-3">
+    <a href="{{ url_for('diagnostic.login') }}" class="btn btn-outline-secondary">返回登录</a>
+  </div>
+</div>
+{% endblock %}

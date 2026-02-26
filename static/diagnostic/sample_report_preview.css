@@ -1,0 +1,128 @@
+/* 示例报告预览（用于登录/注册页下方 & /sample-report 页面） */
+.srp {
+  --bg: #f6f7fb;
+  --surface: #ffffff;
+  --surface-2: #fbfcff;
+  --border: #e6e8f0;
+  --text: #111827;
+  --muted: #6b7280;
+  --brand: #2563eb;
+  --brand-2: #1d4ed8;
+  --success: #16a34a;
+  --info: #0ea5e9;
+  --shadow-1: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-2: 0 10px 26px rgba(16, 24, 40, 0.12);
+  --r-lg: 16px;
+  --r-md: 12px;
+  --r-sm: 10px;
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px; --s-6: 24px;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--text);
+}
+
+.srp-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s-4);
+  margin-bottom: var(--s-4);
+  flex-wrap: wrap;
+}
+.srp-title { font-size: 18px; font-weight: 700; }
+.srp-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.srp-meta { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+.srp-meta-item i { margin-right: 6px; color: var(--brand); }
+.srp-meta-sep { width: 4px; height: 4px; border-radius: 999px; background: #c7cbe0; display: inline-block; }
+
+.srp-grid {
+  display: grid;
+  grid-template-columns: 1.6fr repeat(3, 1fr);
+  gap: var(--s-3);
+  margin-bottom: var(--s-4);
+}
+@media (max-width: 992px) {
+  .srp-grid { grid-template-columns: 1fr; }
+}
+
+.srp-hero {
+  background: linear-gradient(135deg, var(--brand), var(--brand-2));
+  color: #fff;
+  border-radius: var(--r-lg);
+  padding: var(--s-5);
+  box-shadow: var(--shadow-2);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 96px;
+}
+.srp-hero-value { font-size: 30px; font-weight: 800; line-height: 1.1; }
+.srp-hero-sub { font-size: 13px; opacity: 0.9; margin-top: var(--s-1); }
+
+.srp-mini {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--s-4);
+  box-shadow: var(--shadow-1);
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-height: 96px;
+}
+.srp-mini-icon {
+  width: 40px; height: 40px; border-radius: var(--r-sm);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+  flex-shrink: 0;
+}
+.srp-mini-icon.brand { background: #3b82f6; }
+.srp-mini-icon.info { background: #38bdf8; }
+.srp-mini-icon.success { background: #22c55e; }
+.srp-mini-value { font-size: 18px; font-weight: 700; }
+.srp-mini-label { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+.srp-sections {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-3);
+}
+@media (max-width: 992px) {
+  .srp-sections { grid-template-columns: 1fr; }
+}
+
+.srp-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+.srp-card-title {
+  padding: var(--s-4) var(--s-5);
+  border-bottom: 1px solid var(--border);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.srp-card-title i { color: var(--brand); }
+.srp-card-body { padding: var(--s-5); }
+.srp-p { font-size: 13px; color: var(--text); margin-bottom: var(--s-2); line-height: 1.6; }
+.srp-p.mb-0 { margin-bottom: 0; }
+
+.srp-weak-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.srp-weak-row:last-child { border-bottom: none; padding-bottom: 0; }
+.srp-weak-name { font-weight: 600; }
+.srp-weak-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.srp-weak-bar { height: 8px; background: #eef1fb; border-radius: 999px; overflow: hidden; }
+.srp-weak-bar-fill { height: 100%; background: linear-gradient(90deg, #60a5fa, #2563eb); border-radius: 999px; }
+
+.srp-page-note {
+  background: #fff;
+  border: 1px dashed var(--border);
+  border-radius: var(--r-md);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.srp-page-note-title { font-weight: 700; }
+.srp-page-note-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }

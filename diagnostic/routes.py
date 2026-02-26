@@ -168,6 +168,34 @@ def format_time_sec(sec):
     return '%ds' % s
 
 
+def _sample_report_mock():
+    """生成不依赖数据库的示例报告数据（用于展示模板给客户看）。"""
+    total_q = 25
+    correct = 18
+    blank = 2
+    total_time_sec = 28 * 60
+    avg_time = round(total_time_sec / total_q, 0)
+    return {
+        'exam_title': 'Gauss 7 2025（示例）',
+        'submitted_at_str': datetime.utcnow().strftime('%Y-%m-%d'),
+        'user_display_name': '示例学员',
+        'total_questions': total_q,
+        'correct_count': correct,
+        'blank_count': blank,
+        'accuracy_percent': round(100 * correct / total_q, 1),
+        'total_time_sec': int(total_time_sec),
+        'total_time_min': int(round(total_time_sec / 60, 0)),
+        'avg_time_sec': int(avg_time),
+        'slow_wrong_qnums': [4, 9, 16],
+        'practice_summary': {'exists': True, 'count': 10, 'est_minutes': 12},
+        'kp_weak_top': [
+            {'kp_name': '代数（方程与变量）', 'wrong_count': 4, 'n_questions': 8},
+            {'kp_name': '概率', 'wrong_count': 3, 'n_questions': 6},
+            {'kp_name': '数论', 'wrong_count': 2, 'n_questions': 5},
+        ],
+    }
+
+
 @diagnostic_bp.context_processor
 def inject_diag_user():
     try:
@@ -220,13 +248,13 @@ def register():
         confirm = request.form.get('confirm_password') or ''
         if not username or not password:
             flash('用户名和密码不能为空', 'error')
-            return render_template('diagnostic/register.html')
+            return render_template('diagnostic/register.html', sample_report=_sample_report_mock())
         if password != confirm:
             flash('两次密码不一致', 'error')
-            return render_template('diagnostic/register.html')
+            return render_template('diagnostic/register.html', sample_report=_sample_report_mock())
         if db.session.query(DiagUser).filter_by(username=username).first():
             flash('用户名已存在', 'error')
-            return render_template('diagnostic/register.html')
+            return render_template('diagnostic/register.html', sample_report=_sample_report_mock())
         user = DiagUser(
             username=username,
             password_hash=generate_password_hash(password, method='pbkdf2:sha256')
@@ -235,7 +263,7 @@ def register():
         db.session.commit()
         flash('注册成功，请登录', 'success')
         return redirect(url_for('diagnostic.login'))
-    return render_template('diagnostic/register.html')
+    return render_template('diagnostic/register.html', sample_report=_sample_report_mock())
 
 
 @diagnostic_bp.route('/login', methods=['GET', 'POST'])
@@ -248,10 +276,10 @@ def login():
         user = db.session.query(DiagUser).filter_by(username=username).first()
         if not user or not check_password_hash(user.password_hash, password):
             flash('用户名或密码错误', 'error')
-            return render_template('diagnostic/login.html')
+            return render_template('diagnostic/login.html', sample_report=_sample_report_mock())
         if not getattr(user, 'is_active', True):
             flash('该账号已被停用，请联系管理员', 'error')
-            return render_template('diagnostic/login.html')
+            return render_template('diagnostic/login.html', sample_report=_sample_report_mock())
         token = secrets.token_urlsafe(32)
         expires = datetime.utcnow() + timedelta(days=DIAG_SESSION_DAYS)
         sess = DiagSession(user_id=user.id, token=token, expires_at=expires)
@@ -261,14 +289,14 @@ def login():
         resp.set_cookie(DIAG_COOKIE_NAME, token, max_age=DIAG_SESSION_DAYS * 86400, httponly=True, samesite='Lax')
         flash('登录成功', 'success')
         return resp
-    return render_template('diagnostic/login.html')
+    return render_template('diagnostic/login.html', sample_report=_sample_report_mock())
 
 
 @diagnostic_bp.route('/sample-report')
 def sample_report():
-    """示例报告占位页。"""
+    """示例报告：用于营销展示模板，不依赖数据库。"""
     user = get_diag_user_from_cookie()
-    return render_template('diagnostic/sample_report_placeholder.html', user=user)
+    return render_template('diagnostic/sample_report.html', user=user, sample_report=_sample_report_mock())
 
 
 @diagnostic_bp.route('/legal/terms')

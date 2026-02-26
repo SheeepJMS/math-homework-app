@@ -1,0 +1,79 @@
+{# 轻量示例报告预览：用于登录/注册页下方展示，不依赖数据库 #}
+{% set s = sample_report or {} %}
+<div class="srp" data-sample="1">
+  <div class="srp-head">
+    <div class="srp-title-wrap">
+      <div class="srp-title">示例报告预览</div>
+      <div class="srp-sub">让客户一眼看到：分数、耗时、薄弱点与练习建议（示例数据）</div>
+    </div>
+    <div class="srp-meta">
+      <span class="srp-meta-item"><i class="fas fa-file-alt"></i>{{ s.exam_title | default('Gauss 7 2025（示例）') }}</span>
+      <span class="srp-meta-sep"></span>
+      <span class="srp-meta-item"><i class="fas fa-calendar-alt"></i>{{ s.submitted_at_str | default('2026-02-20') }}</span>
+      <span class="srp-meta-sep"></span>
+      <span class="srp-meta-item"><i class="fas fa-user"></i>{{ s.user_display_name | default('示例学员') }}</span>
+    </div>
+  </div>
+
+  <div class="srp-grid">
+    <div class="srp-hero">
+      <div class="srp-hero-value">{{ s.correct_count | default(18) }} / {{ s.total_questions | default(25) }}</div>
+      <div class="srp-hero-sub">正确率 {{ s.accuracy_percent | default(72) }}% · 空题 {{ s.blank_count | default(2) }} 题</div>
+    </div>
+    <div class="srp-mini">
+      <div class="srp-mini-icon brand"><i class="fas fa-clock"></i></div>
+      <div>
+        <div class="srp-mini-value">{{ s.total_time_min | default(28) }} 分钟</div>
+        <div class="srp-mini-label">总耗时</div>
+      </div>
+    </div>
+    <div class="srp-mini">
+      <div class="srp-mini-icon info"><i class="fas fa-hourglass-half"></i></div>
+      <div>
+        <div class="srp-mini-value">{{ s.avg_time_sec | default(67) }} 秒</div>
+        <div class="srp-mini-label">均题耗时</div>
+      </div>
+    </div>
+    <div class="srp-mini">
+      <div class="srp-mini-icon success"><i class="fas fa-check-double"></i></div>
+      <div>
+        <div class="srp-mini-value">{{ s.practice_summary.count | default(10) }} 题</div>
+        <div class="srp-mini-label">推荐练习包</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="srp-sections">
+    <div class="srp-card">
+      <div class="srp-card-title"><i class="fas fa-clipboard-list"></i>诊断结论摘要</div>
+      <div class="srp-card-body">
+        <div class="srp-p"><strong>表现：</strong>正确率 {{ s.accuracy_percent | default(72) }}%，正确 {{ s.correct_count | default(18) }}/{{ s.total_questions | default(25) }} 题。</div>
+        <div class="srp-p"><strong>时间管理：</strong>「慢+错」集中在第 {{ (s.slow_wrong_qnums | default([4, 9, 16]) ) | join('、') }} 题；建议优先复盘题干读题与关键步骤。</div>
+        <div class="srp-p mb-0"><strong>下一步：</strong>练习包 {{ s.practice_summary.count | default(10) }} 题，预计 {{ s.practice_summary.est_minutes | default(12) }} 分钟，针对薄弱知识点逐个巩固。</div>
+      </div>
+    </div>
+
+    <div class="srp-card">
+      <div class="srp-card-title"><i class="fas fa-exclamation-triangle"></i>Top 薄弱知识点（示例）</div>
+      <div class="srp-card-body">
+        {% set weak = s.kp_weak_top | default([
+          {'kp_name':'代数（方程与变量）','wrong_count':4,'n_questions':8},
+          {'kp_name':'概率','wrong_count':3,'n_questions':6},
+          {'kp_name':'数论','wrong_count':2,'n_questions':5}
+        ]) %}
+        {% for w in weak %}
+        {% set rate = (100 * (w.wrong_count | default(0)) / (w.n_questions | default(1))) | round(0) %}
+        <div class="srp-weak-row">
+          <div class="srp-weak-main">
+            <div class="srp-weak-name">{{ w.kp_name }}</div>
+            <div class="srp-weak-meta">错 {{ w.wrong_count }}/{{ w.n_questions }} 题 · 错误率 {{ rate }}%</div>
+          </div>
+          <div class="srp-weak-bar" aria-hidden="true">
+            <div class="srp-weak-bar-fill" style="width: {{ [100, rate] | min }}%;"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
