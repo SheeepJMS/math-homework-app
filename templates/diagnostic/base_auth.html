@@ -1,7 +1,6 @@
 {% extends "diagnostic/base.html" %}
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='diagnostic/auth.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='diagnostic/sample_report_preview.css') }}">
 <style>
 :root {
   --auth-hero-bg: url('{{ url_for("static", filename="diagnostic/img/auth-hero.png") }}');
@@ -45,11 +44,6 @@
     </div>
     <div class="auth-form-col">
       {% block auth_form %}{% endblock %}
-    </div>
-  </div>
-  <div class="auth-container" style="grid-template-columns: 1fr; margin-top: 1rem;">
-    <div style="width: 100%;">
-      {% include 'diagnostic/_sample_report_preview.html' %}
     </div>
   </div>
 </div>
