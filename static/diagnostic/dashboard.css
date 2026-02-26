@@ -299,6 +299,18 @@
 .dashboard-comp-group {
   margin-bottom: var(--s-4);
 }
+.dashboard-contest-group {
+  margin-left: var(--s-3);
+  margin-bottom: var(--s-3);
+}
+.dashboard-contest-group .comp-header {
+  padding: var(--s-2) var(--s-4);
+  font-weight: 600;
+  background: var(--surface);
+}
+.dashboard-contest-group .comp-body {
+  padding: var(--s-2) 0 0 var(--s-3);
+}
 .dashboard-comp-group .comp-header {
   display: flex;
   align-items: center;

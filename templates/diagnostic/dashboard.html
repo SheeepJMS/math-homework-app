@@ -185,50 +185,63 @@
       <input type="text" id="examSearch" class="form-control form-control-sm" placeholder="搜索 Gauss 2025、AMC 8 等..." autocomplete="off">
     </div>
     {% if exams_grouped %}
-    {% for group in exams_grouped %}
-    <div class="dashboard-comp-group collapsed" data-comp="{{ group.competition_name }}">
+    {% for cat in exams_grouped %}
+    <div class="dashboard-comp-group dashboard-cat-group collapsed" data-category="{{ cat.category_name | lower }}">
       <div class="comp-header" onclick="this.parentElement.classList.toggle('collapsed')">
-        <span>{{ group.competition_name }}</span>
+        <span>{{ cat.category_name }}</span>
         <i class="fas fa-chevron-down"></i>
       </div>
       <div class="comp-body">
-        {% for ex in group.exams %}
-        <div class="dashboard-exam-row exam-row" data-title="{{ ex.exam_title | lower }}" data-comp="{{ group.competition_name | lower }}">
-          <div class="exam-main">
-            <span class="exam-title">{{ ex.exam_title }}</span>
-            {% if ex.in_progress %}
-            <span class="exam-meta">进行中：已做 {{ ex.in_progress.answered }}/{{ ex.in_progress.total }} · 已用时 {{ ex.in_progress.time_sec | format_time_sec }}</span>
-            {% elif ex.last_finished %}
-            <span class="exam-meta">最近一次：{{ ex.last_finished.finished_at_str }} · {{ ex.last_finished.score }}/{{ ex.last_finished.total }} · {{ ex.last_finished.accuracy_percent }}%</span>
-            {% else %}
-            <span class="exam-meta">未参加</span>
-            {% endif %}
+        {% for cont in cat.contests %}
+        <div class="dashboard-comp-group dashboard-contest-group collapsed" data-category="{{ cat.category_name | lower }}" data-contest="{{ cont.contest_name | lower }}">
+          <div class="comp-header" onclick="this.parentElement.classList.toggle('collapsed')">
+            <span>{{ cont.contest_name }}</span>
+            <i class="fas fa-chevron-down"></i>
           </div>
-          <span class="exam-badges">
-            {% if ex.status == 'in_progress' %}
-            <span class="badge-status in_progress">进行中</span>
-            {% elif ex.status == 'completed' %}
-            <span class="badge-status completed">已完成</span>
-            {% else %}
-            <span class="badge-status not_started">未开始</span>
-            {% endif %}
-          </span>
-          <span class="exam-actions">
-            {% if ex.status == 'in_progress' %}
-            <a href="{{ url_for('diagnostic.attempt', attempt_id=ex.in_progress.attempt_id) }}" class="btn btn-sm btn-primary">继续</a>
-            {% elif ex.status == 'completed' %}
-              {% if ex.retry_policy.can_retry %}
-              <a href="{{ url_for('diagnostic.report', attempt_id=ex.last_finished.attempt_id) }}" class="btn btn-sm btn-outline-primary">查看报告</a>
-              <a href="{{ url_for('diagnostic.start_exam', exam_id=ex.exam_id) }}" class="btn btn-sm btn-primary">重做</a>
-              {% else %}
-              <a href="{{ url_for('diagnostic.report', attempt_id=ex.last_finished.attempt_id) }}" class="btn btn-sm btn-primary">查看报告</a>
-              <a href="{{ url_for('diagnostic.reports', exam=ex.exam_id) }}" class="btn btn-sm btn-outline-secondary">历史报告</a>
-              <span class="btn btn-sm btn-outline-secondary disabled" title="可在 {{ ex.retry_policy.next_retry_at | format_date }} 后重做（每份试卷每4个月可重做一次）">重做</span>
-              {% endif %}
-            {% else %}
-            <a href="{{ url_for('diagnostic.start_exam', exam_id=ex.exam_id) }}" class="btn btn-sm btn-primary">开始</a>
-            {% endif %}
-          </span>
+          <div class="comp-body">
+            {% for ex in cont.exams %}
+            <div class="dashboard-exam-row exam-row"
+                 data-title="{{ ex.exam_title | lower }}"
+                 data-category="{{ cat.category_name | lower }}"
+                 data-contest="{{ cont.contest_name | lower }}">
+              <div class="exam-main">
+                <span class="exam-title">{{ ex.exam_title }}</span>
+                {% if ex.in_progress %}
+                <span class="exam-meta">进行中：已做 {{ ex.in_progress.answered }}/{{ ex.in_progress.total }} · 已用时 {{ ex.in_progress.time_sec | format_time_sec }}</span>
+                {% elif ex.last_finished %}
+                <span class="exam-meta">最近一次：{{ ex.last_finished.finished_at_str }} · {{ ex.last_finished.score }}/{{ ex.last_finished.total }} · {{ ex.last_finished.accuracy_percent }}%</span>
+                {% else %}
+                <span class="exam-meta">未参加</span>
+                {% endif %}
+              </div>
+              <span class="exam-badges">
+                {% if ex.status == 'in_progress' %}
+                <span class="badge-status in_progress">进行中</span>
+                {% elif ex.status == 'completed' %}
+                <span class="badge-status completed">已完成</span>
+                {% else %}
+                <span class="badge-status not_started">未开始</span>
+                {% endif %}
+              </span>
+              <span class="exam-actions">
+                {% if ex.status == 'in_progress' %}
+                <a href="{{ url_for('diagnostic.attempt', attempt_id=ex.in_progress.attempt_id) }}" class="btn btn-sm btn-primary">继续</a>
+                {% elif ex.status == 'completed' %}
+                  {% if ex.retry_policy.can_retry %}
+                  <a href="{{ url_for('diagnostic.report', attempt_id=ex.last_finished.attempt_id) }}" class="btn btn-sm btn-outline-primary">查看报告</a>
+                  <a href="{{ url_for('diagnostic.start_exam', exam_id=ex.exam_id) }}" class="btn btn-sm btn-primary">重做</a>
+                  {% else %}
+                  <a href="{{ url_for('diagnostic.report', attempt_id=ex.last_finished.attempt_id) }}" class="btn btn-sm btn-primary">查看报告</a>
+                  <a href="{{ url_for('diagnostic.reports', exam=ex.exam_id) }}" class="btn btn-sm btn-outline-secondary">历史报告</a>
+                  <span class="btn btn-sm btn-outline-secondary disabled" title="可在 {{ ex.retry_policy.next_retry_at | format_date }} 后重做（每份试卷每4个月可重做一次）">重做</span>
+                  {% endif %}
+                {% else %}
+                <a href="{{ url_for('diagnostic.start_exam', exam_id=ex.exam_id) }}" class="btn btn-sm btn-primary">开始</a>
+                {% endif %}
+              </span>
+            </div>
+            {% endfor %}
+          </div>
         </div>
         {% endfor %}
       </div>
@@ -266,15 +279,28 @@
         var q = (this.value || '').toLowerCase().trim();
         document.querySelectorAll('.exam-row').forEach(function (row) {
           var title = (row.getAttribute('data-title') || '').toLowerCase();
-          var comp = (row.getAttribute('data-comp') || '').toLowerCase();
-          var match = !q || title.indexOf(q) >= 0 || comp.indexOf(q) >= 0;
+          var category = (row.getAttribute('data-category') || '').toLowerCase();
+          var contest = (row.getAttribute('data-contest') || '').toLowerCase();
+          var match = !q || title.indexOf(q) >= 0 || category.indexOf(q) >= 0 || contest.indexOf(q) >= 0;
           row.style.display = match ? '' : 'none';
         });
-        document.querySelectorAll('.dashboard-comp-group').forEach(function (g) {
-          var visible = g.querySelectorAll('.exam-row');
+
+        // 先处理二级：具体竞赛
+        document.querySelectorAll('.dashboard-contest-group').forEach(function (g) {
+          var rows = g.querySelectorAll('.exam-row');
           var anyVisible = false;
-          visible.forEach(function (r) { if (r.style.display !== 'none') anyVisible = true; });
+          rows.forEach(function (r) { if (r.style.display !== 'none') anyVisible = true; });
           g.style.display = anyVisible ? '' : 'none';
+          if (q && anyVisible) g.classList.remove('collapsed');
+        });
+
+        // 再处理一级：竞赛大类
+        document.querySelectorAll('.dashboard-cat-group').forEach(function (g) {
+          var contests = g.querySelectorAll('.dashboard-contest-group');
+          var anyVisible = false;
+          contests.forEach(function (c) { if (c.style.display !== 'none') anyVisible = true; });
+          g.style.display = anyVisible ? '' : 'none';
+          if (q && anyVisible) g.classList.remove('collapsed');
         });
       });
     }

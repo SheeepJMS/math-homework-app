@@ -913,16 +913,35 @@ def _build_dashboard_data(user, db):
         if att.exam_id not in last_by_exam:
             last_by_exam[att.exam_id] = att
 
-    exams_grouped = []
+    # 首页“开始新试卷”三层结构：竞赛大类(category) -> 具体竞赛(contest) -> 年份试卷
+    from collections import OrderedDict
+    grouped = OrderedDict()  # {category_name: OrderedDict({contest_name: [exam_cards]})}
     for comp in competitions:
-        exams = db.session.query(DiagExam).filter_by(competition_id=comp.id, is_published=True).order_by(DiagExam.created_at.desc()).all()
+        exams = db.session.query(DiagExam).filter_by(
+            competition_id=comp.id, is_published=True
+        ).order_by(
+            DiagExam.year.desc().nullslast(), DiagExam.created_at.desc()
+        ).all()
+        if not exams:
+            continue
         comp_exams = []
         for exam in exams:
             card = _build_exam_card(exam, in_progress_by_exam.get(exam.id), last_finished_by_exam.get(exam.id), db)
             comp_exams.append(card)
-        if comp_exams:
-            comp_name = getattr(comp, 'name_cn', None) or getattr(comp, 'category', None) or comp.name or 'N/A'
-            exams_grouped.append({'competition_name': comp_name, 'exams': comp_exams})
+        if not comp_exams:
+            continue
+        category_name = (getattr(comp, 'category', None) or '').strip() or '未分类'
+        contest_name = (getattr(comp, 'name_cn', None) or '').strip() or (comp.name or 'N/A')
+        if category_name not in grouped:
+            grouped[category_name] = OrderedDict()
+        grouped[category_name][contest_name] = comp_exams
+
+    exams_grouped = []
+    for category_name, contests in grouped.items():
+        contests_out = []
+        for contest_name, contest_exams in contests.items():
+            contests_out.append({'contest_name': contest_name, 'exams': contest_exams})
+        exams_grouped.append({'category_name': category_name, 'contests': contests_out})
 
     weak_kp_names = [w['kp_name'] for w in weak_kps]
     practice_minutes = 10
@@ -934,15 +953,18 @@ def _build_dashboard_data(user, db):
         hero_summary = '暂无测验记录，去完成一次诊断即可获得专属分析。'
 
     recommended_exam = None
-    for grp in exams_grouped:
-        for ex in grp.get('exams', []):
-            if ex.get('status') == 'in_progress' and ex.get('in_progress'):
-                recommended_exam = {'type': 'continue', 'exam_id': ex['exam_id'], 'attempt_id': ex['in_progress']['attempt_id'], 'title': ex.get('exam_title')}
+    for cat in exams_grouped:
+        for cont in cat.get('contests', []):
+            for ex in cont.get('exams', []):
+                if ex.get('status') == 'in_progress' and ex.get('in_progress'):
+                    recommended_exam = {'type': 'continue', 'exam_id': ex['exam_id'], 'attempt_id': ex['in_progress']['attempt_id'], 'title': ex.get('exam_title')}
+                    break
+                if ex.get('status') == 'completed' and ex.get('retry_policy', {}).get('can_retry') and recommended_exam is None:
+                    recommended_exam = {'type': 'retry', 'exam_id': ex['exam_id'], 'title': ex.get('exam_title')}
+                if ex.get('status') == 'not_started' and recommended_exam is None:
+                    recommended_exam = {'type': 'start', 'exam_id': ex['exam_id'], 'title': ex.get('exam_title')}
+            if recommended_exam and recommended_exam.get('type') == 'continue':
                 break
-            if ex.get('status') == 'completed' and ex.get('retry_policy', {}).get('can_retry') and recommended_exam is None:
-                recommended_exam = {'type': 'retry', 'exam_id': ex['exam_id'], 'title': ex.get('exam_title')}
-            if ex.get('status') == 'not_started' and recommended_exam is None:
-                recommended_exam = {'type': 'start', 'exam_id': ex['exam_id'], 'title': ex.get('exam_title')}
         if recommended_exam and recommended_exam.get('type') == 'continue':
             break
 
