@@ -696,6 +696,25 @@ def _parse_enhanced_csv(raw):
     return rows, errors
 
 
+def _decode_csv_bytes(data: bytes):
+    """尽量兼容常见 CSV 编码（UTF-8/UTF-8-SIG/GBK/GB18030）。
+
+    返回 (text, encoding_used)。
+    """
+    if data is None:
+        return ('', 'unknown')
+    encodings = ['utf-8-sig', 'utf-8', 'gb18030', 'gbk']
+    for enc in encodings:
+        try:
+            return (data.decode(enc), enc)
+        except UnicodeDecodeError:
+            continue
+        except Exception:
+            continue
+    # 最后兜底：不让页面直接报错（可能出现乱码，但至少可导入/预览）
+    return (data.decode('utf-8', errors='replace'), 'utf-8(replace)')
+
+
 def _write_csv_rows(db, rows, M, force_exam_id=None):
     """将解析后的 CSV 行写入数据库，返回成功更新的题数。不提交，由调用方 commit。
     force_exam_id: 若提供（如从试卷详情页上传），则所有行强制使用该试卷，忽略 CSV 的 competition_name/exam_title。"""
@@ -751,6 +770,21 @@ def _write_csv_rows(db, rows, M, force_exam_id=None):
         elif not eq:
             continue
         updated += 1
+
+        # 覆盖题目主表（仅在 CSV 提供了值时覆盖，避免把现有内容覆盖成空）
+        try:
+            q = db.session.get(DiagQuestion, eq.question_id)
+            if q:
+                if (r.get('stem_text') or '').strip():
+                    q.stem_text = (r.get('stem_text') or '').strip()
+                if (r.get('correct_answer') or '').strip():
+                    q.answer_key = (r.get('correct_answer') or '').strip()
+                if (r.get('solution_explain') or '').strip():
+                    q.solution_text = (r.get('solution_explain') or '').strip()
+        except Exception:
+            # 不影响主流程：答案/知识点等仍可更新
+            pass
+
         needs_img = bool(r.get('needs_image', False))
         res1 = '1' if needs_img else (r.get('reserved_1') or None)
         res2, res3 = r.get('reserved_2') or None, r.get('reserved_3') or None
@@ -831,10 +865,12 @@ def import_csv_enhanced():
             return redirect(url_for('diagnostic_admin.import_csv_enhanced'))
         file = request.files['file']
         if not file.filename.lower().endswith('.csv'):
-            flash('仅支持 UTF-8 CSV 文件', 'error')
+            flash('仅支持 CSV 文件', 'error')
             return redirect(url_for('diagnostic_admin.import_csv_enhanced'))
         try:
-            raw = file.read().decode('utf-8-sig').strip()
+            data = file.read()
+            raw, enc_used = _decode_csv_bytes(data)
+            raw = (raw or '').strip()
         except Exception as e:
             flash('读取文件失败：{}'.format(str(e)), 'error')
             return redirect(url_for('diagnostic_admin.import_csv_enhanced'))
@@ -842,6 +878,8 @@ def import_csv_enhanced():
         if not rows and not parse_errors:
             flash('CSV 为空或无表头', 'error')
             return redirect(url_for('diagnostic_admin.import_csv_enhanced'))
+        if enc_used and enc_used not in ('utf-8', 'utf-8-sig'):
+            flash('已按编码 {} 读取 CSV（建议以后保存为 UTF-8 以避免兼容问题）'.format(enc_used), 'info')
 
         from_exam = request.form.get('from_exam') or request.args.get('from_exam')
         if from_exam and str(from_exam).isdigit():
