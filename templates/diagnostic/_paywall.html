@@ -4,7 +4,9 @@
 
 {% macro premium(feature_name, required_plan='pro') -%}
   {# TODO(paywall/stripe): gate this feature by plan. Keep visible for now. #}
-  {% set _ = diag_require_plan(required_plan, feature_name) %}
+  {% if diag_require_plan is defined %}
+    {% set _ = diag_require_plan(required_plan, feature_name) %}
+  {% endif %}
   <div class="premium-section" data-feature="{{ feature_name }}" data-required-plan="{{ required_plan }}">
     {{ caller() }}
   </div>
