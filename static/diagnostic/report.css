@@ -184,6 +184,59 @@
   margin-top: var(--s-1);
 }
 
+/* hero 内：分数 + 半圆 gauge（不改变整体布局，只在卡内排版） */
+.hero-score-wrap {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-4);
+}
+.hero-score-left {
+  min-width: 0;
+}
+.hero-gauge {
+  width: 150px;
+  flex: 0 0 auto;
+  text-align: center;
+}
+.gauge-svg {
+  width: 150px;
+  height: 70px;
+  display: block;
+  margin: 0 auto;
+}
+.gauge-track {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.25);
+  stroke-width: 10;
+  stroke-linecap: round;
+}
+.gauge-fill {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.95);
+  stroke-width: 10;
+  stroke-linecap: round;
+  stroke-dasharray: 157;
+  stroke-dashoffset: 157;
+}
+.gauge-text {
+  margin-top: -6px;
+}
+.gauge-label {
+  font-size: var(--small);
+  color: rgba(255, 255, 255, 0.8);
+}
+.gauge-value {
+  font-size: 16px;
+  font-weight: 800;
+  color: #fff;
+}
+@media (max-width: 576px) {
+  .hero-score-wrap { flex-direction: column; }
+  .hero-gauge { width: 140px; }
+}
+
 /* 小卡 mini-card：四个框等大，与左侧大卡等高 */
 .mini-card {
   background: var(--surface);
@@ -410,6 +463,52 @@
   margin-bottom: 0;
 }
 
+/* Key Takeaways */
+.takeaways-card .card-body {
+  padding: var(--s-5);
+}
+.takeaways-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin-bottom: var(--s-4);
+}
+.takeaways-title {
+  font-size: var(--h2);
+  font-weight: 800;
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.takeaways-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--s-4);
+}
+@media (min-width: 1024px) {
+  .takeaways-grid {
+    grid-template-columns: 1.2fr 1fr 1fr;
+    align-items: start;
+  }
+}
+.takeaway-label {
+  font-size: var(--small);
+  color: var(--muted);
+  margin-bottom: var(--s-2);
+}
+.takeaway-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+.takeaway-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+
 /* ========== 专家诊断型模块 ========== */
 .expert-grid {
   display: grid;
@@ -463,10 +562,11 @@
 }
 .expert-stars {
   margin-top: var(--s-2);
-  color: #f5c518;
   display: inline-flex;
   gap: 2px;
 }
+.expert-star { color: #f5c518; }
+.expert-star.expert-star-off { color: var(--muted-2); opacity: 0.9; }
 .expert-small-label {
   font-size: var(--small);
   color: var(--muted);

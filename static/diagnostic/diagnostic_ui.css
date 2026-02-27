@@ -1,0 +1,78 @@
+/* Diagnostic UI base styles (token-driven, minimal structure changes) */
+
+body.diag-app {
+  font-family: var(--font-sans);
+  background: var(--gray-50);
+  color: var(--gray-900);
+}
+
+body.diag-app .container,
+body.diag-app .report-container,
+body.diag-app .auth-page .auth-container {
+  max-width: var(--container-max);
+}
+
+/* Navbar */
+body.diag-app .navbar {
+  background: var(--primary) !important;
+  box-shadow: var(--shadow-sm);
+}
+body.diag-app .navbar .navbar-brand {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* Cards */
+body.diag-app .card {
+  border-radius: var(--radius-lg);
+  border-color: var(--gray-200);
+  box-shadow: var(--shadow-sm);
+}
+body.diag-app .card-header {
+  background: var(--surface);
+  border-bottom-color: var(--gray-200);
+}
+
+/* Buttons (reduce colors) */
+body.diag-app .btn-primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  border-radius: var(--radius-md);
+}
+body.diag-app .btn-primary:hover {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+body.diag-app .btn-outline-secondary,
+body.diag-app .btn-secondary {
+  border-radius: var(--radius-md);
+}
+
+/* Tables */
+body.diag-app .table {
+  color: var(--gray-900);
+}
+body.diag-app .table thead th {
+  color: var(--gray-600);
+  font-weight: 600;
+}
+body.diag-app .table-hover tbody tr:hover {
+  background: var(--gray-50);
+}
+
+/* Lucide icons baseline */
+.lucide {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2;
+}
+
+/* Chips hover */
+.chip {
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.chip:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+

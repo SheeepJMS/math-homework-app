@@ -1,5 +1,5 @@
 # 诊断模块对外路由：/diagnostic/*，独立 cookie 认证
-from flask import Blueprint, request, redirect, url_for, render_template, flash, make_response, abort, jsonify
+from flask import Blueprint, request, redirect, url_for, render_template, flash, make_response, abort, current_app
 from datetime import datetime, timedelta
 from functools import wraps
 import os
@@ -161,13 +161,43 @@ def format_date(dt):
 
 @diagnostic_bp.app_template_filter('format_time_sec')
 def format_time_sec(sec):
-    """秒数格式化为 mm:ss（≥60）或 Ns（<60）。"""
+    """秒数格式化为 '8.2 s' / '206 s'（竞赛风格，统一单位）。"""
     if sec is None:
         return 'N/A'
-    s = int(round(float(sec), 0))
-    if s >= 60:
-        return '%d:%02d' % (s // 60, s % 60)
-    return '%ds' % s
+    try:
+        v = float(sec)
+    except Exception:
+        return 'N/A'
+    if v < 0:
+        v = 0
+    if v >= 100:
+        return f"{int(round(v, 0))} s"
+    return f"{v:.1f} s"
+
+
+@diagnostic_bp.app_template_filter('format_percent1')
+def format_percent1(val):
+    """百分比统一为 1 位小数：20.0%"""
+    if val is None:
+        return 'N/A'
+    try:
+        v = float(val)
+    except Exception:
+        return 'N/A'
+    return f"{v:.1f}%"
+
+
+def require_plan(required_plan='pro', feature_name=None, user=None):
+    """订阅/权限预埋：当前不拦截，仅记录未来应被 gate 的功能。"""
+    try:
+        uname = getattr(user, 'username', None) if user else None
+        current_app.logger.info(
+            "[paywall] require_plan(%s) feature=%s user=%s -> allow (placeholder)",
+            required_plan, feature_name, uname
+        )
+    except Exception:
+        pass
+    return True
 
 
 def _sample_report_mock():
@@ -243,11 +273,19 @@ def inject_diag_user():
         user = get_diag_user_from_cookie()
         static_v = os.environ.get('RENDER_GIT_COMMIT') or os.environ.get('GIT_COMMIT') or ''
         static_v = (static_v or '')[:12] or datetime.utcnow().strftime('%Y%m%d%H%M')
-        return {'user': user, 'diag_static_v': static_v}
+        return {
+            'user': user,
+            'diag_static_v': static_v,
+            'diag_require_plan': lambda required_plan='pro', feature_name=None: require_plan(required_plan, feature_name, user),
+        }
     except Exception:
         static_v = os.environ.get('RENDER_GIT_COMMIT') or os.environ.get('GIT_COMMIT') or ''
         static_v = (static_v or '')[:12] or datetime.utcnow().strftime('%Y%m%d%H%M')
-        return {'user': None, 'diag_static_v': static_v}
+        return {
+            'user': None,
+            'diag_static_v': static_v,
+            'diag_require_plan': lambda required_plan='pro', feature_name=None: require_plan(required_plan, feature_name, None),
+        }
 
 
 def get_diag_user_from_cookie():
@@ -458,6 +496,14 @@ def sample_report():
         chart_bar_labels_slow_indices=[],
         expert_diag=expert_diag,
     )
+
+
+@diagnostic_bp.route('/billing')
+@require_diag_login
+def billing_coming_soon():
+    """订阅/套餐页（预埋 Stripe 接入点，当前仅占位）。"""
+    user = get_diag_user_from_cookie()
+    return render_template('diagnostic/billing_coming_soon.html', user=user, title='订阅与套餐')
 
 
 @diagnostic_bp.route('/legal/terms')
@@ -1389,7 +1435,7 @@ def _compute_style_profile(detail_rows):
 
 
 def _compute_error_type_stats(detail_rows):
-    """错因分类统计：仅统计已标注 error_type 的非空且错误题。"""
+    """错因分类统计：基于每题的 error_type（若无则尝试从 error_tag 推断）。"""
     rows = detail_rows or []
     allowed = [
         'arithmetic_error',
@@ -1411,6 +1457,19 @@ def _compute_error_type_stats(detail_rows):
         if r.get('is_blank') or r.get('is_correct'):
             continue
         et = (r.get('error_type') or '').strip()
+        if not et:
+            tag = (r.get('error_tag') or '').strip()
+            # 兼容现有系统：没有持久化 error_type 时，根据 error_tag 做最小推断
+            if '算' in tag or '计算' in tag:
+                et = 'arithmetic_error'
+            elif '概念' in tag:
+                et = 'concept_misunderstanding'
+            elif '建模' in tag or '模型' in tag:
+                et = 'modeling_error'
+            elif '时间' in tag:
+                et = 'time_management'
+            elif tag and tag != 'unknown':
+                et = 'careless_error'
         if not et:
             continue
         if et not in counts:
@@ -1616,7 +1675,6 @@ def _build_report_data(att, user, db):
             'correct_answer': correct_ans,
             'kp_primary_name': primary_kp or 'N/A',
             'kp_secondary_names': secondary_kps,
-            'error_type': getattr(aa, 'error_type', None) if aa else None,
             'error_tag': getattr(aa, 'error_tag', None) or 'unknown',
             'solution_text': solution_txt,
             'solution_image_url': getattr(q, 'solution_image_url', None) if q else None,
@@ -1707,35 +1765,6 @@ def report(attempt_id):
     report_data['chart_radar_values'] = [r['value_0to100'] for r in report_data['kp_radar']]
     report_data['expert_diag'] = _compute_expert_diagnosis(report_data)
     return render_template('diagnostic/report.html', **report_data)
-
-
-@diagnostic_bp.route('/api/attempt-answer/<int:answer_id>/error-type', methods=['POST'])
-@require_diag_login
-def set_attempt_answer_error_type(answer_id):
-    """为某题打错因标签（用于专家诊断：错因分类统计）。"""
-    db = _get_db()
-    from app import DiagAttemptAnswer, DiagAttempt
-    aa = db.session.get(DiagAttemptAnswer, answer_id)
-    if not aa:
-        abort(404)
-    att = db.session.get(DiagAttempt, aa.attempt_id)
-    user = get_diag_user_from_cookie()
-    if not att or not user or att.user_id != user.id:
-        abort(403)
-    payload = request.get_json(silent=True) or {}
-    et = (payload.get('error_type') or '').strip()
-    allowed = {
-        'arithmetic_error',
-        'concept_misunderstanding',
-        'modeling_error',
-        'careless_error',
-        'time_management',
-    }
-    if et and et not in allowed:
-        return jsonify({'ok': False, 'error': 'invalid_error_type'}), 400
-    aa.error_type = et or None
-    db.session.commit()
-    return jsonify({'ok': True, 'error_type': aa.error_type})
 
 
 def _parse_practice_choices(choices_str):

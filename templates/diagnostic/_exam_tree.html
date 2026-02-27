@@ -8,7 +8,7 @@
     {% for sub in exam_tree %}
     <div class="tree-level-1 tree-node collapsed" data-subject="{{ sub.subject }}" data-category="" data-contest="">
       <div class="tree-toggle" onclick="this.parentElement.classList.toggle('collapsed')">
-        <i class="fas fa-chevron-down tree-chevron"></i>
+        <i data-lucide="chevron-down" class="tree-chevron"></i>
         <span class="tree-label">{{ sub.subject }}</span>
         <span class="tree-badge">{{ sub.categories | length }}</span>
       </div>
@@ -16,7 +16,7 @@
         {% for cat in sub.categories %}
         <div class="tree-level-2 tree-node collapsed" data-subject="{{ sub.subject }}" data-category="{{ cat.category }}" data-contest="">
           <div class="tree-toggle" onclick="this.parentElement.classList.toggle('collapsed')">
-            <i class="fas fa-chevron-down tree-chevron"></i>
+            <i data-lucide="chevron-down" class="tree-chevron"></i>
             <span class="tree-label">{{ cat.category }}</span>
             <span class="tree-badge">{{ cat.contests | length }}</span>
           </div>
@@ -24,7 +24,7 @@
             {% for cont in cat.contests %}
             <div class="tree-level-3 tree-node collapsed" data-subject="{{ sub.subject }}" data-category="{{ cat.category }}" data-contest="{{ cont.contest }}">
               <div class="tree-toggle" onclick="this.parentElement.classList.toggle('collapsed')">
-                <i class="fas fa-chevron-down tree-chevron"></i>
+                <i data-lucide="chevron-down" class="tree-chevron"></i>
                 <span class="tree-label">{{ cont.contest }}</span>
                 <span class="tree-badge">{{ cont.years | length }}</span>
               </div>
@@ -36,7 +36,7 @@
                     {% if yr.in_progress %}
                     <span class="year-meta">进行中：已做 {{ yr.in_progress.answered }}/{{ yr.in_progress.total }} · 已用时 {{ yr.in_progress.time_sec | format_time_sec }}</span>
                     {% elif yr.last_finished %}
-                    <span class="year-meta">最近一次：{{ yr.last_finished.finished_at_str }} · {{ yr.last_finished.score }}/{{ yr.last_finished.total }} · {{ yr.last_finished.accuracy_percent }}%</span>
+                    <span class="year-meta">最近一次：{{ yr.last_finished.finished_at_str }} · {{ yr.last_finished.score }}/{{ yr.last_finished.total }} · {{ yr.last_finished.accuracy_percent | format_percent1 }}</span>
                     {% else %}
                     <span class="year-meta">未参加</span>
                     {% endif %}
@@ -83,7 +83,7 @@
   </div>
   {% else %}
   <div class="dashboard-empty">
-    <div class="icon-empty"><i class="fas fa-folder-open"></i></div>
+    <div class="icon-empty"><i data-lucide="folder-open"></i></div>
     <p class="mb-0">暂无已发布的试卷。</p>
   </div>
   {% endif %}

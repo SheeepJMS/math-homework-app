@@ -12,7 +12,7 @@
       <div class="hero-metric">
         {% if last_attempt %}
         <span class="hero-score">{{ last_attempt.score }}/{{ last_attempt.score_max }}</span>
-        <span class="hero-accuracy">{{ last_attempt.accuracy_percent }}%</span>
+        <span class="hero-accuracy">{{ last_attempt.accuracy_percent | format_percent1 }}</span>
         {% else %}
         <span class="hero-accuracy">--</span>
         {% endif %}
@@ -39,11 +39,11 @@
   {# B) 4 张指标卡 #}
   <div class="dashboard-summary-grid">
     <div class="dashboard-mini-card">
-      <div class="icon-wrap brand"><i class="fas fa-chart-line"></i></div>
+      <div class="icon-wrap brand"><i data-lucide="line-chart"></i></div>
       <div>
         <div class="metric-value">
           {% if last_attempt %}
-          {{ last_attempt.score }}/{{ last_attempt.score_max }} · {{ last_attempt.accuracy_percent }}%
+          {{ last_attempt.score }}/{{ last_attempt.score_max }} · {{ last_attempt.accuracy_percent | format_percent1 }}
           {% else %}
           N/A
           {% endif %}
@@ -52,10 +52,10 @@
       </div>
     </div>
     <div class="dashboard-mini-card">
-      <div class="icon-wrap success"><i class="fas fa-percent"></i></div>
+      <div class="icon-wrap success"><i data-lucide="percent"></i></div>
       <div>
         <div class="metric-value">
-          {% if stats_30d %}{{ stats_30d.avg_accuracy_percent }}%
+          {% if stats_30d %}{{ stats_30d.avg_accuracy_percent | format_percent1 }}
           {% if stats_30d.accuracy_trend is defined and stats_30d.accuracy_trend != 0 %}
           <span class="trend-arrow {{ 'up' if stats_30d.accuracy_trend > 0 else 'down' }}">{% if stats_30d.accuracy_trend > 0 %}↑{% else %}↓{% endif %}{{ stats_30d.accuracy_trend|abs }}</span>
           {% endif %}
@@ -65,7 +65,7 @@
       </div>
     </div>
     <div class="dashboard-mini-card">
-      <div class="icon-wrap info"><i class="fas fa-clock"></i></div>
+      <div class="icon-wrap info"><i data-lucide="clock"></i></div>
       <div>
         <div class="metric-value">
           {% if stats_30d %}{{ stats_30d.avg_time_per_q_sec | format_time_sec }}{% else %}N/A{% endif %}
@@ -74,7 +74,7 @@
       </div>
     </div>
     <div class="dashboard-mini-card">
-      <div class="icon-wrap neutral"><i class="fas fa-check-double"></i></div>
+      <div class="icon-wrap neutral"><i data-lucide="check-check"></i></div>
       <div>
         <div class="metric-value">
           {% if stats_30d %}{{ stats_30d.attempts_count }}{% else %}0{% endif %}
@@ -86,7 +86,7 @@
 
   {% if not last_attempt and not trend %}
   <div class="dashboard-empty mb-4">
-    <div class="icon-empty"><i class="fas fa-chart-pie"></i></div>
+    <div class="icon-empty"><i data-lucide="pie-chart"></i></div>
     <p class="mb-0">暂无数据。去<a href="{{ url_for('diagnostic.exams') }}">试卷中心</a>完成一次诊断即可看到你的表现与趋势。</p>
   </div>
   {% endif %}
@@ -95,7 +95,7 @@
   <div class="dashboard-mid-grid">
     <div>
       <div class="dashboard-card mb-3">
-        <div class="card-header"><i class="fas fa-chart-line me-2"></i>最近 6 次正确率趋势</div>
+        <div class="card-header"><i data-lucide="line-chart" class="me-2"></i>最近 6 次正确率趋势</div>
         <div class="card-body">
           {% if trend and trend|length > 0 %}
           <div class="dashboard-chart-wrap">
@@ -103,14 +103,14 @@
           </div>
           {% else %}
           <div class="dashboard-empty small">
-            <div class="icon-empty"><i class="fas fa-chart-line"></i></div>
+            <div class="icon-empty"><i data-lucide="line-chart"></i></div>
             <p class="mb-0">暂无趋势数据</p>
           </div>
           {% endif %}
         </div>
       </div>
       <div class="dashboard-card">
-        <div class="card-header"><i class="fas fa-exclamation-triangle me-2"></i>Top 3 薄弱知识点</div>
+        <div class="card-header"><i data-lucide="alert-triangle" class="me-2"></i>Top 3 薄弱知识点</div>
         <div class="card-body">
           {% if weak_kps and weak_kps|length > 0 %}
           <div class="dashboard-chart-wrap" style="height: 120px;">
@@ -123,7 +123,7 @@
           </ul>
           {% else %}
           <div class="dashboard-empty small">
-            <div class="icon-empty"><i class="fas fa-tags"></i></div>
+            <div class="icon-empty"><i data-lucide="tags"></i></div>
             <p class="mb-0">暂无知识点标签。请在后台为题目选择知识点后，即可生成薄弱点榜单。</p>
           </div>
           {% endif %}
@@ -132,7 +132,7 @@
     </div>
     <div class="dashboard-right-col">
       <div class="dashboard-card mb-3">
-        <div class="card-header"><i class="fas fa-calendar-check me-2"></i>最近一周参与频率</div>
+        <div class="card-header"><i data-lucide="calendar-check" class="me-2"></i>最近一周参与频率</div>
         <div class="card-body d-flex align-items-center justify-content-center" style="min-height: 160px;">
           <div class="gauge-wrap" data-days="{{ weekly_participation.days_active | default(0) }}">
             <canvas id="participationGauge"></canvas>
@@ -145,7 +145,7 @@
       </div>
       <div class="dashboard-card" style="align-self: start;">
         <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="fas fa-history me-2"></i>最近报告</span>
+          <span><i data-lucide="history" class="me-2"></i>最近报告</span>
           <a href="{{ url_for('diagnostic.reports') }}" class="btn btn-sm btn-outline-primary">全部报告</a>
         </div>
         <div class="card-body">
@@ -155,7 +155,7 @@
             <li class="report-row">
               <div class="report-main">
                 <span class="report-title">{{ r.exam_title }}</span>
-                <span class="report-meta">{{ r.submitted_at_str }} · {{ r.score }}/{{ r.score_max }} · {{ r.accuracy_percent }}% · {{ r.total_time_sec | format_time_sec }}</span>
+                <span class="report-meta">{{ r.submitted_at_str }} · {{ r.score }}/{{ r.score_max }} · {{ r.accuracy_percent | format_percent1 }} · {{ r.total_time_sec | format_time_sec }}</span>
               </div>
               <div class="report-actions">
                 <a href="{{ url_for('diagnostic.report', attempt_id=r.attempt_id) }}" class="btn btn-sm btn-primary">查看报告</a>
@@ -168,7 +168,7 @@
           </ul>
           {% else %}
           <div class="dashboard-empty small">
-            <div class="icon-empty"><i class="fas fa-file-alt"></i></div>
+            <div class="icon-empty"><i data-lucide="file-text"></i></div>
             <p class="mb-0">暂无报告。完成试卷后即可在此查看。</p>
           </div>
           {% endif %}
@@ -179,7 +179,7 @@
 
   {# D) 底部：推荐/最近试卷（3–6 条） #}
   <div class="dashboard-exams-section">
-    <h3><i class="fas fa-pencil-alt me-2"></i>开始新试卷</h3>
+    <h3><i data-lucide="pencil" class="me-2"></i>开始新试卷</h3>
     <p class="text-muted small mb-3">选择试卷开始答题，或前往 <a href="{{ url_for('diagnostic.exams') }}">试卷中心</a> 查看完整四级树结构。</p>
     <div class="dashboard-search-wrap mb-3">
       <input type="text" id="examSearch" class="form-control form-control-sm" placeholder="搜索 Gauss 2025、AMC 8 等..." autocomplete="off">
@@ -189,14 +189,14 @@
     <div class="dashboard-comp-group dashboard-cat-group collapsed" data-category="{{ cat.category_name | lower }}">
       <div class="comp-header" onclick="this.parentElement.classList.toggle('collapsed')">
         <span>{{ cat.category_name }}</span>
-        <i class="fas fa-chevron-down"></i>
+        <i data-lucide="chevron-down"></i>
       </div>
       <div class="comp-body">
         {% for cont in cat.contests %}
         <div class="dashboard-comp-group dashboard-contest-group collapsed" data-category="{{ cat.category_name | lower }}" data-contest="{{ cont.contest_name | lower }}">
           <div class="comp-header" onclick="this.parentElement.classList.toggle('collapsed')">
             <span>{{ cont.contest_name }}</span>
-            <i class="fas fa-chevron-down"></i>
+            <i data-lucide="chevron-down"></i>
           </div>
           <div class="comp-body">
             {% for ex in cont.exams %}
@@ -209,7 +209,7 @@
                 {% if ex.in_progress %}
                 <span class="exam-meta">进行中：已做 {{ ex.in_progress.answered }}/{{ ex.in_progress.total }} · 已用时 {{ ex.in_progress.time_sec | format_time_sec }}</span>
                 {% elif ex.last_finished %}
-                <span class="exam-meta">最近一次：{{ ex.last_finished.finished_at_str }} · {{ ex.last_finished.score }}/{{ ex.last_finished.total }} · {{ ex.last_finished.accuracy_percent }}%</span>
+                <span class="exam-meta">最近一次：{{ ex.last_finished.finished_at_str }} · {{ ex.last_finished.score }}/{{ ex.last_finished.total }} · {{ ex.last_finished.accuracy_percent | format_percent1 }}</span>
                 {% else %}
                 <span class="exam-meta">未参加</span>
                 {% endif %}
@@ -249,7 +249,7 @@
     {% endfor %}
     {% else %}
     <div class="dashboard-empty">
-      <div class="icon-empty"><i class="fas fa-file-alt"></i></div>
+      <div class="icon-empty"><i data-lucide="file-text"></i></div>
       <p class="mb-0">暂无已发布的试卷。</p>
     </div>
     {% endif %}

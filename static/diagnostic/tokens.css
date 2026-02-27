@@ -1,0 +1,90 @@
+/* Diagnostic Design Tokens (Premium SaaS look)
+   Scope: diagnostic module only (loaded by templates/diagnostic/base.html and admin diagnostic templates) */
+
+:root {
+  /* Brand + semantic */
+  --primary: #2563eb;
+  --success: #16a34a;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+
+  /* Grays */
+  --gray-50:  #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+
+  /* Radius */
+  --radius-sm: 10px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  /* Shadow */
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-md: 0 8px 24px rgba(16, 24, 40, 0.08);
+
+  /* Spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+
+  /* Typography */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+  --fs-caption: 12px;
+  --fs-body: 14px;
+  --fs-h2: 18px;
+  --fs-h1: 28px;
+
+  /* Layout */
+  --container-max: 1200px;
+
+  /* Back-compat aliases used by existing diagnostic CSS (do not remove) */
+  --brand: var(--primary);
+  --brand-2: #1d4ed8;
+  --info: #0ea5e9;
+  --bg: #f6f7fb;
+  --surface: #ffffff;
+  --surface-2: #fbfcff;
+  --border: #e6e8f0;
+  --text: var(--gray-900);
+  --muted: var(--gray-500);
+  --muted-2: var(--gray-400);
+  --success-bg: #eaf7ef;
+  --warning-bg: #fff7e6;
+  --danger-bg: #feecec;
+  --info-bg: #e8f6fe;
+  --brand-bg: #e8efff;
+  --r-lg: var(--radius-lg);
+  --r-md: var(--radius-md);
+  --r-sm: var(--radius-sm);
+  --shadow-1: var(--shadow-sm);
+  --shadow-2: var(--shadow-md);
+  --s-1: var(--space-1);
+  --s-2: var(--space-2);
+  --s-3: var(--space-3);
+  --s-4: var(--space-4);
+  --s-5: var(--space-5);
+  --s-6: var(--space-6);
+  --s-8: var(--space-8);
+  --s-10: 40px;
+  --font: var(--font-sans);
+  --h1: var(--fs-h1);
+  --h2: var(--fs-h2);
+  --base: var(--fs-body);
+  --small: var(--fs-caption);
+  --mono: var(--font-mono);
+}
+

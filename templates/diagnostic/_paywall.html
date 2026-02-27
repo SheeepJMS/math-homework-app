@@ -1,0 +1,12 @@
+{# Paywall / subscription pre-wiring (placeholder)
+   - diag_require_plan(required_plan, feature_name) always allows for now, but logs gating points.
+   - Use as a wrapper to mark premium-only sections without hiding them today. #}
+
+{% macro premium(feature_name, required_plan='pro') -%}
+  {# TODO(paywall/stripe): gate this feature by plan. Keep visible for now. #}
+  {% set _ = diag_require_plan(required_plan, feature_name) %}
+  <div class="premium-section" data-feature="{{ feature_name }}" data-required-plan="{{ required_plan }}">
+    {{ caller() }}
+  </div>
+{%- endmacro %}
+

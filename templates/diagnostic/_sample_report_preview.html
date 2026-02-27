@@ -7,11 +7,11 @@
       <div class="srp-sub">让客户一眼看到：分数、耗时、薄弱点与练习建议（示例数据）</div>
     </div>
     <div class="srp-meta">
-      <span class="srp-meta-item"><i class="fas fa-file-alt"></i>{{ s.exam_title | default('Gauss 7 2025（示例）') }}</span>
+      <span class="srp-meta-item"><i data-lucide="file-text"></i>{{ s.exam_title | default('Gauss 7 2025（示例）') }}</span>
       <span class="srp-meta-sep"></span>
-      <span class="srp-meta-item"><i class="fas fa-calendar-alt"></i>{{ s.submitted_at_str | default('2026-02-20') }}</span>
+      <span class="srp-meta-item"><i data-lucide="calendar"></i>{{ s.submitted_at_str | default('2026-02-20') }}</span>
       <span class="srp-meta-sep"></span>
-      <span class="srp-meta-item"><i class="fas fa-user"></i>{{ s.user_display_name | default('示例学员') }}</span>
+      <span class="srp-meta-item"><i data-lucide="user"></i>{{ s.user_display_name | default('示例学员') }}</span>
     </div>
   </div>
 
@@ -21,21 +21,21 @@
       <div class="srp-hero-sub">正确率 {{ s.accuracy_percent | default(72) }}% · 空题 {{ s.blank_count | default(2) }} 题</div>
     </div>
     <div class="srp-mini">
-      <div class="srp-mini-icon brand"><i class="fas fa-clock"></i></div>
+      <div class="srp-mini-icon brand"><i data-lucide="clock"></i></div>
       <div>
         <div class="srp-mini-value">{{ s.total_time_min | default(28) }} 分钟</div>
         <div class="srp-mini-label">总耗时</div>
       </div>
     </div>
     <div class="srp-mini">
-      <div class="srp-mini-icon info"><i class="fas fa-hourglass-half"></i></div>
+      <div class="srp-mini-icon info"><i data-lucide="hourglass"></i></div>
       <div>
         <div class="srp-mini-value">{{ s.avg_time_sec | default(67) }} 秒</div>
         <div class="srp-mini-label">均题耗时</div>
       </div>
     </div>
     <div class="srp-mini">
-      <div class="srp-mini-icon success"><i class="fas fa-check-double"></i></div>
+      <div class="srp-mini-icon success"><i data-lucide="check-check"></i></div>
       <div>
         <div class="srp-mini-value">{{ s.practice_summary.count | default(10) }} 题</div>
         <div class="srp-mini-label">推荐练习包</div>
@@ -45,7 +45,7 @@
 
   <div class="srp-sections">
     <div class="srp-card">
-      <div class="srp-card-title"><i class="fas fa-clipboard-list"></i>诊断结论摘要</div>
+      <div class="srp-card-title"><i data-lucide="clipboard-list"></i>诊断结论摘要</div>
       <div class="srp-card-body">
         <div class="srp-p"><strong>表现：</strong>正确率 {{ s.accuracy_percent | default(72) }}%，正确 {{ s.correct_count | default(18) }}/{{ s.total_questions | default(25) }} 题。</div>
         <div class="srp-p"><strong>时间管理：</strong>「慢+错」集中在第 {{ (s.slow_wrong_qnums | default([4, 9, 16]) ) | join('、') }} 题；建议优先复盘题干读题与关键步骤。</div>
@@ -54,7 +54,7 @@
     </div>
 
     <div class="srp-card">
-      <div class="srp-card-title"><i class="fas fa-exclamation-triangle"></i>Top 薄弱知识点（示例）</div>
+      <div class="srp-card-title"><i data-lucide="alert-triangle"></i>Top 薄弱知识点（示例）</div>
       <div class="srp-card-body">
         {% set weak = s.kp_weak_top | default([
           {'kp_name':'代数（方程与变量）','wrong_count':4,'n_questions':8},
@@ -76,4 +76,128 @@
       </div>
     </div>
   </div>
+
+  <div class="srp-charts">
+    <div class="srp-card">
+      <div class="srp-card-title"><i data-lucide="hexagon"></i>知识点掌握雷达图（示例）</div>
+      <div class="srp-card-body">
+        <div class="srp-chart-wrap">
+          <canvas id="radarChart"></canvas>
+        </div>
+        <div class="srp-chart-hint">展示“掌握度”对比，客户能一眼看出强弱项。</div>
+      </div>
+    </div>
+    <div class="srp-card">
+      <div class="srp-card-title"><i data-lucide="line-chart"></i>每题平均正确率曲线（示例）</div>
+      <div class="srp-card-body">
+        <div class="srp-chart-wrap">
+          <canvas id="lineChart"></canvas>
+        </div>
+        <div class="srp-chart-hint">用于定位“从哪题开始明显掉分”。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="srp-charts">
+    <div class="srp-card">
+      <div class="srp-card-title"><i data-lucide="bar-chart-3"></i>每题耗时柱状图（示例）</div>
+      <div class="srp-card-body">
+        <div class="srp-chart-wrap">
+          <canvas id="barTimeChart"></canvas>
+        </div>
+        <div class="srp-chart-hint">展示时间管理：慢题、超时题一目了然。</div>
+      </div>
+    </div>
+    <div class="srp-card">
+      <div class="srp-card-title"><i data-lucide="target"></i>正误分布 + 答案分析（示例）</div>
+      <div class="srp-card-body">
+        <div class="srp-dots">
+          {% for row in (s.detail_rows | default([])) %}
+          <span class="srp-dot {% if row.is_correct %}ok{% elif row.is_blank %}blank{% else %}bad{% endif %}" title="第 {{ row.qnum }} 题：{% if row.is_correct %}正确{% elif row.is_blank %}空题{% else %}错误{% endif %}">{{ row.qnum }}</span>
+          {% endfor %}
+        </div>
+        <div class="srp-answer-grid">
+          <div class="srp-answer-metric">
+            <div class="srp-answer-value">{{ s.correct_count | default(0) }}</div>
+            <div class="srp-answer-label">正确</div>
+          </div>
+          <div class="srp-answer-metric">
+            <div class="srp-answer-value">{{ s.wrong_count | default(0) }}</div>
+            <div class="srp-answer-label">错误</div>
+          </div>
+          <div class="srp-answer-metric">
+            <div class="srp-answer-value">{{ s.blank_count | default(0) }}</div>
+            <div class="srp-answer-label">空题</div>
+          </div>
+          <div class="srp-answer-metric">
+            <div class="srp-answer-value">{{ (s.answer_analysis.fast_wrong_qnums | default([])) | length }}</div>
+            <div class="srp-answer-label">快错</div>
+          </div>
+        </div>
+        <div class="srp-mini-list">
+          <div class="srp-mini-list-title">常见失分原因（示例）</div>
+          {% for it in (s.answer_analysis.common_errors | default([])) %}
+          <div class="srp-mini-list-row">
+            <span class="srp-tag">{{ it.tag }}</span>
+            <span class="srp-mini-list-count">{{ it.count }} 次</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="srp-sections">
+    <div class="srp-card">
+      <div class="srp-card-title"><i data-lucide="dumbbell"></i>错题练习包（示例）</div>
+      <div class="srp-card-body">
+        <div class="srp-p">系统会把错题对应知识点自动生成练习包（示例：{{ s.practice_summary.count | default(10) }} 题）。</div>
+        <div class="srp-practice-list">
+          {% for i in range(1, 6) %}
+          <div class="srp-practice-row">
+            <span class="srp-practice-q">练习题 {{ i }}</span>
+            <span class="srp-practice-kp">{{ (s.kp_weak_top[0].kp_name if s.kp_weak_top else '代数') }}</span>
+            <span class="srp-practice-meta">预计 1–2 分钟</span>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="srp-practice-actions">
+          <a class="btn btn-sm btn-primary" href="{{ url_for('diagnostic.register') }}">体验错题练习（注册后）</a>
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('diagnostic.sample_report') }}">查看完整示例报告</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="srp-card">
+      <div class="srp-card-title"><i data-lucide="signal"></i>薄弱点条形图（示例）</div>
+      <div class="srp-card-body">
+        <div class="srp-chart-wrap srp-chart-short">
+          <canvas id="barWeakChart"></canvas>
+        </div>
+        <div class="srp-chart-hint">展示 Top 薄弱点错题数量（用于行动建议）。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="srp-chart-fallback" id="srpChartFallback" style="display:none;">
+    图表脚本未加载（可能被网络拦截）。不影响示例报告文字展示。
+  </div>
 </div>
+
+<script>
+(function(){
+  var s = {{ (sample_report or {}) | tojson }};
+  var payload = (s && s.chart) ? s.chart : {};
+  payload.kp_weak_top = s.kp_weak_top || [];
+  function boot(){
+    if (typeof window.Chart === 'undefined' || typeof window.initDiagnosticReportCharts !== 'function') {
+      var fb = document.getElementById('srpChartFallback');
+      if (fb) fb.style.display = '';
+      return;
+    }
+    try { window.initDiagnosticReportCharts(payload); } catch (e) {}
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+</script>

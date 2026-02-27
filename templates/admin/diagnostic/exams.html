@@ -1,6 +1,8 @@
 {% extends "admin/base.html" %}
 {% block admin_content %}
 <div class="container">
+    <link rel="stylesheet" href="{{ url_for('static', filename='diagnostic/tokens.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='diagnostic/diagnostic_ui.css') }}">
     <input type="hidden" id="pageCsrfToken" value="{{ csrf_token() }}">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>诊断试卷管理</h2>
@@ -55,7 +57,7 @@
             {% for (subject, category), comps_dict in hierarchy.items() %}
             <div class="mb-4 category-group">
                 <div class="text-muted small mb-2 d-flex align-items-center category-toggle" data-collapse-target="#collapse-cat-{{ loop.index }}" role="button" aria-expanded="false">
-                    <i class="fas fa-chevron-down category-chevron me-1" style="transition:transform .2s; transform:rotate(-90deg);"></i>
+                    <i data-lucide="chevron-down" class="category-chevron me-1" style="transition:transform .2s; transform:rotate(-90deg);"></i>
                     <strong class="text-dark">{{ subject }}</strong>
                     <span class="mx-1">›</span>
                     <strong class="text-dark">{{ category }}</strong>
@@ -64,7 +66,7 @@
                 {% for comp_key, data in comps_dict.items() %}
                 <div class="ms-3 mb-2 exam-comp-group">
                     <div class="fw-bold text-primary mb-1 d-flex align-items-center comp-toggle" data-collapse-target="#collapse-comp-{{ data.comp.id }}" role="button" aria-expanded="false">
-                        <i class="fas fa-chevron-down comp-chevron me-1" style="transition:transform .2s; transform:rotate(-90deg);"></i>
+                        <i data-lucide="chevron-down" class="comp-chevron me-1" style="transition:transform .2s; transform:rotate(-90deg);"></i>
                         {{ data.comp.name }}
                     </div>
                     <div class="collapse" id="collapse-comp-{{ data.comp.id }}">
@@ -351,4 +353,6 @@
   });
 })();
 </script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>try{ lucide.createIcons(); }catch(e){}</script>
 {% endblock %}

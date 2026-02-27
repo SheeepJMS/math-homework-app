@@ -11,7 +11,7 @@
   min-height: calc(100vh - 56px);
   padding-top: 2rem;
   padding-bottom: 3rem;
-  background: #f0f2f5;
+  background: var(--gray-50);
 }
 
 .auth-page .auth-container {
@@ -41,7 +41,7 @@
   justify-content: center;
   position: relative;
   overflow: hidden;
-  background-color: #1e3a5f;
+  background-color: var(--gray-900);
   background-image: var(--auth-hero-bg, url('/static/diagnostic/img/auth-hero.png'));
   background-size: cover;
   background-position: center;
