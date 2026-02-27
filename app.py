@@ -2975,7 +2975,8 @@ def lesson_students(lesson_id):
     completed_histories = QuizHistory.query.filter_by(lesson_id=lesson_id).all()
     completed_students = set(h.user for h in completed_histories)
     completed = [s for s in students if s in completed_students]
-    not_completed = [s for s in students if s not in completed_students]
+    # 未完成：过滤掉已被停用（未激活）的学生
+    not_completed = [s for s in students if s not in completed_students and getattr(s, 'is_active', True)]
 
     # 统计每个已完成学生的得分
     completed_scores = []
