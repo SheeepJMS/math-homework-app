@@ -45,6 +45,7 @@
             <input type="hidden" name="time_spent_ms" id="timeSpentMs" value="0">
             <div class="mb-3">
                 <label class="form-label">答案</label>
+                <div class="form-text text-muted">提示：输入根号请用 <code>v</code> 表示。例如 √3 写 <code>v3</code>。</div>
                 <div class="options-vertical">
                     {% for opt in choices %}
                     {% set key_val = opt.get('key', opt) %}

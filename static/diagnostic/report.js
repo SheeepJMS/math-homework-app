@@ -39,7 +39,7 @@
           backgroundColor: tokens.brandFill,
           borderColor: tokens.brand,
           pointBackgroundColor: tokens.brand,
-          tension: 0.3,
+          tension: 0,
         }],
       },
       options: {
