@@ -736,25 +736,29 @@
 
 /* ========== 正误圆圈格点 ========== */
 .correctness-dots {
-  display: flex;
-  flex-wrap: wrap;
+  /* 响应式网格：容器越宽，每行题号越多；同时保持均匀铺开 */
+  --dot-size: 28px;
+  --dot-col-min: 32px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--dot-col-min), 1fr));
   gap: var(--s-2);
   align-items: center;
   padding: var(--s-3) 0;
-  max-width: 300px;
+  width: 100%;
 }
 
 .correctness-dots .dot {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: var(--dot-size);
+  height: var(--dot-size);
   border-radius: 50%;
   font-size: var(--small);
   font-weight: 500;
   color: #fff;
   flex-shrink: 0;
+  justify-self: center;
 }
 
 .correctness-dots a.dot {
@@ -768,6 +772,21 @@
 .correctness-dots .dot-correct { background: var(--success); }
 .correctness-dots .dot-wrong   { background: var(--danger); }
 .correctness-dots .dot-blank  { background: var(--warning); color: var(--text); }
+
+@media (min-width: 768px) {
+  .correctness-dots {
+    --dot-size: 30px;
+    --dot-col-min: 36px;
+    gap: var(--s-3);
+  }
+}
+
+@media (min-width: 1024px) {
+  .correctness-dots {
+    --dot-size: 32px;
+    --dot-col-min: 40px;
+  }
+}
 
 .correctness-dots .dot-legend {
   width: 8px;
