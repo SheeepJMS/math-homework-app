@@ -239,9 +239,13 @@ def _sample_report_mock():
 def inject_diag_user():
     try:
         user = get_diag_user_from_cookie()
-        return {'user': user}
+        static_v = os.environ.get('RENDER_GIT_COMMIT') or os.environ.get('GIT_COMMIT') or ''
+        static_v = (static_v or '')[:12] or datetime.utcnow().strftime('%Y%m%d%H%M')
+        return {'user': user, 'diag_static_v': static_v}
     except Exception:
-        return {'user': None}
+        static_v = os.environ.get('RENDER_GIT_COMMIT') or os.environ.get('GIT_COMMIT') or ''
+        static_v = (static_v or '')[:12] or datetime.utcnow().strftime('%Y%m%d%H%M')
+        return {'user': None, 'diag_static_v': static_v}
 
 
 def get_diag_user_from_cookie():

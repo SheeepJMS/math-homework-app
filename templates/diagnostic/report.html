@@ -1,7 +1,7 @@
 {% extends "diagnostic/base.html" %}
 {% block title %}报告 - {{ exam_title | default('N/A') }}{% endblock %}
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='diagnostic/report.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='diagnostic/report.css', v=diag_static_v) }}">
 {% endblock %}
 {% block content %}
 <div class="report-page py-4">
@@ -219,7 +219,7 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="{{ url_for('static', filename='diagnostic/report.js') }}"></script>
+<script src="{{ url_for('static', filename='diagnostic/report.js', v=diag_static_v) }}"></script>
 <script>
 (function(){
   var data = {
