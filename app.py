@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_from_directory, send_file
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_from_directory, send_file, abort
 import os
 import pandas as pd
 from werkzeug.utils import secure_filename
@@ -372,6 +372,10 @@ class DiagUser(db.Model):
     # 预留：未来邮箱找回
     email = db.Column(db.String(255), nullable=True)
     email_verified = db.Column(db.Boolean, default=False, nullable=False)
+    # 注册学员补充信息（可选，默认不影响旧账号）
+    birth_year = db.Column(db.Integer, nullable=True)  # 出生年份
+    school = db.Column(db.String(255), nullable=True)  # 学校
+    province = db.Column(db.String(32), nullable=True, default='BC')  # 地区（省/州），默认 BC
 
 
 class DiagPasswordResetToken(db.Model):
@@ -504,8 +508,6 @@ class DiagAttemptAnswer(db.Model):
     answer = db.Column(db.String(50), nullable=True)
     is_correct = db.Column(db.Boolean, nullable=True)
     time_spent_ms = db.Column(db.BigInteger, default=0)
-    # 专家诊断：错因分类标签（可选）。用于报告的错因统计；无数据时报告自动隐藏该模块。
-    error_type = db.Column(db.String(64), nullable=True)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     attempt = db.relationship('DiagAttempt', backref=db.backref('answers', lazy=True))
     question = db.relationship('DiagQuestion', backref=db.backref('attempt_answers', lazy=True))

@@ -17,6 +17,34 @@
             <label for="confirm_password" class="auth-label">确认密码</label>
             <input type="password" class="auth-input" id="confirm_password" name="confirm_password" required>
         </div>
+        <div class="auth-field">
+            <label for="birth_year" class="auth-label">出生年份</label>
+            <input type="number" class="auth-input" id="birth_year" name="birth_year" min="1900" max="2100" placeholder="如：2014（可选）">
+            <div class="auth-help" id="gradeHint" style="margin-top:6px; color: rgba(17,24,39,0.65); font-size: 12px;">年级估算：N/A</div>
+        </div>
+        <div class="auth-field">
+            <label for="school" class="auth-label">学校</label>
+            <input type="text" class="auth-input" id="school" name="school" placeholder="学校名称（可选）">
+        </div>
+        <div class="auth-field">
+            <label for="province" class="auth-label">地区（省/州）</label>
+            <select class="auth-input" id="province" name="province">
+                <option value="BC" selected>BC 不列颠哥伦比亚</option>
+                <option value="AB">AB 阿尔伯塔</option>
+                <option value="ON">ON 安大略</option>
+                <option value="QC">QC 魁北克</option>
+                <option value="MB">MB 曼尼托巴</option>
+                <option value="SK">SK 萨斯喀彻温</option>
+                <option value="NS">NS 新斯科舍</option>
+                <option value="NB">NB 新不伦瑞克</option>
+                <option value="NL">NL 纽芬兰与拉布拉多</option>
+                <option value="PE">PE 爱德华王子岛</option>
+                <option value="NT">NT 西北地区</option>
+                <option value="NU">NU 努纳武特</option>
+                <option value="YT">YT 育空</option>
+                <option value="OTHER">其它</option>
+            </select>
+        </div>
         <button type="submit" class="auth-btn">注册</button>
     </form>
     <p class="auth-switch">
@@ -26,4 +54,30 @@
         数据仅用于生成学习报告，不对外公开。
     </p>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{{ super() }}
+<script>
+(function(){
+  var el = document.getElementById('birth_year');
+  var hint = document.getElementById('gradeHint');
+  if (!el || !hint) return;
+  function calc(by) {
+    var y = new Date().getFullYear();
+    var n = parseInt(by, 10);
+    if (!n || n < 1900 || n > y) return 'N/A';
+    var age = y - n;
+    var g = age - 5; // 6岁≈1年级
+    if (g <= 0) return '学前';
+    if (g >= 13) return '12年级+';
+    return g + '年级';
+  }
+  function render() {
+    hint.textContent = '年级估算：' + calc(el.value);
+  }
+  el.addEventListener('input', render);
+  render();
+})();
+</script>
 {% endblock %}

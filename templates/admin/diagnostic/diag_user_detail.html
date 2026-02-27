@@ -16,6 +16,9 @@
                     <p><strong>用户名：</strong>{{ user.username }}</p>
                     <p><strong>密码：</strong>******** <span class="text-muted small">（加密存储，无法查看。可重置）</span></p>
                     <p><strong>注册时间：</strong>{{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else 'N/A' }}</p>
+                    <p><strong>出生年份：</strong>{{ user.birth_year or 'N/A' }}{% if user.birth_year %} <span class="text-muted small">（约 {{ user.birth_year | estimate_grade }}）</span>{% endif %}</p>
+                    <p><strong>学校：</strong>{{ user.school or 'N/A' }}</p>
+                    <p><strong>地区（省/州）：</strong>{{ user.province or 'BC' }}</p>
                     <p><strong>状态：</strong>
                         <span class="badge {% if user.is_active %}bg-success{% else %}bg-secondary{% endif %}">
                             {{ '正常' if user.is_active else '已停用' }}

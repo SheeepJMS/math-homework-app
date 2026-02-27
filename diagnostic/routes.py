@@ -187,6 +187,26 @@ def format_percent1(val):
     return f"{v:.1f}%"
 
 
+@diagnostic_bp.app_template_filter('estimate_grade')
+def estimate_grade(birth_year):
+    """根据出生年份粗略估算年级（仅展示用）。"""
+    if birth_year is None:
+        return 'N/A'
+    try:
+        by = int(birth_year)
+    except Exception:
+        return 'N/A'
+    y = datetime.utcnow().year
+    age = y - by
+    # 经验：6岁≈1年级 → grade = age - 5
+    g = age - 5
+    if g <= 0:
+        return '学前'
+    if g >= 13:
+        return '12年级+'
+    return f'{g}年级'
+
+
 def require_plan(required_plan='pro', feature_name=None, user=None):
     """订阅/权限预埋：当前不拦截，仅记录未来应被 gate 的功能。"""
     try:
@@ -329,6 +349,9 @@ def register():
         username = (request.form.get('username') or '').strip()
         password = request.form.get('password') or ''
         confirm = request.form.get('confirm_password') or ''
+        birth_year_raw = (request.form.get('birth_year') or '').strip()
+        school = (request.form.get('school') or '').strip()
+        province = (request.form.get('province') or 'BC').strip() or 'BC'
         if not username or not password:
             flash('用户名和密码不能为空', 'error')
             return render_template('diagnostic/register.html', sample_report=_sample_report_mock())
@@ -338,9 +361,21 @@ def register():
         if db.session.query(DiagUser).filter_by(username=username).first():
             flash('用户名已存在', 'error')
             return render_template('diagnostic/register.html', sample_report=_sample_report_mock())
+        birth_year = None
+        if birth_year_raw:
+            try:
+                birth_year = int(birth_year_raw)
+                y = datetime.utcnow().year
+                if birth_year < 1900 or birth_year > y:
+                    birth_year = None
+            except Exception:
+                birth_year = None
         user = DiagUser(
             username=username,
-            password_hash=generate_password_hash(password, method='pbkdf2:sha256')
+            password_hash=generate_password_hash(password, method='pbkdf2:sha256'),
+            birth_year=birth_year,
+            school=school or None,
+            province=province or 'BC',
         )
         db.session.add(user)
         db.session.commit()
