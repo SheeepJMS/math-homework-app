@@ -32,7 +32,13 @@
                                 </span>
                             </td>
                             <td>
-                                <a href="{{ url_for('diagnostic_admin.diag_user_detail', user_id=u.id) }}" class="btn btn-sm btn-primary">查看</a>
+                                <div class="d-flex gap-2">
+                                    <a href="{{ url_for('diagnostic_admin.diag_user_detail', user_id=u.id) }}" class="btn btn-sm btn-primary">查看</a>
+                                    <form method="post" action="{{ url_for('diagnostic_admin.diag_user_login_as', user_id=u.id) }}" class="d-inline" target="_blank">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary">进入主页</button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                         {% else %}

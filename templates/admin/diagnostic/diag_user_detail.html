@@ -30,6 +30,10 @@
                     <button type="button" class="btn btn-outline-primary ms-2" data-bs-toggle="modal" data-bs-target="#resetPasswordModal">
                         <i class="fas fa-key"></i> 重置密码
                     </button>
+                    <form method="post" action="{{ url_for('diagnostic_admin.diag_user_login_as', user_id=user.id) }}" class="d-inline ms-2" target="_blank">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-outline-secondary"><i class="fas fa-external-link-alt"></i> 进入主页</button>
+                    </form>
                 </div>
             </div>
         </div>

@@ -1,7 +1,8 @@
 # 诊断后台：/admin/diagnostic/*，使用现有 admin_required（Flask-Login）
-from flask import Blueprint, request, redirect, url_for, render_template, flash, current_app, abort, send_file
-from datetime import datetime
+from flask import Blueprint, request, redirect, url_for, render_template, flash, current_app, abort, send_file, make_response
+from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash
+import secrets
 import csv
 import io
 import json
@@ -1216,3 +1217,29 @@ def diag_user_reset_password(user_id):
     db.session.commit()
     flash('密码已重置', 'success')
     return redirect(url_for('diagnostic_admin.diag_user_detail', user_id=user_id))
+
+
+@diagnostic_admin_bp.route('/diag-users/<int:user_id>/login-as', methods=['POST'])
+@admin_required
+def diag_user_login_as(user_id):
+    """管理员以该诊断学员身份进入 /diagnostic/（设置 diag_session cookie）。"""
+    db = _db()
+    from app import DiagUser, DiagSession
+    user = db.session.get(DiagUser, user_id)
+    if not user:
+        abort(404)
+    if not getattr(user, 'is_active', True):
+        flash('该账号已停用，无法进入主页', 'warning')
+        return redirect(url_for('diagnostic_admin.diag_user_detail', user_id=user_id))
+
+    cookie_name = os.environ.get('DIAG_COOKIE_NAME', 'diag_session')
+    days = int(os.environ.get('DIAG_SESSION_DAYS', '7'))
+    token = secrets.token_urlsafe(32)
+    expires = datetime.utcnow() + timedelta(days=days)
+    sess = DiagSession(user_id=user.id, token=token, expires_at=expires)
+    db.session.add(sess)
+    db.session.commit()
+
+    resp = make_response(redirect(url_for('diagnostic.index')))
+    resp.set_cookie(cookie_name, token, max_age=days * 86400, httponly=True, samesite='Lax', path='/')
+    return resp
