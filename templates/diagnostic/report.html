@@ -177,52 +177,33 @@
           </div>
         </div>
       </div>
-      <div class="card chart-card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i data-lucide="layout-grid" class="me-2"></i>答题正误分布</span>
-          <span class="correctness-legend-compact">
-            <span class="legend-item legend-correct"><span class="dot dot-correct dot-legend"></span><span class="legend-label">正确</span></span>
-            <span class="legend-item legend-wrong"><span class="dot dot-wrong dot-legend"></span><span class="legend-label">错误</span></span>
-            <span class="legend-item legend-blank"><span class="dot dot-blank dot-legend"></span><span class="legend-label">空题</span></span>
-          </span>
-        </div>
-        <div class="card-body">
-          <div class="correctness-dots">
-            {% for row in detail_rows %}
-            <a href="#q-{{ row.qnum }}" class="dot {% if row.is_correct %}dot-correct{% elif row.is_blank %}dot-blank{% else %}dot-wrong{% endif %}" title="第 {{ row.qnum }} 题{% if row.is_correct %}：正确{% elif row.is_blank %}：空题{% else %}：错误{% endif %}，点击跳转到解析">{{ row.qnum }}</a>
-            {% endfor %}
-          </div>
-        </div>
-      </div>
-    </div>
-    {% if kp_has_data and kp_weak_top %}
-    <div class="mb-4">
+      {% if kp_has_data and kp_weak_top %}
       <div class="card chart-card">
         <div class="card-header"><i data-lucide="alert-triangle" class="me-2"></i>Top 薄弱知识点</div>
         <div class="card-body">
-          <div class="chart-container" style="height: 160px;"><canvas id="barWeakChart"></canvas></div>
+          <div class="chart-container" style="height: 180px;"><canvas id="barWeakChart"></canvas></div>
         </div>
       </div>
+      {% endif %}
     </div>
-    {% endif %}
 
-    {# E) CTA #}
-    {% if practice_set %}
-    <div class="card mb-4 no-print">
-      <div class="card-body text-center" style="padding: var(--s-10);">
-        <p class="mb-4" style="color: var(--muted);">将推送 {{ practice_summary.count | default(0) }} 题，预计 {{ practice_summary.est_minutes | default(5) }} 分钟</p>
-        <a href="{{ url_for('diagnostic.practice', practice_set_id=practice_set.id) }}" class="btn btn-primary">
-          <i data-lucide="play" class="me-2"></i>开始错题练习包
-        </a>
+    {# 答题正误分布（拉宽，紧贴逐题详情） #}
+    <div class="card chart-card mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i data-lucide="layout-grid" class="me-2"></i>答题正误分布</span>
+        <span class="correctness-legend-compact">
+          <span class="legend-item legend-correct"><span class="dot dot-correct dot-legend"></span><span class="legend-label">正确</span></span>
+          <span class="legend-item legend-wrong"><span class="dot dot-wrong dot-legend"></span><span class="legend-label">错误</span></span>
+          <span class="legend-item legend-blank"><span class="dot dot-blank dot-legend"></span><span class="legend-label">空题</span></span>
+        </span>
       </div>
-    </div>
-    {% endif %}
-
-    <div class="mb-4 no-print">
-      <button type="button" class="btn btn-secondary" onclick="window.print()"><i data-lucide="printer" class="me-2"></i>打印报告</button>
-      {% call premium('pdf_export', 'pro') %}
-        <button type="button" class="btn btn-outline-secondary ms-2" disabled title="即将上线（预埋订阅权限）"><i data-lucide="file-down" class="me-2"></i>导出 PDF</button>
-      {% endcall %}
+      <div class="card-body">
+        <div class="correctness-dots">
+          {% for row in detail_rows %}
+          <a href="#q-{{ row.qnum }}" class="dot {% if row.is_correct %}dot-correct{% elif row.is_blank %}dot-blank{% else %}dot-wrong{% endif %}" title="第 {{ row.qnum }} 题{% if row.is_correct %}：正确{% elif row.is_blank %}：空题{% else %}：错误{% endif %}，点击跳转到解析">{{ row.qnum }}</a>
+          {% endfor %}
+        </div>
+      </div>
     </div>
 
     {# F) 逐题详情 #}
