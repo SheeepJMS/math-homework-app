@@ -1,5 +1,5 @@
 # 诊断模块对外路由：/diagnostic/*，独立 cookie 认证
-from flask import Blueprint, request, redirect, url_for, render_template, flash, make_response, abort
+from flask import Blueprint, request, redirect, url_for, render_template, flash, make_response, abort, jsonify
 from datetime import datetime, timedelta
 from functools import wraps
 import os
@@ -7,6 +7,8 @@ import re
 import secrets
 import json
 import random
+import math
+import statistics
 from werkzeug.security import generate_password_hash, check_password_hash
 
 
@@ -362,6 +364,19 @@ def sample_report():
         speed = '慢' if qnum in (s.get('slow_wrong_qnums') or []) else ('快' if qnum in ((s.get('answer_analysis') or {}).get('fast_wrong_qnums') or []) else '中')
         kp_primary_name = (kp_weak_top[0].get('kp_name') if kp_weak_top else '代数')
         kp_secondary_names = ['概念', '读题', '计算'][:2]
+        error_tag = '读题遗漏' if (not is_correct and not is_blank and qnum in (4, 9)) else ('计算失误' if (not is_correct and not is_blank) else 'unknown')
+        error_type = None
+        if error_tag != 'unknown':
+            if '计算' in error_tag:
+                error_type = 'arithmetic_error'
+            elif '概念' in error_tag:
+                error_type = 'concept_misunderstanding'
+            elif '建模' in error_tag:
+                error_type = 'modeling_error'
+            elif '时间' in error_tag:
+                error_type = 'time_management'
+            else:
+                error_type = 'careless_error'
         detail_rows.append({
             'qnum': qnum,
             'points': 1,
@@ -370,7 +385,8 @@ def sample_report():
             'speed': speed,
             'kp_primary_name': kp_primary_name,
             'kp_secondary_names': kp_secondary_names,
-            'error_tag': '读题遗漏' if (not is_correct and not is_blank and qnum in (4, 9)) else ('计算失误' if (not is_correct and not is_blank) else 'unknown'),
+            'error_type': error_type,
+            'error_tag': error_tag,
             'user_answer': ('—' if is_blank else ('A' if is_correct else 'C')),
             'correct_answer': 'B',
             'time_sec': int((s.get('chart') or {}).get('chart_bar_time', [avg_time_sec] * total)[qnum - 1]) if qnum >= 1 and (s.get('chart') or {}).get('chart_bar_time') else avg_time_sec,
@@ -387,6 +403,22 @@ def sample_report():
     fast_wrong = [{'qnum': x} for x in ((s.get('answer_analysis') or {}).get('fast_wrong_qnums') or [])]
 
     ch = s.get('chart') or {}
+    kp_radar = []
+    for i, lab in enumerate(ch.get('chart_radar_labels') or []):
+        try:
+            v = float((ch.get('chart_radar_values') or [0] * 10)[i])
+        except Exception:
+            v = 0
+        kp_radar.append({'category': lab, 'value_0to100': v, 'n_questions': 0})
+    expert_diag = _compute_expert_diagnosis({
+        'total_questions': total,
+        'accuracy_percent': s.get('accuracy_percent'),
+        'score_percent': s.get('score_percent') or s.get('accuracy_percent'),
+        'score_max': total,
+        'blank_count': blank,
+        'detail_rows': detail_rows,
+        'kp_radar': kp_radar,
+    })
     return render_template(
         'diagnostic/report.html',
         user=user,
@@ -424,6 +456,7 @@ def sample_report():
         # 逐题
         detail_rows=detail_rows,
         chart_bar_labels_slow_indices=[],
+        expert_diag=expert_diag,
     )
 
 
@@ -1182,6 +1215,303 @@ def _parse_choices(choices_json):
     return [{'key': c, 'text': c} for c in ('A', 'B', 'C', 'D', 'E')]
 
 
+def _safe_mean(xs):
+    xs = [float(x) for x in (xs or []) if x is not None]
+    if not xs:
+        return 0.0
+    return float(sum(xs)) / float(len(xs))
+
+
+def _safe_stdev(xs):
+    xs = [float(x) for x in (xs or []) if x is not None]
+    if len(xs) < 2:
+        return 0.0
+    try:
+        return float(statistics.stdev(xs))
+    except Exception:
+        return 0.0
+
+
+def _time_stability_score(time_secs):
+    """时间稳定度：使用 CV=stdev/mean，将其映射到 0~100（越高越稳定）。"""
+    xs = [float(t) for t in (time_secs or []) if t is not None and float(t) > 0]
+    if len(xs) < 3:
+        return {'score_0to100': None, 'cv': None}
+    m = _safe_mean(xs)
+    if m <= 0:
+        return {'score_0to100': None, 'cv': None}
+    sd = _safe_stdev(xs)
+    cv = sd / m
+    score = int(round(max(0.0, 1.0 - min(1.0, cv)) * 100, 0))
+    return {'score_0to100': score, 'cv': float(cv)}
+
+
+def _level_from_metrics(accuracy_percent, score_percent, time_stability_score):
+    """能力等级：1~5。核心依据：正确率/得分率/时间稳定度（缺失时降级）。"""
+    acc = float(accuracy_percent or 0.0)
+    sp = float(score_percent or 0.0)
+    ts = time_stability_score if time_stability_score is not None else 60.0
+    composite = 0.45 * sp + 0.45 * acc + 0.10 * float(ts)
+    if composite >= 85:
+        level = 5
+    elif composite >= 70:
+        level = 4
+    elif composite >= 55:
+        level = 3
+    elif composite >= 40:
+        level = 2
+    else:
+        level = 1
+    labels = {
+        1: '基础待强化',
+        2: '基础提升期',
+        3: '中等水平',
+        4: '具备竞赛潜力',
+        5: '冲刺高分水平',
+    }
+    stages = {
+        1: '先补基础概念与常见题型，建立稳定解题流程',
+        2: '专项练习 + 纠错复盘，减少低级失分',
+        3: '分模块强化 + 套题训练，提升综合迁移能力',
+        4: '套卷训练 + 策略优化，追求稳定高分',
+        5: '冲刺阶段：稳定输出 + 难题突破与心态管理',
+    }
+    return {'level_score': level, 'level_label': labels[level], 'prep_stage': stages[level], 'composite': composite}
+
+
+def _predicted_range(score_max, level_score):
+    """预测得分区间（基于 level 的经验区间，输出数值范围）。"""
+    try:
+        mx = float(score_max or 0)
+    except Exception:
+        mx = 0
+    if mx <= 0:
+        return None
+    pct_ranges = {
+        1: (10, 35),
+        2: (25, 50),
+        3: (45, 70),
+        4: (65, 88),
+        5: (80, 98),
+    }
+    lo, hi = pct_ranges.get(int(level_score or 1), (30, 60))
+    a = int(round(mx * lo / 100.0, 0))
+    b = int(round(mx * hi / 100.0, 0))
+    if a > b:
+        a, b = b, a
+    return {'low': a, 'high': b, 'max': int(round(mx, 0))}
+
+
+def _median(xs):
+    xs = [float(x) for x in (xs or []) if x is not None]
+    if not xs:
+        return None
+    xs = sorted(xs)
+    n = len(xs)
+    mid = n // 2
+    if n % 2 == 1:
+        return xs[mid]
+    return (xs[mid - 1] + xs[mid]) / 2.0
+
+
+def _compute_style_profile(detail_rows):
+    """答题风格画像：四象限统计 + 3条风格描述。"""
+    rows = detail_rows or []
+    time_list = [r.get('time_sec') for r in rows if not r.get('is_blank')]
+    t_med = _median([t for t in time_list if t and float(t) > 0])
+    if t_med is None:
+        t_med = _safe_mean([t for t in time_list if t and float(t) > 0]) or 0
+
+    quad = {'fast_wrong': 0, 'slow_wrong': 0, 'fast_correct': 0, 'slow_correct': 0}
+    total_attempted = 0
+    for r in rows:
+        if r.get('is_blank'):
+            continue
+        total_attempted += 1
+        t = float(r.get('time_sec') or 0)
+        is_fast = (t_med > 0 and t <= t_med)
+        is_correct = bool(r.get('is_correct'))
+        if is_fast and is_correct:
+            quad['fast_correct'] += 1
+        elif (not is_fast) and is_correct:
+            quad['slow_correct'] += 1
+        elif is_fast and (not is_correct):
+            quad['fast_wrong'] += 1
+        else:
+            quad['slow_wrong'] += 1
+
+    denom = max(1, total_attempted)
+    fw = quad['fast_wrong'] / denom
+    sw = quad['slow_wrong'] / denom
+    fc = quad['fast_correct'] / denom
+
+    if fw >= 0.30 and (fw > sw):
+        style = '冲动型'
+        desc = [
+            '容易快速作答但出现非必要错误，建议先“审题-列式-再计算”。',
+            '每题最后留 3~5 秒做反向检查（单位/符号/边界）。',
+            '优先训练“易错题型清单”，把快错转化为快对。',
+        ]
+    elif sw >= 0.30 and (sw >= fw):
+        style = '理解困难型'
+        desc = [
+            '慢+错占比较高，通常卡在模型建立或关键概念上。',
+            '建议把错题按知识点拆分，先补“定义/典型例题/变式”。',
+            '限时做“同类题 3 题”，训练从题面到模型的提取速度。',
+        ]
+    elif fc >= 0.45 and (fw + sw) <= 0.20:
+        style = '熟练型'
+        desc = [
+            '快+对占比较高，说明基础题与常规题型掌握扎实。',
+            '建议把节省时间用于 1~2 道压轴题的策略尝试。',
+            '保持稳定输出，避免追求速度导致粗心。',
+        ]
+    else:
+        style = '稳健型'
+        desc = [
+            '整体节奏相对均衡，说明你能在速度与正确之间权衡。',
+            '建议把慢题拆解为“卡点清单”，逐步降低慢错比例。',
+            '通过套卷训练形成固定节奏：先稳拿基础分，再冲高分。',
+        ]
+
+    calc_stability = '高' if (fw + sw) <= 0.25 else ('中' if (fw + sw) <= 0.45 else '低')
+    ts = _time_stability_score([r.get('time_sec') for r in rows if not r.get('is_blank')]).get('score_0to100')
+    time_level = '高' if (ts is not None and ts >= 75) else ('中' if (ts is not None and ts >= 55) else '低')
+
+    return {
+        'quadrants': quad,
+        'style_label': style,
+        'calculation_stability': calc_stability,
+        'time_allocation_stability': time_level,
+        'descriptions': desc,
+        'slow_wrong_ratio': sw,
+    }
+
+
+def _compute_error_type_stats(detail_rows):
+    """错因分类统计：仅统计已标注 error_type 的非空且错误题。"""
+    rows = detail_rows or []
+    allowed = [
+        'arithmetic_error',
+        'concept_misunderstanding',
+        'modeling_error',
+        'careless_error',
+        'time_management',
+    ]
+    labels = {
+        'arithmetic_error': '计算失误',
+        'concept_misunderstanding': '概念误解',
+        'modeling_error': '建模错误',
+        'careless_error': '粗心失误',
+        'time_management': '时间管理',
+    }
+    counts = {k: 0 for k in allowed}
+    total = 0
+    for r in rows:
+        if r.get('is_blank') or r.get('is_correct'):
+            continue
+        et = (r.get('error_type') or '').strip()
+        if not et:
+            continue
+        if et not in counts:
+            continue
+        counts[et] += 1
+        total += 1
+    if total <= 0:
+        return None
+    items = []
+    for k in allowed:
+        n = counts.get(k, 0)
+        if n <= 0:
+            continue
+        pct = round(100 * n / total, 0)
+        items.append({'key': k, 'label': labels.get(k, k), 'count': n, 'percent': int(pct)})
+    items = sorted(items, key=lambda x: -x['count'])
+    return {'total_tagged': total, 'items': items}
+
+
+def _compute_risk(accuracy_percent, blank_count, slow_wrong_ratio):
+    acc = float(accuracy_percent or 0.0)
+    blanks = int(blank_count or 0)
+    swr = float(slow_wrong_ratio or 0.0)
+    flags = []
+    if acc < 30:
+        flags.append('正确率偏低（<30%）')
+    if blanks > 3:
+        flags.append('空题偏多（>3）')
+    if swr >= 0.30:
+        flags.append('慢+错比例偏高')
+    score = len(flags)
+    if score >= 3:
+        level = '高'
+        tone = 'danger'
+    elif score == 2:
+        level = '中'
+        tone = 'warning'
+    else:
+        level = '低'
+        tone = 'success'
+    return {'risk_level': level, 'tone': tone, 'reasons': flags}
+
+
+def _compute_growth(kp_radar):
+    """成长潜力：找优势知识点并生成一句专家鼓励语。"""
+    items = kp_radar or []
+    items = [x for x in items if (x.get('category') or '').strip() and x.get('category') != '暂无']
+    if not items:
+        return None
+    top = sorted(items, key=lambda x: -(float(x.get('value_0to100') or 0)))[:2]
+    names = [t.get('category') for t in top if float(t.get('value_0to100') or 0) >= 60]
+    if not names:
+        return None
+    if len(names) == 1:
+        text = f'在「{names[0]}」相关题目中表现相对更稳定，说明该模块的解题结构已具备基础优势。建议保持优势并向相邻模块迁移。'
+    else:
+        text = f'在「{names[0]}」与「{names[1]}」题型中表现较好，说明逻辑结构理解能力具备基础优势。建议以此为支点，带动薄弱模块提升。'
+    return {'strength_kps': names, 'message': text}
+
+
+def _compute_expert_diagnosis(ctx):
+    """专家诊断型报告：返回 5 个模块数据；无数据的模块返回 None。"""
+    total = int(ctx.get('total_questions') or 0)
+    if total <= 0:
+        return None
+    detail_rows = ctx.get('detail_rows') or []
+    acc = float(ctx.get('accuracy_percent') or 0.0)
+    sp = float(ctx.get('score_percent') or 0.0) or float(acc)
+    time_stab = _time_stability_score([r.get('time_sec') for r in detail_rows if not r.get('is_blank')])
+    level_meta = _level_from_metrics(acc, sp, time_stab.get('score_0to100'))
+    pr = _predicted_range(ctx.get('score_max') or ctx.get('total_questions'), level_meta['level_score'])
+    module1 = {
+        'level_score': level_meta['level_score'],
+        'level_label': level_meta['level_label'],
+        'predicted_range': pr,
+        'prep_stage': level_meta['prep_stage'],
+        'time_stability_score': time_stab.get('score_0to100'),
+    }
+
+    style = _compute_style_profile(detail_rows)
+    module2 = {
+        'quadrants': style['quadrants'],
+        'style_label': style['style_label'],
+        'calculation_stability': style['calculation_stability'],
+        'time_allocation_stability': style['time_allocation_stability'],
+        'descriptions': style['descriptions'],
+    }
+
+    module3 = _compute_error_type_stats(detail_rows)
+    module4 = _compute_risk(acc, ctx.get('blank_count'), style.get('slow_wrong_ratio'))
+    module5 = _compute_growth(ctx.get('kp_radar') or [])
+
+    return {
+        'ability_level': module1,
+        'answer_style': module2,
+        'error_type_stats': module3,
+        'learning_risk': module4,
+        'growth_potential': module5,
+    }
+
+
 def _build_report_data(att, user, db):
     """组装报告数据结构，缺失字段安全降级为 N/A 或空。优先使用 CSV 导入的答案/解析/知识点。"""
     from sqlalchemy import func
@@ -1286,6 +1616,7 @@ def _build_report_data(att, user, db):
             'correct_answer': correct_ans,
             'kp_primary_name': primary_kp or 'N/A',
             'kp_secondary_names': secondary_kps,
+            'error_type': getattr(aa, 'error_type', None) if aa else None,
             'error_tag': getattr(aa, 'error_tag', None) or 'unknown',
             'solution_text': solution_txt,
             'solution_image_url': getattr(q, 'solution_image_url', None) if q else None,
@@ -1374,7 +1705,37 @@ def report(attempt_id):
     report_data['attempt'] = att
     report_data['chart_radar_labels'] = [r['category'] for r in report_data['kp_radar']]
     report_data['chart_radar_values'] = [r['value_0to100'] for r in report_data['kp_radar']]
+    report_data['expert_diag'] = _compute_expert_diagnosis(report_data)
     return render_template('diagnostic/report.html', **report_data)
+
+
+@diagnostic_bp.route('/api/attempt-answer/<int:answer_id>/error-type', methods=['POST'])
+@require_diag_login
+def set_attempt_answer_error_type(answer_id):
+    """为某题打错因标签（用于专家诊断：错因分类统计）。"""
+    db = _get_db()
+    from app import DiagAttemptAnswer, DiagAttempt
+    aa = db.session.get(DiagAttemptAnswer, answer_id)
+    if not aa:
+        abort(404)
+    att = db.session.get(DiagAttempt, aa.attempt_id)
+    user = get_diag_user_from_cookie()
+    if not att or not user or att.user_id != user.id:
+        abort(403)
+    payload = request.get_json(silent=True) or {}
+    et = (payload.get('error_type') or '').strip()
+    allowed = {
+        'arithmetic_error',
+        'concept_misunderstanding',
+        'modeling_error',
+        'careless_error',
+        'time_management',
+    }
+    if et and et not in allowed:
+        return jsonify({'ok': False, 'error': 'invalid_error_type'}), 400
+    aa.error_type = et or None
+    db.session.commit()
+    return jsonify({'ok': True, 'error_type': aa.error_type})
 
 
 def _parse_practice_choices(choices_str):

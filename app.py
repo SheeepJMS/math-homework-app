@@ -504,6 +504,8 @@ class DiagAttemptAnswer(db.Model):
     answer = db.Column(db.String(50), nullable=True)
     is_correct = db.Column(db.Boolean, nullable=True)
     time_spent_ms = db.Column(db.BigInteger, default=0)
+    # 专家诊断：错因分类标签（可选）。用于报告的错因统计；无数据时报告自动隐藏该模块。
+    error_type = db.Column(db.String(64), nullable=True)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     attempt = db.relationship('DiagAttempt', backref=db.backref('answers', lazy=True))
     question = db.relationship('DiagQuestion', backref=db.backref('attempt_answers', lazy=True))

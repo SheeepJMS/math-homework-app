@@ -410,6 +410,177 @@
   margin-bottom: 0;
 }
 
+/* ========== 专家诊断型模块 ========== */
+.expert-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--s-4);
+}
+@media (min-width: 1024px) {
+  .expert-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .expert-card-wide {
+    grid-column: span 2;
+  }
+}
+
+.expert-card {
+  padding: 0; /* 复用 card-header/card-body 的 padding */
+}
+.expert-card .expert-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-4) var(--card-pad);
+  border-bottom: 1px solid var(--border);
+}
+.expert-card .expert-title {
+  font-weight: 700;
+  font-size: var(--h2);
+  color: var(--text);
+}
+.expert-card .expert-body {
+  padding: var(--card-pad);
+}
+
+.expert-kv {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--s-4);
+}
+@media (min-width: 768px) {
+  .expert-kv {
+    grid-template-columns: 1.6fr 1fr;
+    align-items: center;
+  }
+}
+.expert-big {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.expert-stars {
+  margin-top: var(--s-2);
+  color: #f5c518;
+  display: inline-flex;
+  gap: 2px;
+}
+.expert-small-label {
+  font-size: var(--small);
+  color: var(--muted);
+}
+.expert-range {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text);
+}
+.expert-desc {
+  margin-top: var(--s-4);
+  border-top: 1px dashed var(--border);
+  padding-top: var(--s-4);
+}
+.expert-text {
+  margin-top: var(--s-1);
+  color: var(--text);
+}
+.expert-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin-bottom: var(--s-3);
+}
+.expert-list {
+  margin: var(--s-3) 0 0 0;
+  padding-left: 18px;
+  color: var(--text);
+}
+.expert-list li {
+  margin-bottom: 6px;
+}
+.expert-hint {
+  margin-top: var(--s-3);
+  font-size: var(--small);
+}
+
+/* 四象限简图 */
+.quad-grid {
+  display: grid;
+  grid-template-columns: 56px 1fr 1fr;
+  gap: 8px;
+  margin-top: var(--s-2);
+}
+.quad-cell {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 10px;
+  text-align: center;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: var(--small);
+}
+.quad-head {
+  background: #f3f4f6;
+  color: var(--muted);
+  font-weight: 700;
+  border-style: dashed;
+}
+.quad-ok {
+  background: var(--success-bg);
+  border-color: rgba(22, 163, 74, 0.18);
+}
+.quad-bad {
+  background: var(--danger-bg);
+  border-color: rgba(239, 68, 68, 0.18);
+}
+.quad-num {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+/* 错因横向条形图（纯 CSS，免额外依赖） */
+.err-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.err-row {
+  display: grid;
+  grid-template-columns: 110px 1fr 110px;
+  gap: 10px;
+  align-items: center;
+}
+@media (max-width: 575px) {
+  .err-row {
+    grid-template-columns: 90px 1fr 70px;
+  }
+}
+.err-label {
+  color: var(--text);
+  font-weight: 600;
+  font-size: var(--small);
+}
+.err-meta {
+  text-align: right;
+  color: var(--muted);
+  font-size: var(--small);
+}
+.err-bar-wrap {
+  height: 10px;
+  background: #f3f4f6;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.err-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--warning), var(--brand));
+  border-radius: 999px;
+}
+
 /* ========== F) 图表区 ========== */
 .charts-grid {
   display: grid;

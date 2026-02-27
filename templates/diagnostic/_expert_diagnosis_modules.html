@@ -1,0 +1,149 @@
+{# 专家诊断型报告模块（插入在“诊断结论摘要”下方） #}
+{% if expert_diag %}
+  <div class="expert-grid mb-4">
+
+    {# 1) 能力等级评估 #}
+    {% set m1 = expert_diag.ability_level %}
+    {% if m1 %}
+    <div class="card expert-card">
+      <div class="expert-head">
+        <div class="expert-title"><i class="fas fa-bullseye me-2" style="color: var(--brand);"></i>能力等级评估</div>
+        <div class="badge badge-info">Level {{ m1.level_score }}</div>
+      </div>
+      <div class="expert-body">
+        <div class="expert-kv">
+          <div class="expert-kv-main">
+            <div class="expert-big">{{ m1.level_label }}</div>
+            <div class="expert-stars" aria-label="level stars">
+              {% for i in range(1,6) %}
+                {% if i <= (m1.level_score or 0) %}
+                  <i class="fas fa-star"></i>
+                {% else %}
+                  <i class="far fa-star"></i>
+                {% endif %}
+              {% endfor %}
+            </div>
+          </div>
+          <div class="expert-kv-side">
+            {% if m1.predicted_range %}
+              <div class="expert-small-label">预测得分区间</div>
+              <div class="expert-range">{{ m1.predicted_range.low }}–{{ m1.predicted_range.high }} / {{ m1.predicted_range.max }}</div>
+            {% endif %}
+          </div>
+        </div>
+        <div class="expert-desc">
+          <div class="expert-small-label">建议备赛阶段</div>
+          <div class="expert-text">{{ m1.prep_stage }}</div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {# 2) 答题风格画像 #}
+    {% set m2 = expert_diag.answer_style %}
+    {% if m2 %}
+    <div class="card expert-card">
+      <div class="expert-head">
+        <div class="expert-title"><i class="fas fa-brain me-2" style="color: var(--brand);"></i>答题风格画像</div>
+        <div class="badge badge-neutral">{{ m2.style_label }}</div>
+      </div>
+      <div class="expert-body">
+        <div class="expert-badges">
+          <span class="badge badge-success">计算稳定度：{{ m2.calculation_stability }}</span>
+          <span class="badge badge-info">时间分配稳定度：{{ m2.time_allocation_stability }}</span>
+        </div>
+        {% if m2.quadrants %}
+        <div class="quad-grid" role="group" aria-label="fast/slow x correct/wrong">
+          <div class="quad-cell quad-head"></div>
+          <div class="quad-cell quad-head">快</div>
+          <div class="quad-cell quad-head">慢</div>
+          <div class="quad-cell quad-head">对</div>
+          <div class="quad-cell quad-ok">快+对<br><span class="quad-num">{{ m2.quadrants.fast_correct }}</span></div>
+          <div class="quad-cell quad-ok">慢+对<br><span class="quad-num">{{ m2.quadrants.slow_correct }}</span></div>
+          <div class="quad-cell quad-head">错</div>
+          <div class="quad-cell quad-bad">快+错<br><span class="quad-num">{{ m2.quadrants.fast_wrong }}</span></div>
+          <div class="quad-cell quad-bad">慢+错<br><span class="quad-num">{{ m2.quadrants.slow_wrong }}</span></div>
+        </div>
+        {% endif %}
+        {% if m2.descriptions %}
+        <ul class="expert-list">
+          {% for t in m2.descriptions[:3] %}
+            <li>{{ t }}</li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {# 3) 错因分类统计（无数据时隐藏） #}
+    {% set m3 = expert_diag.error_type_stats %}
+    {% if m3 and m3.items and (m3.total_tagged or 0) > 0 %}
+    <div class="card expert-card expert-card-wide">
+      <div class="expert-head">
+        <div class="expert-title"><i class="fas fa-exclamation-triangle me-2" style="color: var(--warning);"></i>错因分类统计</div>
+        <div class="badge badge-neutral">已标注 {{ m3.total_tagged }} 题</div>
+      </div>
+      <div class="expert-body">
+        <div class="err-bars">
+          {% for it in m3.items %}
+          <div class="err-row">
+            <div class="err-label">{{ it.label }}</div>
+            <div class="err-bar-wrap" aria-label="{{ it.label }} {{ it.percent }}%">
+              <div class="err-bar" style="width: {{ it.percent }}%;"></div>
+            </div>
+            <div class="err-meta">{{ it.count }}（{{ it.percent }}%）</div>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="expert-hint text-muted">提示：错因需要在评分数据中标注（`error_type`），未标注则不展示本模块。</div>
+      </div>
+    </div>
+    {% endif %}
+
+    {# 4) 学习风险提示 #}
+    {% set m4 = expert_diag.learning_risk %}
+    {% if m4 %}
+    <div class="card expert-card">
+      <div class="expert-head">
+        <div class="expert-title"><i class="fas fa-shield-alt me-2" style="color: var(--brand);"></i>学习风险提示</div>
+        <div class="badge {% if m4.tone=='danger' %}badge-danger{% elif m4.tone=='warning' %}badge-warning{% else %}badge-success{% endif %}">风险：{{ m4.risk_level }}</div>
+      </div>
+      <div class="expert-body">
+        {% if m4.reasons and m4.reasons|length > 0 %}
+          <ul class="expert-list">
+            {% for r in m4.reasons %}
+              <li>{{ r }}</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <div class="expert-text">当前风险信号较少，建议保持节奏并持续复盘错题。</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {# 5) 成长潜力分析（无知识点数据时隐藏） #}
+    {% set m5 = expert_diag.growth_potential %}
+    {% if m5 %}
+    <div class="card expert-card">
+      <div class="expert-head">
+        <div class="expert-title"><i class="fas fa-chart-line me-2" style="color: var(--success);"></i>成长潜力分析</div>
+        <div class="badge badge-success">优势</div>
+      </div>
+      <div class="expert-body">
+        <div class="expert-text">{{ m5.message }}</div>
+        {% if m5.strength_kps %}
+          <div class="mt-2">
+            {% for kp in m5.strength_kps %}
+              <span class="chip chip-primary">{{ kp }}</span>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+{% endif %}
+
