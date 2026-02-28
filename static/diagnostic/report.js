@@ -40,6 +40,8 @@
           borderColor: tokens.brand,
           pointBackgroundColor: tokens.brand,
           tension: 0,
+          borderJoinStyle: 'miter',
+          borderCapStyle: 'butt',
         }],
       },
       options: {
@@ -47,7 +49,7 @@
           r: {
             min: 0,
             max: 100,
-            grid: { color: tokens.border },
+            grid: { color: tokens.border, circular: false },
             angleLines: { color: tokens.border },
           },
         },

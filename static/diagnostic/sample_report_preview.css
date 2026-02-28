@@ -117,6 +117,117 @@
 .srp-weak-bar { height: 8px; background: #eef1fb; border-radius: 999px; overflow: hidden; }
 .srp-weak-bar-fill { height: 100%; background: linear-gradient(90deg, #60a5fa, #2563eb); border-radius: 999px; }
 
+.srp-charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-3);
+  margin-top: var(--s-3);
+}
+@media (max-width: 992px) {
+  .srp-charts { grid-template-columns: 1fr; }
+}
+
+.srp-chart-wrap {
+  position: relative;
+  height: 220px;
+}
+.srp-chart-wrap.srp-chart-short { height: 180px; }
+.srp-chart-hint {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 8px;
+}
+
+.srp-dots {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 12px;
+}
+@media (max-width: 576px) {
+  .srp-dots { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+}
+.srp-dot {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: #fff;
+  user-select: none;
+}
+.srp-dot.ok { background: rgba(22, 163, 74, 0.85); }
+.srp-dot.bad { background: rgba(239, 68, 68, 0.85); }
+.srp-dot.blank { background: rgba(107, 114, 128, 0.75); }
+
+.srp-answer-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 10px;
+}
+@media (max-width: 576px) {
+  .srp-answer-grid { grid-template-columns: repeat(2, 1fr); }
+}
+.srp-answer-metric {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+  background: var(--surface-2);
+}
+.srp-answer-value { font-weight: 800; font-size: 18px; }
+.srp-answer-label { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+.srp-mini-list { margin-top: 10px; }
+.srp-mini-list-title { font-weight: 700; font-size: 13px; margin-bottom: 6px; }
+.srp-mini-list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.srp-mini-list-row:last-child { border-bottom: none; padding-bottom: 0; }
+.srp-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eef1fb;
+  color: #1f2a44;
+  font-size: 12px;
+}
+.srp-mini-list-count { color: var(--muted); font-size: 12px; }
+
+.srp-practice-list { margin-top: 10px; }
+.srp-practice-row {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr) 110px;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.srp-practice-row:last-child { border-bottom: none; padding-bottom: 0; }
+.srp-practice-q { font-weight: 700; }
+.srp-practice-kp { color: #1f2a44; }
+.srp-practice-meta { color: var(--muted); font-size: 12px; text-align: right; }
+.srp-practice-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
+.srp-chart-fallback {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+  border: 1px dashed var(--border);
+  background: var(--surface-2);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+}
+
 .srp-page-note {
   background: #fff;
   border: 1px dashed var(--border);

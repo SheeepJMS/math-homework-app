@@ -3,6 +3,10 @@
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='diagnostic/sample_report_preview.css') }}">
 {% endblock %}
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='diagnostic/report.js') }}"></script>
+{% endblock %}
 {% block content %}
 <div class="container py-4">
   <div class="srp-page-note">
