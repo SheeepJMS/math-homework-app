@@ -24,10 +24,10 @@
                         <tr>
                             <th>课程名称</th>
                             <th>描述</th>
-                            <th style="min-width: 220px;">班级</th>
+                            <th class="col-classes">班级</th>
                             <th>状态</th>
                             <th>创建时间</th>
-                            <th style="min-width: 370px;">操作</th>
+                            <th class="col-actions">操作</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -35,7 +35,7 @@
                         <tr data-lesson-id="{{ lesson.id }}">
                             <td>{{ lesson.title }}</td>
                             <td>{{ lesson.description }}</td>
-                            <td>
+                            <td class="td-classes">
                                 {% for class in lesson.classes %}
                                 <span class="badge bg-info">{{ class.name }}</span>
                                 {% else %}
@@ -48,59 +48,58 @@
                                 </span>
                             </td>
                             <td>{{ lesson.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
-                            <td>
-                                <div class="lesson-actions btn-toolbar justify-content-start" role="toolbar">
-                                    <!-- 主操作：启用状态 / 管理题目 / 查看学生 -->
-                                    <div class="btn-group btn-group-sm me-2 mb-1" role="group" aria-label="课程主要操作">
-                                        <button type="button"
-                                                class="btn {% if lesson.is_active %}btn-warning{% else %}btn-success{% endif %}"
-                                                onclick="toggleLessonStatus('{{ lesson.id }}', this)">
-                                            <i class="fas {% if lesson.is_active %}fa-pause{% else %}fa-play{% endif %}"></i>
-                                            {{ '停用' if lesson.is_active else '激活' }}
-                                        </button>
-                                        <a href="{{ url_for('manage_questions', lesson_id=lesson.id) }}" class="btn btn-primary">
-                                            <i class="fas fa-bee"></i> 管理题目
-                                        </a>
-                                        <a href="{{ url_for('lesson_students', lesson_id=lesson.id) }}" class="btn btn-info">
-                                            <i class="fas fa-users"></i> 学生
-                                        </a>
+                            <td class="td-actions">
+                                <div class="lesson-actions" role="toolbar">
+                                    <div class="lesson-actions-row">
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <button type="button"
+                                                    class="btn {% if lesson.is_active %}btn-warning{% else %}btn-success{% endif %}"
+                                                    onclick="toggleLessonStatus('{{ lesson.id }}', this)">
+                                                <i class="fas {% if lesson.is_active %}fa-pause{% else %}fa-play{% endif %}"></i>
+                                                {{ '停用' if lesson.is_active else '激活' }}
+                                            </button>
+                                            <a href="{{ url_for('manage_questions', lesson_id=lesson.id) }}" class="btn btn-primary">
+                                                <i class="fas fa-bee"></i> 管理题目
+                                            </a>
+                                            <a href="{{ url_for('lesson_students', lesson_id=lesson.id) }}" class="btn btn-info">
+                                                <i class="fas fa-users"></i> 学生
+                                            </a>
+                                        </div>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            {% if lesson.video_url %}
+                                            <a href="{{ lesson.video_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-info">
+                                                <i class="fas fa-eye"></i> 查看回放
+                                            </a>
+                                            <button type="button" class="btn btn-info" onclick="uploadVideo('{{ lesson.id }}')">
+                                                <i class="fas fa-video"></i> 更改回放
+                                            </button>
+                                            {% else %}
+                                            <button type="button" class="btn btn-secondary" onclick="uploadVideo('{{ lesson.id }}')">
+                                                <i class="fas fa-video"></i> 上传回放
+                                            </button>
+                                            {% endif %}
+                                        </div>
                                     </div>
-
-                                    <!-- 回放相关：查看 / 上传 / 更改 -->
-                                    <div class="btn-group btn-group-sm me-2 mb-1" role="group" aria-label="课程回放">
-                                        {% if lesson.video_url %}
-                                        <a href="{{ lesson.video_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-info">
-                                            <i class="fas fa-eye"></i> 查看回放
-                                        </a>
-                                        <button type="button" class="btn btn-info" onclick="uploadVideo('{{ lesson.id }}')">
-                                            <i class="fas fa-video"></i> 更改回放
-                                        </button>
-                                        {% else %}
-                                        <button type="button" class="btn btn-secondary" onclick="uploadVideo('{{ lesson.id }}')">
-                                            <i class="fas fa-video"></i> 上传回放
-                                        </button>
-                                        {% endif %}
-                                    </div>
-
-                                    <!-- 课件与维护：课件 / 编辑 / 删除 -->
-                                    <div class="btn-group btn-group-sm mb-1" role="group" aria-label="课件与维护">
-                                        {% if lesson.courseware_files %}
-                                        <a href="{{ url_for('view_lesson_courseware', lesson_id=lesson.id) }}" class="btn btn-success">
-                                            <i class="fas fa-file-alt"></i> 查看课件
-                                        </a>
-                                        {% endif %}
-                                        <button type="button"
-                                                class="btn {% if lesson.courseware_files %}btn-outline-success{% else %}btn-secondary{% endif %}"
-                                                data-bs-toggle="modal"
-                                                data-bs-target="#uploadCoursewareModal{{ lesson.id }}">
-                                            <i class="fas fa-upload"></i> {{ '追加课件' if lesson.courseware_files else '上传课件' }}
-                                        </button>
-                                        <button type="button" class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#editLessonModal{{ lesson.id }}">
-                                            <i class="fas fa-edit"></i> 编辑
-                                        </button>
-                                        <button type="button" class="btn btn-outline-danger" onclick="deleteLesson('{{ lesson.id }}')">
-                                            <i class="fas fa-trash"></i> 删除
-                                        </button>
+                                    <div class="lesson-actions-row">
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            {% if lesson.courseware_files %}
+                                            <a href="{{ url_for('view_lesson_courseware', lesson_id=lesson.id) }}" class="btn btn-success">
+                                                <i class="fas fa-file-alt"></i> 查看课件
+                                            </a>
+                                            {% endif %}
+                                            <button type="button"
+                                                    class="btn {% if lesson.courseware_files %}btn-outline-success{% else %}btn-secondary{% endif %}"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#uploadCoursewareModal{{ lesson.id }}">
+                                                <i class="fas fa-upload"></i> {{ '追加课件' if lesson.courseware_files else '上传课件' }}
+                                            </button>
+                                            <button type="button" class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#editLessonModal{{ lesson.id }}">
+                                                <i class="fas fa-edit"></i> 编辑
+                                            </button>
+                                            <button type="button" class="btn btn-outline-danger" onclick="deleteLesson('{{ lesson.id }}')">
+                                                <i class="fas fa-trash"></i> 删除
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                                 <!-- 上传课件模态框 -->
@@ -350,11 +349,37 @@
     margin-bottom: 0;
 }
 
-/* 行内操作按钮布局 */
+/* 班级列：窄一点 */
+.col-classes, .td-classes {
+    max-width: 150px;
+    min-width: 120px;
+}
+.td-classes .badge {
+    font-size: 0.75rem;
+    padding: 0.25em 0.5em;
+    margin: 0.15rem 0.15rem 0 0;
+}
+
+/* 操作列：宽一点，固定2行按钮，统一行高 */
+.col-actions, .td-actions {
+    min-width: 520px;
+    vertical-align: middle;
+}
+.td-actions {
+    min-height: 88px;
+}
+
 .lesson-actions {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.lesson-actions-row {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    align-items: center;
 }
 
 .lesson-actions .btn-group {
@@ -366,11 +391,12 @@
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
-    padding: 0.25rem 0.6rem;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.8rem;
 }
 
 .lesson-actions .btn-group .fas {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
 }
 
 .badge {
@@ -384,20 +410,9 @@
     padding: 0.75rem;
 }
 
-.table th:nth-child(3), .table td:nth-child(3) {
-    min-width: 220px;
-}
-.table th:last-child, .table td:last-child {
-    min-width: 370px;
-}
-
-@media (max-width: 992px) {
-    .table th:last-child, .table td:last-child {
-        min-width: 320px;
-    }
-    
-    .lesson-actions {
-        gap: 0.3rem;
+@media (max-width: 1200px) {
+    .col-actions, .td-actions {
+        min-width: 460px;
     }
 }
 </style>
