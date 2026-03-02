@@ -49,46 +49,59 @@
                             </td>
                             <td>{{ lesson.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
                             <td>
-                                <div class="d-flex flex-row flex-wrap gap-1 align-items-center">
-                                    <button type="button" class="btn {% if lesson.is_active %}btn-warning{% else %}btn-success{% endif %} btn-sm" onclick="toggleLessonStatus('{{ lesson.id }}', this)">
-                                        <i class="fas {% if lesson.is_active %}fa-pause{% else %}fa-play{% endif %}"></i>
-                                        {{ '停用' if lesson.is_active else '激活' }}
-                                    </button>
-                                    <a href="{{ url_for('manage_questions', lesson_id=lesson.id) }}" class="btn btn-primary btn-sm">
-                                        <i class="fas fa-bee"></i> 管理题目
-                                    </a>
-                                    {% if lesson.video_url %}
-                                    <a href="{{ lesson.video_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-info btn-sm">
-                                        <i class="fas fa-eye"></i> 查看回放
-                                    </a>
-                                    <button type="button" class="btn btn-outline-info btn-sm" onclick="uploadVideo('{{ lesson.id }}')">
-                                        <i class="fas fa-video"></i> 更改回放
-                                    </button>
-                                    {% else %}
-                                    <button type="button" class="btn btn-secondary btn-sm" onclick="uploadVideo('{{ lesson.id }}')">
-                                        <i class="fas fa-video"></i> 上传回放
-                                    </button>
-                                    {% endif %}
-                                    {% if lesson.courseware_files %}
-                                    <a href="{{ url_for('view_lesson_courseware', lesson_id=lesson.id) }}" class="btn btn-success btn-sm">
-                                        <i class="fas fa-file-alt"></i> 查看课件
-                                    </a>
-                                    {% endif %}
-                                    <button type="button"
-                                            class="btn btn-sm {% if lesson.courseware_files %}btn-outline-success{% else %}btn-secondary{% endif %}"
-                                            data-bs-toggle="modal"
-                                            data-bs-target="#uploadCoursewareModal{{ lesson.id }}">
-                                        <i class="fas fa-upload"></i> {{ '追加课件' if lesson.courseware_files else '上传课件' }}
-                                    </button>
-                                    <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#editLessonModal{{ lesson.id }}">
-                                        <i class="fas fa-edit"></i> 编辑
-                                    </button>
-                                    <button type="button" class="btn btn-danger btn-sm" style="min-width:60px;" onclick="deleteLesson('{{ lesson.id }}')">
-                                        <i class="fas fa-trash"></i> 删除
-                                    </button>
-                                    <a href="{{ url_for('lesson_students', lesson_id=lesson.id) }}" class="btn btn-info btn-sm">
-                                        <i class="fas fa-users"></i> 查看学生
-                                    </a>
+                                <div class="lesson-actions btn-toolbar justify-content-start" role="toolbar">
+                                    <!-- 主操作：启用状态 / 管理题目 / 查看学生 -->
+                                    <div class="btn-group btn-group-sm me-2 mb-1" role="group" aria-label="课程主要操作">
+                                        <button type="button"
+                                                class="btn {% if lesson.is_active %}btn-warning{% else %}btn-success{% endif %}"
+                                                onclick="toggleLessonStatus('{{ lesson.id }}', this)">
+                                            <i class="fas {% if lesson.is_active %}fa-pause{% else %}fa-play{% endif %}"></i>
+                                            {{ '停用' if lesson.is_active else '激活' }}
+                                        </button>
+                                        <a href="{{ url_for('manage_questions', lesson_id=lesson.id) }}" class="btn btn-primary">
+                                            <i class="fas fa-bee"></i> 管理题目
+                                        </a>
+                                        <a href="{{ url_for('lesson_students', lesson_id=lesson.id) }}" class="btn btn-info">
+                                            <i class="fas fa-users"></i> 学生
+                                        </a>
+                                    </div>
+
+                                    <!-- 回放相关：查看 / 上传 / 更改 -->
+                                    <div class="btn-group btn-group-sm me-2 mb-1" role="group" aria-label="课程回放">
+                                        {% if lesson.video_url %}
+                                        <a href="{{ lesson.video_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-info">
+                                            <i class="fas fa-eye"></i> 查看回放
+                                        </a>
+                                        <button type="button" class="btn btn-info" onclick="uploadVideo('{{ lesson.id }}')">
+                                            <i class="fas fa-video"></i> 更改回放
+                                        </button>
+                                        {% else %}
+                                        <button type="button" class="btn btn-secondary" onclick="uploadVideo('{{ lesson.id }}')">
+                                            <i class="fas fa-video"></i> 上传回放
+                                        </button>
+                                        {% endif %}
+                                    </div>
+
+                                    <!-- 课件与维护：课件 / 编辑 / 删除 -->
+                                    <div class="btn-group btn-group-sm mb-1" role="group" aria-label="课件与维护">
+                                        {% if lesson.courseware_files %}
+                                        <a href="{{ url_for('view_lesson_courseware', lesson_id=lesson.id) }}" class="btn btn-success">
+                                            <i class="fas fa-file-alt"></i> 查看课件
+                                        </a>
+                                        {% endif %}
+                                        <button type="button"
+                                                class="btn {% if lesson.courseware_files %}btn-outline-success{% else %}btn-secondary{% endif %}"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#uploadCoursewareModal{{ lesson.id }}">
+                                            <i class="fas fa-upload"></i> {{ '追加课件' if lesson.courseware_files else '上传课件' }}
+                                        </button>
+                                        <button type="button" class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#editLessonModal{{ lesson.id }}">
+                                            <i class="fas fa-edit"></i> 编辑
+                                        </button>
+                                        <button type="button" class="btn btn-outline-danger" onclick="deleteLesson('{{ lesson.id }}')">
+                                            <i class="fas fa-trash"></i> 删除
+                                        </button>
+                                    </div>
                                 </div>
                                 <!-- 上传课件模态框 -->
                                 <div class="modal fade" id="uploadCoursewareModal{{ lesson.id }}" tabindex="-1">
@@ -337,20 +350,27 @@
     margin-bottom: 0;
 }
 
-/* 添加新的样式 */
-.btn-group form {
-    display: inline-block;
+/* 行内操作按钮布局 */
+.lesson-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
 }
 
-.btn-group .btn {
+.lesson-actions .btn-group {
+    display: inline-flex;
+    flex-wrap: nowrap;
+}
+
+.lesson-actions .btn-group .btn {
     display: inline-flex;
     align-items: center;
-    gap: 0.3rem;
-    padding: 0.25rem 0.5rem;
+    gap: 0.25rem;
+    padding: 0.25rem 0.6rem;
 }
 
-.btn-group .fas {
-    font-size: 0.875rem;
+.lesson-actions .btn-group .fas {
+    font-size: 0.85rem;
 }
 
 .badge {
@@ -364,24 +384,21 @@
     padding: 0.75rem;
 }
 
-.btn-group {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    align-items: center;
-}
-
-.d-flex.flex-row,
-.btn-group {
-    flex-wrap: nowrap !important;
-    gap: 0.3rem;
-    align-items: center;
-}
 .table th:nth-child(3), .table td:nth-child(3) {
     min-width: 220px;
 }
 .table th:last-child, .table td:last-child {
     min-width: 370px;
+}
+
+@media (max-width: 992px) {
+    .table th:last-child, .table td:last-child {
+        min-width: 320px;
+    }
+    
+    .lesson-actions {
+        gap: 0.3rem;
+    }
 }
 </style>
 
