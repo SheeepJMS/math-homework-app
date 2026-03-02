@@ -58,7 +58,10 @@
                                         <i class="fas fa-bee"></i> 管理题目
                                     </a>
                                     {% if lesson.video_url %}
-                                    <button type="button" class="btn btn-info btn-sm" onclick="uploadVideo('{{ lesson.id }}')">
+                                    <a href="{{ lesson.video_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-info btn-sm">
+                                        <i class="fas fa-eye"></i> 查看回放
+                                    </a>
+                                    <button type="button" class="btn btn-outline-info btn-sm" onclick="uploadVideo('{{ lesson.id }}')">
                                         <i class="fas fa-video"></i> 更改回放
                                     </button>
                                     {% else %}
@@ -66,11 +69,16 @@
                                         <i class="fas fa-video"></i> 上传回放
                                     </button>
                                     {% endif %}
+                                    {% if lesson.courseware_files %}
+                                    <a href="{{ url_for('view_lesson_courseware', lesson_id=lesson.id) }}" class="btn btn-success btn-sm">
+                                        <i class="fas fa-file-alt"></i> 查看课件
+                                    </a>
+                                    {% endif %}
                                     <button type="button"
-                                            class="btn btn-sm {% if lesson.courseware_files %}btn-success{% else %}btn-secondary{% endif %}"
+                                            class="btn btn-sm {% if lesson.courseware_files %}btn-outline-success{% else %}btn-secondary{% endif %}"
                                             data-bs-toggle="modal"
                                             data-bs-target="#uploadCoursewareModal{{ lesson.id }}">
-                                        <i class="fas fa-upload"></i> 上传课件
+                                        <i class="fas fa-upload"></i> {{ '追加课件' if lesson.courseware_files else '上传课件' }}
                                     </button>
                                     <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#editLessonModal{{ lesson.id }}">
                                         <i class="fas fa-edit"></i> 编辑

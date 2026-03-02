@@ -2905,6 +2905,14 @@ def upload_courseware(lesson_id):
     flash('课件上传成功', 'success')
     return redirect(url_for('admin_lessons'))
 
+@app.route('/admin/lesson/<int:lesson_id>/courseware')
+@admin_required
+def view_lesson_courseware(lesson_id):
+    """管理员查看某课程下已上传的课件列表，可下载或继续上传。"""
+    lesson = Lesson.query.get_or_404(lesson_id)
+    files = lesson.courseware_files or []
+    return render_template('admin/lesson_courseware.html', lesson=lesson, courseware_files=files)
+
 @app.route('/courseware/<int:courseware_id>/download')
 @login_required
 def download_courseware(courseware_id):

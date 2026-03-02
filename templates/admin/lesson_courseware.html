@@ -1,0 +1,51 @@
+{% extends "admin/base.html" %}
+
+{% block admin_content %}
+<div class="container">
+    <div class="card">
+        <div class="card-body">
+            <nav aria-label="breadcrumb" class="mb-3">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a href="{{ url_for('admin_lessons') }}">课程管理</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">{{ lesson.title }} · 课件</li>
+                </ol>
+            </nav>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="card-title mb-0">查看课件</h2>
+                <a href="{{ url_for('admin_lessons') }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-arrow-left"></i> 返回课程管理
+                </a>
+            </div>
+
+            {% if courseware_files %}
+            <p class="text-muted">共 {{ courseware_files|length }} 个课件，点击可下载。</p>
+            <ul class="list-group list-group-flush mb-4">
+                {% for cw in courseware_files %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-file-powerpoint text-primary me-2"></i>{{ cw.filename }}</span>
+                    <span class="text-muted small">{{ cw.uploaded_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                    <a href="{{ url_for('download_courseware', courseware_id=cw.id) }}" class="btn btn-primary btn-sm" download>
+                        <i class="fas fa-download"></i> 下载
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="text-muted mb-4">该课程暂无课件。</p>
+            {% endif %}
+
+            <hr>
+            <h5 class="mb-3">上传新课件</h5>
+            <form action="{{ url_for('upload_courseware', lesson_id=lesson.id) }}" method="post" enctype="multipart/form-data" class="row g-2 align-items-end">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="col-auto">
+                    <input type="file" name="courseware" accept=".ppt,.pptx" required class="form-control">
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-upload"></i> 上传</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
