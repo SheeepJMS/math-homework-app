@@ -463,50 +463,134 @@
   margin-bottom: 0;
 }
 
-/* Key Takeaways */
-.takeaways-card .card-body {
+/* AI个性化竞赛训练包（原 Key Takeaways） */
+.takeaways-card.practice-pack-card .card-body {
   padding: var(--s-5);
 }
-.takeaways-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--s-3);
+.practice-pack-head {
   margin-bottom: var(--s-4);
 }
-.takeaways-title {
+.practice-pack-title {
   font-size: var(--h2);
   font-weight: 800;
   color: var(--text);
+  margin: 0;
   display: inline-flex;
   align-items: center;
   gap: var(--s-2);
 }
-.takeaways-grid {
+.practice-pack-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: var(--s-4);
+  gap: var(--s-6);
+  align-items: start;
 }
-@media (min-width: 1024px) {
-  .takeaways-grid {
-    grid-template-columns: 1.2fr 1fr 1fr;
+@media (min-width: 768px) {
+  .practice-pack-grid {
+    grid-template-columns: 1fr auto;
     align-items: start;
   }
 }
-.takeaway-label {
-  font-size: var(--small);
+.practice-pack-desc {
+  font-size: var(--base);
   color: var(--muted);
+  line-height: 1.6;
+  margin-bottom: var(--s-4);
+}
+.practice-pack-weak {
+  margin-bottom: var(--s-4);
+}
+.practice-pack-weak-label {
+  font-size: var(--small);
+  font-weight: 600;
+  color: var(--text);
   margin-bottom: var(--s-2);
 }
-.takeaway-items {
+.practice-pack-weak-tags {
   display: flex;
   flex-wrap: wrap;
   gap: var(--s-2);
 }
-.takeaway-actions {
+.practice-pack-weak-tags .chip {
+  font-size: var(--small);
+}
+.practice-pack-contents-label {
+  font-size: var(--small);
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: var(--s-2);
+}
+.practice-pack-contents-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: var(--small);
+  color: var(--muted);
+  line-height: 1.8;
+}
+.practice-pack-contents-list li {
+  position: relative;
+  padding-left: 1.4em;
+}
+.practice-pack-contents-list li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: var(--success);
+  font-weight: 700;
+}
+.practice-pack-right {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: var(--s-4);
+  min-width: 0;
+}
+@media (min-width: 768px) {
+  .practice-pack-right {
+    min-width: 220px;
+  }
+}
+.practice-pack-info-card {
+  background: var(--surface-2, #f8fafc);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--s-4);
+}
+.practice-pack-info-row {
+  display: flex;
+  justify-content: space-between;
   gap: var(--s-2);
+  font-size: var(--small);
+  padding: var(--s-1) 0;
+}
+.practice-pack-info-row:not(:last-child) {
+  border-bottom: 1px solid var(--border);
+}
+.practice-pack-info-label {
+  color: var(--muted);
+}
+.practice-pack-info-value {
+  color: var(--text);
+  font-weight: 500;
+}
+.practice-pack-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--s-2);
+}
+.practice-pack-btn {
+  width: 100%;
+  padding: var(--s-3) var(--s-5);
+  font-size: 1rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.practice-pack-cta-hint {
+  font-size: var(--small);
+  color: var(--muted);
+  margin: 0;
+  text-align: center;
 }
 
 /* ========== 专家诊断型模块 ========== */
