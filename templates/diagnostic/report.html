@@ -85,22 +85,28 @@
       </div>
     </div>
 
-    {# AI个性化竞赛训练包（原 Key Takeaways） #}
-    <div class="card takeaways-card practice-pack-card mb-4">
-      <div class="card-body">
-        <div class="practice-pack-head">
-          <h2 class="practice-pack-title"><i data-lucide="sparkles" class="me-2"></i>AI个性化竞赛训练包</h2>
-        </div>
+    {# AI个性化训练包（premium SaaS 布局） #}
+    {% set pack_count = practice_summary.count | default(3) %}
+    {% set pack_est_min = (pack_count * 0.5) | round(1) %}
+    <div class="card practice-pack-card mb-4">
+      <div class="practice-pack-card-body">
         <div class="practice-pack-grid">
           <div class="practice-pack-left">
-            <p class="practice-pack-desc">根据本次测试表现，<br>系统自动生成针对性练习题，<br>重点强化你的薄弱知识点。</p>
+            <div class="practice-pack-head">
+              <h2 class="practice-pack-title"><i data-lucide="sparkles" class="me-2"></i>AI个性化训练包</h2>
+              <span class="practice-pack-badge">AI生成</span>
+            </div>
+            <p class="practice-pack-desc">根据本次测试表现，系统自动生成针对性练习题，重点强化你的薄弱知识点。</p>
             <div class="practice-pack-weak">
               <div class="practice-pack-weak-label">薄弱知识点</div>
               {% if kp_has_data and kp_weak_top %}
                 <div class="practice-pack-weak-tags">
                   {% for item in kp_weak_top[:3] %}
-                    <span class="chip chip-primary">{{ item.kp_name }}</span>
+                    <span class="chip chip-slate">{{ item.kp_name }}</span>
                   {% endfor %}
+                  {% if kp_weak_top|length > 3 %}
+                    <span class="chip chip-slate">+{{ kp_weak_top|length - 3 }}</span>
+                  {% endif %}
                 </div>
               {% else %}
                 <div class="text-muted small">暂无知识点标签</div>
@@ -108,28 +114,49 @@
             </div>
             <div class="practice-pack-contents">
               <div class="practice-pack-contents-label">训练内容包含：</div>
-              <ul class="practice-pack-contents-list">
+              <ul class="practice-pack-contents-grid">
                 <li>重点知识点强化</li>
                 <li>相似竞赛题型练习</li>
-                <li>分层难度训练（基础 → 竞赛）</li>
+                <li>分层难度训练（基础→竞赛）</li>
                 <li>每题详细解析</li>
                 <li>错题即时反馈</li>
+                <li>完成后自动更新能力评估</li>
               </ul>
             </div>
           </div>
           <div class="practice-pack-right">
-            <div class="practice-pack-info-card">
-              <div class="practice-pack-info-row"><span class="practice-pack-info-label">题目数量：</span><span class="practice-pack-info-value">{{ practice_summary.count | default(3) }}题</span></div>
-              <div class="practice-pack-info-row"><span class="practice-pack-info-label">预计时间：</span><span class="practice-pack-info-value">{% if practice_summary and practice_summary.est_minutes %}{{ practice_summary.est_minutes }}分钟{% else %}10–15分钟{% endif %}</span></div>
-              <div class="practice-pack-info-row"><span class="practice-pack-info-label">训练类型：</span><span class="practice-pack-info-value">竞赛专项</span></div>
-            </div>
-            <div class="practice-pack-cta">
-              {% if practice_summary and practice_summary.exists and practice_summary.practice_set_id %}
-                <a class="btn btn-primary btn-lg practice-pack-btn" href="{{ url_for('diagnostic.practice', practice_set_id=practice_summary.practice_set_id) }}">🚀 开始针对性训练</a>
-              {% else %}
-                <button class="btn btn-primary btn-lg practice-pack-btn" disabled>🚀 开始针对性训练</button>
-              {% endif %}
-              <p class="practice-pack-cta-hint">完成训练后系统将更新你的能力评估。</p>
+            <div class="practice-pack-cta-panel">
+              <div class="practice-pack-stats">
+                <div class="practice-pack-stat">
+                  <i data-lucide="list-checks" class="practice-pack-stat-icon"></i>
+                  <div class="practice-pack-stat-body">
+                    <span class="practice-pack-stat-label">题目</span>
+                    <span class="practice-pack-stat-value">{{ pack_count }}</span>
+                  </div>
+                </div>
+                <div class="practice-pack-stat">
+                  <i data-lucide="clock" class="practice-pack-stat-icon"></i>
+                  <div class="practice-pack-stat-body">
+                    <span class="practice-pack-stat-label">预计</span>
+                    <span class="practice-pack-stat-value">{{ pack_est_min }} min</span>
+                  </div>
+                </div>
+                <div class="practice-pack-stat">
+                  <i data-lucide="layers" class="practice-pack-stat-icon"></i>
+                  <div class="practice-pack-stat-body">
+                    <span class="practice-pack-stat-label">类型</span>
+                    <span class="practice-pack-stat-value">基础</span>
+                  </div>
+                </div>
+              </div>
+              <div class="practice-pack-cta">
+                {% if practice_summary and practice_summary.exists and practice_summary.practice_set_id %}
+                  <a class="btn btn-primary practice-pack-btn" href="{{ url_for('diagnostic.practice', practice_set_id=practice_summary.practice_set_id) }}">🚀 开始针对性训练</a>
+                {% else %}
+                  <button class="btn btn-primary practice-pack-btn" disabled>🚀 开始针对性训练</button>
+                {% endif %}
+                <p class="practice-pack-cta-hint">完成训练后系统将更新你的能力评估。</p>
+              </div>
             </div>
           </div>
         </div>
