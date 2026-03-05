@@ -383,3 +383,11 @@
   margin-bottom: var(--s-4);
   max-width: 280px;
 }
+
+/* ========== Competition Roadmap 竞赛路线规划 ========== */
+#roadmap-body .roadmap-loading { display: flex; align-items: center; padding: var(--s-4); color: var(--muted); }
+#roadmap-body .roadmap-path-title { font-size: var(--small); color: var(--text); }
+#roadmap-body .roadmap-step { font-size: var(--small); }
+#roadmap-body .roadmap-next,
+#roadmap-body .roadmap-practice { font-size: var(--base); }
+#roadmap-body .roadmap-training li { padding-left: var(--s-2); }

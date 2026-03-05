@@ -177,6 +177,41 @@
     </div>
   </div>
 
+  {# Competition Roadmap 竞赛路线规划 — 由 /diagnostic/api/roadmap 动态加载 #}
+  <div class="dashboard-card mb-4" id="roadmap-card" data-exams-url="{{ url_for('diagnostic.exams') }}">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span><i data-lucide="map" class="me-2"></i>竞赛路线规划 <span class="text-muted small">(Competition Roadmap)</span></span>
+    </div>
+    <div class="card-body" id="roadmap-body">
+      <div class="roadmap-loading" id="roadmap-loading">
+        <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+        <span>加载中...</span>
+      </div>
+      <div class="roadmap-empty d-none" id="roadmap-empty">
+        <div class="dashboard-empty small">
+          <div class="icon-empty"><i data-lucide="map"></i></div>
+          <p class="mb-0">暂无路线数据。完成试卷后可根据年级与赛历获得推荐。</p>
+        </div>
+      </div>
+      <div class="roadmap-content d-none" id="roadmap-content">
+        <div class="roadmap-grade mb-2 text-muted small" id="roadmap-grade"></div>
+        <div class="roadmap-paths mb-3">
+          <div class="roadmap-path mb-3" id="roadmap-path-canada">
+            <div class="roadmap-path-title fw-medium mb-1">Canada 路径</div>
+            <div class="roadmap-stepper d-flex flex-wrap gap-1 align-items-center" id="roadmap-stepper-canada"></div>
+          </div>
+          <div class="roadmap-path">
+            <div class="roadmap-path-title fw-medium mb-1">AMC 路径</div>
+            <div class="roadmap-stepper d-flex flex-wrap gap-1 align-items-center" id="roadmap-stepper-amc"></div>
+          </div>
+        </div>
+        <div class="roadmap-next mb-3" id="roadmap-next"></div>
+        <div class="roadmap-practice mb-3" id="roadmap-practice"></div>
+        <ul class="roadmap-training list-unstyled small text-muted mb-0" id="roadmap-training"></ul>
+      </div>
+    </div>
+  </div>
+
   {# D) 底部：推荐/最近试卷（3–6 条） #}
   <div class="dashboard-exams-section">
     <h3><i data-lucide="pencil" class="me-2"></i>开始新试卷</h3>
@@ -304,6 +339,129 @@
         });
       });
     }
+
+    // Competition Roadmap: fetch /diagnostic/api/roadmap and render
+    (function () {
+      var card = document.getElementById('roadmap-card');
+      var loading = document.getElementById('roadmap-loading');
+      var empty = document.getElementById('roadmap-empty');
+      var content = document.getElementById('roadmap-content');
+      var examsUrl = card ? (card.getAttribute('data-exams-url') || '/diagnostic/exams') : '/diagnostic/exams';
+
+      function showLoading() {
+        if (loading) loading.classList.remove('d-none');
+        if (empty) empty.classList.add('d-none');
+        if (content) content.classList.add('d-none');
+      }
+      function showEmpty() {
+        if (loading) loading.classList.add('d-none');
+        if (empty) empty.classList.remove('d-none');
+        if (content) content.classList.add('d-none');
+      }
+      function showContent() {
+        if (loading) loading.classList.add('d-none');
+        if (empty) empty.classList.add('d-none');
+        if (content) content.classList.remove('d-none');
+      }
+
+      function renderStepper(containerId, pathData) {
+        var el = document.getElementById(containerId);
+        if (!el || !pathData || !pathData.sequence) return;
+        el.innerHTML = '';
+        var completed = pathData.completed || [];
+        var current = pathData.current_stage;
+        var next = pathData.next_target;
+        pathData.sequence.forEach(function (s) {
+          var key = s.contest_key;
+          var name = s.display_name || key;
+          var state = completed.indexOf(key) >= 0 ? 'completed' : (key === next || key === current ? 'current' : 'locked');
+          var span = document.createElement('span');
+          span.className = 'roadmap-step badge me-1 ' +
+            (state === 'completed' ? 'bg-success' : state === 'current' ? 'bg-primary' : 'bg-secondary');
+          span.textContent = name;
+          span.title = state === 'completed' ? '已完成' : state === 'current' ? '当前/下一步' : '未解锁';
+          el.appendChild(span);
+        });
+      }
+
+      function renderNext(paths) {
+        var el = document.getElementById('roadmap-next');
+        if (!el) return;
+        var parts = [];
+        if (paths.CANADA && paths.CANADA.next_target) {
+          var c = paths.CANADA;
+          var name = (c.sequence.find(function (s) { return s.contest_key === c.next_target; }) || {}).display_name || c.next_target;
+          parts.push('Canada：下一目标 <strong>' + name + '</strong>' + (c.next_target_month_name ? '（预计 ' + c.next_target_month_name + '）' : ''));
+        }
+        if (paths.AMC && paths.AMC.next_target) {
+          var a = paths.AMC;
+          var name = (a.sequence.find(function (s) { return s.contest_key === a.next_target; }) || {}).display_name || a.next_target;
+          parts.push('AMC：下一目标 <strong>' + name + '</strong>' + (a.next_target_month_name ? '（预计 ' + a.next_target_month_name + '）' : ''));
+        }
+        el.innerHTML = parts.length ? '<div class="small"><span class="text-muted">下一目标：</span>' + parts.join('；') + '。根据年级与赛历推荐。</div>' : '';
+      }
+
+      function renderPractice(paths) {
+        var el = document.getElementById('roadmap-practice');
+        if (!el) return;
+        var items = [];
+        ['CANADA', 'AMC'].forEach(function (pathId) {
+          var path = paths[pathId];
+          if (!path || !path.recommended_practice) return;
+          path.recommended_practice.forEach(function (p) {
+            var q = (p.search_query || p.contest || p.label || '').replace(/\s+/g, ' ').trim();
+            var href = examsUrl + (q ? '?q=' + encodeURIComponent(q) : '');
+            items.push({ label: p.label, href: href });
+          });
+        });
+        if (items.length === 0) {
+          el.innerHTML = '';
+          return;
+        }
+        el.innerHTML = '<div class="small mb-1 text-muted">推荐练习：</div><div class="d-flex flex-wrap gap-2">' +
+          items.map(function (p) {
+            return '<a href="' + p.href + '" class="btn btn-sm btn-outline-primary">' + p.label + ' → 试卷中心</a>';
+          }).join('') + '</div>';
+      }
+
+      function renderTraining(bullets) {
+        var el = document.getElementById('roadmap-training');
+        if (!el) return;
+        if (!bullets || bullets.length === 0) {
+          el.innerHTML = '';
+          return;
+        }
+        el.innerHTML = '<div class="small text-muted mb-1">训练建议：</div>' +
+          bullets.map(function (b) { return '<li class="mb-1">' + b + '</li>'; }).join('');
+      }
+
+      showLoading();
+      fetch('/diagnostic/api/roadmap', { credentials: 'same-origin' })
+        .then(function (res) {
+          if (!res.ok) throw new Error('roadmap ' + res.status);
+          return res.json();
+        })
+        .then(function (data) {
+          if (data.error) throw new Error(data.message || data.error);
+          showContent();
+          var gradeEl = document.getElementById('roadmap-grade');
+          if (gradeEl) gradeEl.textContent = data.student_grade != null ? '当前年级参考：' + data.student_grade + ' 年级' : '未填写年级，显示通用推荐';
+          var paths = data.paths || {};
+          renderStepper('roadmap-stepper-canada', paths.CANADA);
+          renderStepper('roadmap-stepper-amc', paths.AMC);
+          renderNext(paths);
+          var allPractice = [];
+          ['CANADA', 'AMC'].forEach(function (id) {
+            if (paths[id] && paths[id].recommended_practice) allPractice = allPractice.concat(paths[id].recommended_practice);
+          });
+          renderPractice(paths);
+          var firstPath = paths.CANADA || paths.AMC;
+          renderTraining(firstPath && firstPath.training_path ? firstPath.training_path : []);
+        })
+        .catch(function () {
+          showEmpty();
+        });
+    })();
   });
 </script>
 {% endblock %}

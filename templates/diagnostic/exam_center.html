@@ -16,33 +16,38 @@
 <script>
   document.addEventListener('DOMContentLoaded', function () {
     var search = document.getElementById('examTreeSearch');
-    if (search) {
-      search.addEventListener('input', function () {
-        var q = (this.value || '').toLowerCase().trim();
-        document.querySelectorAll('.tree-year-row').forEach(function (row) {
-          var title = (row.getAttribute('data-title') || '').toLowerCase();
-          var sub = (row.getAttribute('data-subject') || '').toLowerCase();
-          var cat = (row.getAttribute('data-category') || '').toLowerCase();
-          var cont = (row.getAttribute('data-contest') || '').toLowerCase();
-          var yr = (row.getAttribute('data-year') || '').toString();
-          var match = !q || title.indexOf(q) >= 0 || sub.indexOf(q) >= 0 || cat.indexOf(q) >= 0 || cont.indexOf(q) >= 0 || yr.indexOf(q) >= 0;
-          row.style.display = match ? '' : 'none';
-        });
-        function hasVisibleDescendant(el) {
-          var rows = el.querySelectorAll('.tree-year-row');
-          for (var i = 0; i < rows.length; i++) {
-            if (rows[i].style.display !== 'none') return true;
-          }
-          var children = el.querySelectorAll(':scope > .tree-children > .tree-node');
-          for (var j = 0; j < children.length; j++) {
-            if (hasVisibleDescendant(children[j])) return true;
-          }
-          return false;
-        }
-        document.querySelectorAll('.tree-level-3, .tree-level-2, .tree-level-1').forEach(function (node) {
-          node.style.display = hasVisibleDescendant(node) ? '' : 'none';
-        });
+    function applyFilter(q) {
+      if (!search) return;
+      q = (q || '').toLowerCase().trim();
+      document.querySelectorAll('.tree-year-row').forEach(function (row) {
+        var title = (row.getAttribute('data-title') || '').toLowerCase();
+        var sub = (row.getAttribute('data-subject') || '').toLowerCase();
+        var cat = (row.getAttribute('data-category') || '').toLowerCase();
+        var cont = (row.getAttribute('data-contest') || '').toLowerCase();
+        var yr = (row.getAttribute('data-year') || '').toString();
+        var match = !q || title.indexOf(q) >= 0 || sub.indexOf(q) >= 0 || cat.indexOf(q) >= 0 || cont.indexOf(q) >= 0 || yr.indexOf(q) >= 0;
+        row.style.display = match ? '' : 'none';
       });
+      function hasVisibleDescendant(el) {
+        var rows = el.querySelectorAll('.tree-year-row');
+        for (var i = 0; i < rows.length; i++) { if (rows[i].style.display !== 'none') return true; }
+        var children = el.querySelectorAll(':scope > .tree-children > .tree-node');
+        for (var j = 0; j < children.length; j++) { if (hasVisibleDescendant(children[j])) return true; }
+        return false;
+      }
+      document.querySelectorAll('.tree-level-3, .tree-level-2, .tree-level-1').forEach(function (node) {
+        node.style.display = hasVisibleDescendant(node) ? '' : 'none';
+      });
+    }
+    if (search) {
+      var params = new URLSearchParams(window.location.search);
+      var q = params.get('q');
+      if (q) {
+        search.value = q;
+        applyFilter(q);
+        document.querySelectorAll('.tree-level-1, .tree-level-2, .tree-level-3').forEach(function (n) { n.classList.remove('collapsed'); });
+      }
+      search.addEventListener('input', function () { applyFilter(this.value); });
     }
     var firstSub = document.querySelector('.tree-level-1');
     if (firstSub) {

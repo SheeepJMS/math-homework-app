@@ -1,5 +1,5 @@
 # 诊断模块对外路由：/diagnostic/*，独立 cookie 认证
-from flask import Blueprint, request, redirect, url_for, render_template, flash, make_response, abort, current_app
+from flask import Blueprint, request, redirect, url_for, render_template, flash, make_response, abort, current_app, jsonify
 from datetime import datetime, timedelta
 from functools import wraps
 import os
@@ -340,6 +340,21 @@ def index():
         dashboard = _build_dashboard_data(user, db)
         return render_template('diagnostic/dashboard.html', user=user, **dashboard)
     return render_template('diagnostic/index.html')
+
+
+@diagnostic_bp.route('/api/roadmap', methods=['GET'])
+def api_roadmap():
+    """GET /diagnostic/api/roadmap — Competition Roadmap data for the logged-in student. Diagnostic-only."""
+    user = get_diag_user_from_cookie()
+    if not user:
+        return jsonify({'error': 'unauthorized'}), 401
+    db = _get_db()
+    try:
+        data = _build_roadmap_data(user, db)
+        return jsonify(data)
+    except Exception as e:
+        current_app.logger.warning('roadmap api error: %s', e)
+        return jsonify({'error': 'roadmap_build_failed', 'message': str(e)}), 500
 
 
 @diagnostic_bp.route('/register', methods=['GET', 'POST'])
@@ -1036,6 +1051,191 @@ def _build_exam_tree(competitions, in_progress_by_exam, last_finished_by_exam, d
         for c in s['categories']:
             del c['_contests']
     return tree
+
+
+def _build_roadmap_data(user, db):
+    """Build Competition Roadmap JSON for GET /diagnostic/api/roadmap. Uses existing attempts + contest catalog."""
+    from app import DiagAttempt, DiagExam, DiagCompetition
+    from diagnostic.roadmap_config import (
+        PATH_CANADA, PATH_AMC,
+        get_catalog_by_key, get_sequence_for_path, infer_contest_key,
+        grade_eligible, months_near, CONTEST_CATALOG,
+        AIME_AMC10_THRESHOLD, AIME_AMC12_THRESHOLD,
+    )
+    as_of = datetime.utcnow()
+    # Infer grade from birth_year (North America: grade 1 ≈ age 6–7)
+    grade = None
+    if getattr(user, 'birth_year', None) is not None:
+        try:
+            age = as_of.year - int(user.birth_year)
+            if 5 <= age <= 22:
+                grade = age - 6  # grade 1 at 7 yo
+                if grade < 1:
+                    grade = 1
+                if grade > 12:
+                    grade = 12
+        except (TypeError, ValueError):
+            pass
+
+    # Finished attempts with exam + competition
+    finished = db.session.query(DiagAttempt).filter(
+        DiagAttempt.user_id == user.id,
+        DiagAttempt.status == 'finished'
+    ).order_by(DiagAttempt.finished_at.desc()).all()
+
+    # Map attempt -> (contest_key, score, date)
+    attempt_contest_scores = []
+    for att in finished:
+        exam = getattr(att, 'exam', None)
+        if not exam:
+            continue
+        comp = getattr(exam, 'competition', None)
+        comp_name = getattr(comp, 'name', None) if comp else None
+        exam_title = getattr(exam, 'title', None) or ''
+        ckey = infer_contest_key(comp_name, exam_title)
+        if not ckey:
+            continue
+        st = _attempt_quick_stats(att, db)
+        fin_at = getattr(att, 'finished_at', None) or getattr(att, 'started_at', None)
+        attempt_contest_scores.append({
+            'contest_key': ckey,
+            'score': st['score'],
+            'score_max': st['score_max'],
+            'finished_at': fin_at,
+        })
+
+    catalog = get_catalog_by_key()
+
+    def build_path(path_id):
+        sequence = get_sequence_for_path(path_id)
+        if not sequence:
+            return {
+                'sequence': [],
+                'completed': [],
+                'current_stage': None,
+                'next_target': None,
+                'recommended_practice': [],
+                'training_path': [],
+                'confidence': 'low',
+            }
+        completed = list(dict.fromkeys([
+            a['contest_key'] for a in attempt_contest_scores
+            if a['contest_key'] in sequence
+        ]))
+        # Keep order of first occurrence (most recent per contest)
+        completed_ordered = [c for c in sequence if c in completed]
+        current_stage = completed_ordered[-1] if completed_ordered else None
+        # Next target: first in sequence after current_stage that is grade-eligible; prefer season-near
+        candidates = []
+        for ckey in sequence:
+            if ckey == current_stage:
+                continue
+            if current_stage and sequence.index(ckey) <= sequence.index(current_stage):
+                continue
+            if not grade_eligible(ckey, grade):
+                continue
+            candidates.append(ckey)
+        next_target = None
+        if candidates:
+            # Prefer contest whose month is within next 0–3 months
+            for c in candidates:
+                if months_near(c, as_of, 3):
+                    next_target = c
+                    break
+            if not next_target:
+                next_target = candidates[0]
+        elif not current_stage:
+            # No completion yet: first grade-eligible in sequence
+            for c in sequence:
+                if grade_eligible(c, grade):
+                    next_target = c
+                    break
+
+        # AIME override for AMC path
+        if path_id == PATH_AMC and sequence == get_sequence_for_path(PATH_AMC):
+            cutoff_12m = as_of - timedelta(days=365)
+            for a in attempt_contest_scores:
+                if a['contest_key'] not in ('AMC10', 'AMC12') or (a.get('finished_at') and a['finished_at'] < cutoff_12m):
+                    continue
+                if a['contest_key'] == 'AMC10' and a.get('score', 0) >= AIME_AMC10_THRESHOLD:
+                    next_target = 'AIME'
+                    break
+                if a['contest_key'] == 'AMC12' and a.get('score', 0) >= AIME_AMC12_THRESHOLD:
+                    next_target = 'AIME'
+                    break
+
+        # Recommended practice: max 3 per path (labels + query for 试卷中心)
+        recommended_practice = []
+        if next_target:
+            c = catalog.get(next_target)
+            if c:
+                display_name = c.get('display_name', next_target)
+                recommended_practice.append({
+                    'label': display_name + ' 近年真题',
+                    'contest': next_target,
+                    'search_query': display_name,
+                    'years': 5,
+                })
+        for ckey in reversed(sequence):
+            if ckey == next_target or len(recommended_practice) >= 3:
+                continue
+            if ckey in completed_ordered and ckey not in [p['contest'] for p in recommended_practice]:
+                c = catalog.get(ckey)
+                if c:
+                    display_name = c.get('display_name', ckey)
+                    recommended_practice.append({
+                        'label': display_name + ' 巩固',
+                        'contest': ckey,
+                        'search_query': display_name,
+                        'years': 3,
+                    })
+        recommended_practice = recommended_practice[:3]
+
+        # Training path bullets (3–5)
+        training_path = []
+        if next_target:
+            c = catalog.get(next_target)
+            name = c.get('display_name', next_target) if c else next_target
+            training_path.append('下一步目标：' + name)
+        training_path.append('按年级与赛历选择下一场竞赛，保持节奏练习。')
+        training_path.append('完成试卷后可在报告中心查看薄弱知识点。')
+        if not grade:
+            training_path.append('填写出生年份后可获得更精准的年级推荐。')
+        training_path = training_path[:5]
+
+        confidence = 'high' if (grade is not None and attempt_contest_scores) else ('medium' if grade is not None else 'low')
+
+        month_num = (catalog.get(next_target, {}).get('months') or [None])[0] if next_target else None
+        month_names = ('', '一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月')
+        next_target_month_name = month_names[month_num] if isinstance(month_num, int) and 1 <= month_num <= 12 else None
+
+        return {
+            'sequence': [{'contest_key': k, 'display_name': catalog.get(k, {}).get('display_name', k)} for k in sequence],
+            'completed': completed_ordered,
+            'current_stage': current_stage,
+            'next_target': next_target,
+            'next_target_month': month_num,
+            'next_target_month_name': next_target_month_name,
+            'recommended_practice': recommended_practice,
+            'training_path': training_path,
+            'confidence': confidence,
+        }
+
+    paths = {
+        PATH_CANADA: build_path(PATH_CANADA),
+        PATH_AMC: build_path(PATH_AMC),
+    }
+    current_app.logger.info(
+        'roadmap built user_id=%s grade=%s canada_next=%s amc_next=%s',
+        user.id, grade,
+        paths.get(PATH_CANADA, {}).get('next_target'),
+        paths.get(PATH_AMC, {}).get('next_target'),
+    )
+    return {
+        'student_grade': grade,
+        'as_of_date': as_of.isoformat() + 'Z',
+        'paths': paths,
+    }
 
 
 def _build_dashboard_data(user, db):
