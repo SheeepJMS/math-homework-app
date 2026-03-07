@@ -77,6 +77,7 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 限制文件大小为16MB
 app.config['BILLING_ENABLED'] = os.environ.get('BILLING_ENABLED', 'false').lower() == 'true'
 app.config['STRIPE_WEBHOOK_SECRET'] = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
 app.config['DIAG_SHOW_HELP_BUTTON'] = False  # 未来开启帮助入口
+app.config['DIAG_OFFICIAL_WEBSITE_URL'] = os.environ.get('DIAG_OFFICIAL_WEBSITE_URL', '')  # 诊断系统顶栏「官网」入口链接，空则模板内用 #
 
 # 确保上传目录存在
 os.makedirs(os.path.join('static', UPLOAD_FOLDER, 'exams'), exist_ok=True)

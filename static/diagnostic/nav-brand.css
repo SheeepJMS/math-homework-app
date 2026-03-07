@@ -1,0 +1,168 @@
+/**
+ * 诊断系统顶栏 - Burning Math Academy 品牌统一
+ * 白/浅灰底、机构感、官网轻入口
+ */
+.diag-nav--brand {
+  background: #ffffff !important;
+  border-bottom: 1px solid var(--gray-200, #e5e7eb);
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.04);
+  min-height: 56px;
+}
+
+.diag-nav__container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3, 12px);
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.diag-nav__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3, 12px);
+  text-decoration: none;
+  color: var(--gray-900, #111827);
+}
+.diag-nav__brand:hover {
+  color: var(--gray-900, #111827);
+}
+
+.diag-nav__logo {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+}
+
+.diag-nav__brand-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  line-height: 1.2;
+}
+
+.diag-nav__brand-name {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--gray-900, #111827);
+  letter-spacing: -0.02em;
+}
+
+.diag-nav__brand-sub {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--gray-500, #6b7280);
+  margin-top: 1px;
+}
+
+.diag-nav__toggler {
+  display: none;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md, 8px);
+  background: #fff;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+}
+.diag-nav__toggler-icon {
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: var(--gray-700);
+  box-shadow: 0 6px 0 var(--gray-700), 0 -6px 0 var(--gray-700);
+}
+
+.diag-nav__collapse {
+  flex-grow: 1;
+  justify-content: space-between;
+  align-items: center;
+}
+
+@media (max-width: 991px) {
+  .diag-nav__toggler { display: inline-flex; }
+  .diag-nav__collapse {
+    flex-basis: 100%;
+    order: 3;
+    margin-top: var(--space-2);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--gray-200);
+  }
+  .diag-nav__main,
+  .diag-nav__right {
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+  }
+  .diag-nav__item { width: 100%; }
+  .diag-nav__link,
+  .diag-nav__user {
+    display: block;
+    padding: var(--space-2) 0;
+    width: 100%;
+  }
+}
+
+.diag-nav__main,
+.diag-nav__right {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1, 4px) var(--space-4, 16px);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.diag-nav__link {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-600, #4b5563);
+  text-decoration: none;
+  padding: var(--space-2, 8px) var(--space-3, 12px);
+  border-radius: var(--radius-sm, 6px);
+  transition: color 0.2s, background 0.2s;
+}
+.diag-nav__link:hover {
+  color: var(--primary, #2563eb);
+  background: var(--gray-50, #f9fafb);
+}
+.diag-nav__link--active {
+  color: var(--primary, #2563eb);
+  font-weight: 600;
+  position: relative;
+}
+.diag-nav__link--active::after {
+  content: "";
+  position: absolute;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: 4px;
+  height: 2px;
+  background: var(--primary, #2563eb);
+  border-radius: 1px;
+}
+
+.diag-nav__link--light {
+  color: var(--gray-500, #6b7280);
+  font-weight: 500;
+}
+.diag-nav__link--light:hover {
+  color: var(--primary, #2563eb);
+}
+
+.diag-nav__user {
+  font-size: 13px;
+  color: var(--gray-600, #4b5563);
+  padding: var(--space-2) var(--space-3);
+}
+
+/* 登录/注册页顶栏保持同风格，不额外加类 */
+.diag-nav.auth-page-nav {
+  background: #ffffff !important;
+}

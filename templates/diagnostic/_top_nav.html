@@ -1,0 +1,43 @@
+{# 诊断系统统一顶栏：Burning Math Academy 品牌 + 主导航 + 官网轻入口 + 用户区 #}
+{% set _official_url = config.get('DIAG_OFFICIAL_WEBSITE_URL') or '#' %}
+<nav class="diag-nav diag-nav--brand fixed-top {% block nav_extra_class %}{% endblock %}" id="diagTopNav">
+  <div class="container diag-nav__container">
+    <a class="diag-nav__brand" href="{{ url_for('diagnostic.index') }}">
+      <img class="diag-nav__logo" src="{{ url_for('static', filename='diagnostic/brand/logo.png') }}" alt="Burning Math Academy" onerror="this.style.display='none'">
+      <div class="diag-nav__brand-text">
+        <span class="diag-nav__brand-name">Burning Math Academy</span>
+        <span class="diag-nav__brand-sub">数学竞赛诊断平台</span>
+      </div>
+    </a>
+    <button class="diag-nav__toggler" type="button" data-bs-toggle="collapse" data-bs-target="#diagNav" aria-controls="diagNav" aria-expanded="false" aria-label="展开菜单">
+      <span class="diag-nav__toggler-icon"></span>
+    </button>
+    <div class="collapse diag-nav__collapse" id="diagNav">
+      <ul class="diag-nav__main">
+        <li class="diag-nav__item">
+          <a class="diag-nav__link {% if request.endpoint == 'diagnostic.index' %}diag-nav__link--active{% endif %}" href="{{ url_for('diagnostic.index') }}">首页</a>
+        </li>
+        {% if user or request.cookies.get('diag_session') %}
+        <li class="diag-nav__item">
+          <a class="diag-nav__link {% if request.endpoint == 'diagnostic.exams' %}diag-nav__link--active{% endif %}" href="{{ url_for('diagnostic.exams') }}">试卷中心</a>
+        </li>
+        <li class="diag-nav__item">
+          <a class="diag-nav__link {% if request.endpoint == 'diagnostic.reports' %}diag-nav__link--active{% endif %}" href="{{ url_for('diagnostic.reports') }}">报告中心</a>
+        </li>
+        {% endif %}
+      </ul>
+      <ul class="diag-nav__right">
+        <li class="diag-nav__item">
+          <a class="diag-nav__link diag-nav__link--light" href="{{ _official_url }}" target="_blank" rel="noopener">官网</a>
+        </li>
+        {% if user %}
+        <li class="diag-nav__item"><span class="diag-nav__user">{{ user.username }}</span></li>
+        <li class="diag-nav__item"><a class="diag-nav__link" href="{{ url_for('diagnostic.logout') }}">退出</a></li>
+        {% else %}
+        <li class="diag-nav__item"><a class="diag-nav__link {% if request.endpoint == 'diagnostic.login' %}diag-nav__link--active{% endif %}" href="{{ url_for('diagnostic.login') }}">登录</a></li>
+        <li class="diag-nav__item"><a class="diag-nav__link {% if request.endpoint == 'diagnostic.register' %}diag-nav__link--active{% endif %}" href="{{ url_for('diagnostic.register') }}">注册</a></li>
+        {% endif %}
+      </ul>
+    </div>
+  </div>
+</nav>
