@@ -818,6 +818,37 @@ def reports():
             exam_title += ' (进行中)'
 
         exam_history = exam_history_by_exam.get(att.exam_id) or []
+        attempt_rank = None
+        for i, h in enumerate(exam_history):
+            if h.get('attempt_id') == att.id:
+                attempt_rank = i + 1
+                break
+        is_best_for_exam = False
+        if exam_history and att.status == 'finished':
+            best_acc = max(h.get('accuracy_percent', 0) for h in exam_history)
+            is_best_for_exam = (st['accuracy_percent'] >= best_acc)
+
+        benchmark_top_percent = None
+        ability_label = None
+        if att.status == 'finished' and st.get('score') is not None:
+            try:
+                from diagnostic.roadmap_config import infer_contest_key
+                from diagnostic.benchmark import get_benchmark_summary
+                contest_key = infer_contest_key(comp_name, getattr(exam, 'title', None) or '')
+                if contest_key:
+                    bm = get_benchmark_summary(contest_key, float(st['score']), db)
+                    if bm:
+                        pct_above = bm.get('percentile_estimate') or 0
+                        benchmark_top_percent = round(100 - pct_above, 1)
+                        if pct_above < 33:
+                            ability_label = '基础'
+                        elif pct_above < 66:
+                            ability_label = '中游'
+                        else:
+                            ability_label = '中上'
+            except Exception:
+                pass
+
         items.append({
             'attempt_id': att.id,
             'exam_id': att.exam_id,
@@ -833,7 +864,14 @@ def reports():
             'practice': practice_info,
             'status': att.status,
             'exam_history': exam_history[:5],
+            'attempt_rank': attempt_rank,
+            'is_best_for_exam': is_best_for_exam,
+            'benchmark_top_percent': benchmark_top_percent,
+            'ability_label': ability_label,
         })
+
+    for i, item in enumerate(items):
+        item['is_latest'] = (i == 0)
 
     competitions = db.session.query(DiagCompetition).order_by(DiagCompetition.id).all()
     exams_by_comp = {}

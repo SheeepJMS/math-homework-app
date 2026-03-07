@@ -5,134 +5,146 @@
 {% endblock %}
 {% block content %}
 <div class="report-center-page">
-  <h2 class="mb-4"><i data-lucide="folder-open" class="me-2"></i>报告中心</h2>
-  <p class="text-muted small mb-3">同一试卷可多次完成，每次生成独立报告。可按试卷筛选查看该卷全部历史记录。</p>
+  <header class="rc-header">
+    <h1 class="rc-title"><i data-lucide="folder-open" class="me-2"></i>报告中心</h1>
+    <p class="rc-subtitle">查看已完成试卷的历史报告，支持按竞赛、试卷和时间筛选。</p>
+  </header>
 
-  {# A) Filter Bar #}
-  <form method="get" action="{{ url_for('diagnostic.reports') }}" class="rc-filter-bar">
+  {# 筛选工具栏：产品化两行 #}
+  <form method="get" action="{{ url_for('diagnostic.reports') }}" class="rc-toolbar" id="rcFilterForm">
     <input type="hidden" name="page" value="1">
-    <div class="rc-filter-row">
-      <div class="rc-filter-group">
-        <label>搜索</label>
-        <input type="text" name="q" class="form-control form-control-sm rc-search-input" placeholder="试卷名/竞赛名"
-               value="{{ reports_view.filters.q or '' }}">
+    <input type="hidden" name="range" id="filterRange" value="{{ reports_view.filters.range or 'all' }}">
+    <div class="rc-toolbar-row rc-toolbar-row--1">
+      <div class="rc-toolbar-search-wrap">
+        <input type="text" name="q" class="rc-toolbar-search" placeholder="搜索试卷名、竞赛名…"
+               value="{{ reports_view.filters.q or '' }}" id="rcSearch">
       </div>
-      <div class="rc-filter-group">
-        <label>日期</label>
-        <input type="hidden" name="range" id="filterRange" value="{{ reports_view.filters.range or 'all' }}">
-        <div class="btn-group btn-group-sm rc-range-btns" role="group">
-          <button type="button" class="btn btn-outline-secondary {% if reports_view.filters.range == '7d' %}active{% endif %}" data-range="7d">最近7天</button>
-          <button type="button" class="btn btn-outline-secondary {% if reports_view.filters.range == '30d' %}active{% endif %}" data-range="30d">30天</button>
-          <button type="button" class="btn btn-outline-secondary {% if reports_view.filters.range == 'all' or not reports_view.filters.range %}active{% endif %}" data-range="all">全部</button>
+      <div class="rc-toolbar-range">
+        <span class="rc-toolbar-label">时间</span>
+        <div class="rc-range-chips" role="group">
+          <button type="button" class="rc-range-chip {% if reports_view.filters.range == '7d' %}active{% endif %}" data-range="7d">最近7天</button>
+          <button type="button" class="rc-range-chip {% if reports_view.filters.range == '30d' %}active{% endif %}" data-range="30d">30天</button>
+          <button type="button" class="rc-range-chip {% if reports_view.filters.range == 'all' or not reports_view.filters.range %}active{% endif %}" data-range="all">全部</button>
         </div>
       </div>
-      <div class="rc-filter-group">
-        <label>竞赛</label>
-        <select name="competition" class="form-select form-select-sm" style="width:160px;" id="filterCompetition">
+      <div class="rc-toolbar-select-wrap">
+        <label class="rc-toolbar-label" for="filterCompetition">竞赛</label>
+        <select name="competition" id="filterCompetition" class="rc-toolbar-select">
           <option value="">全部</option>
           {% for c in reports_view.competitions %}
-          <option value="{{ c.id }}" {% if reports_view.filters.competition == c.id %}selected{% endif %}>
-            {{ c.name or c.category or 'N/A' }}
-          </option>
+          <option value="{{ c.id }}" {% if reports_view.filters.competition == c.id %}selected{% endif %}>{{ c.name or c.category or 'N/A' }}</option>
           {% endfor %}
         </select>
       </div>
-      <div class="rc-filter-group">
-        <label>试卷</label>
-        <select name="exam" class="form-select form-select-sm" style="width:180px;" id="filterExam">
+      <div class="rc-toolbar-select-wrap">
+        <label class="rc-toolbar-label" for="filterExam">试卷</label>
+        <select name="exam" id="filterExam" class="rc-toolbar-select">
           <option value="">全部</option>
           {% for c in reports_view.competitions %}
-            {% for ex in (reports_view.exams_by_comp.get(c.id) or []) %}
-            <option value="{{ ex.id }}" data-comp="{{ c.id }}" {% if reports_view.filters.exam == ex.id %}selected{% endif %}>
-              {{ ex.title }}
-            </option>
-            {% endfor %}
+          {% for ex in (reports_view.exams_by_comp.get(c.id) or []) %}
+          <option value="{{ ex.id }}" data-comp="{{ c.id }}" {% if reports_view.filters.exam == ex.id %}selected{% endif %}>{{ ex.title }}</option>
+          {% endfor %}
           {% endfor %}
         </select>
       </div>
-      <div class="rc-filter-group">
-        <label class="form-check-label d-flex align-items-center gap-1">
-          <input type="checkbox" name="include_in_progress" value="1" class="form-check-input"
-                 {% if reports_view.filters.include_in_progress %}checked{% endif %}> 含进行中
-        </label>
-      </div>
-      <div class="rc-filter-group">
-        <label>排序</label>
-        <select name="sort" class="form-select form-select-sm rc-sort-select">
+    </div>
+    <div class="rc-toolbar-row rc-toolbar-row--2">
+      <label class="rc-toolbar-check">
+        <input type="checkbox" name="include_in_progress" value="1" class="rc-toolbar-check-input" {% if reports_view.filters.include_in_progress %}checked{% endif %}>
+        <span>含进行中</span>
+      </label>
+      <div class="rc-toolbar-select-wrap">
+        <label class="rc-toolbar-label" for="filterSort">排序</label>
+        <select name="sort" id="filterSort" class="rc-toolbar-select rc-toolbar-sort">
           <option value="latest" {% if reports_view.filters.sort == 'latest' %}selected{% endif %}>最近</option>
           <option value="best_accuracy" {% if reports_view.filters.sort == 'best_accuracy' %}selected{% endif %}>正确率最高</option>
           <option value="fastest" {% if reports_view.filters.sort == 'fastest' %}selected{% endif %}>用时最短</option>
         </select>
       </div>
-      <button type="submit" class="btn btn-primary btn-sm">筛选</button>
+      <button type="button" class="rc-toolbar-reset" id="rcReset">重置筛选</button>
+      <button type="submit" class="rc-toolbar-submit btn btn-primary btn-sm">筛选</button>
     </div>
   </form>
 
-  {# B) Report List #}
+  {# 报告列表：摘要卡片 #}
   <div class="rc-list">
     {% if reports_view['items'] %}
     {% for item in reports_view['items'] %}
-    <div class="rc-report-card" data-attempt-id="{{ item.attempt_id }}">
-      <div class="rc-report-header">
-        <div>
-          <span class="rc-report-title">{{ item.exam_title }}</span>
-          <span class="rc-report-meta ms-2">· {{ item.competition_name }}</span>
-        </div>
-        <span class="rc-report-meta">{{ item.submitted_at_str }}</span>
-      </div>
-      <div class="rc-report-metrics">
-        <span>{{ item.score }}/{{ item.total }}</span>
-        <span>正确率 {{ item.accuracy_percent | format_percent1 }}</span>
-        <span>耗时 {{ item.total_time_sec | format_time_sec }}</span>
-        {% if item.delta_vs_prev %}
-        <span class="{% if item.delta_vs_prev.accuracy_delta > 0 %}rc-delta-up{% elif item.delta_vs_prev.accuracy_delta < 0 %}rc-delta-down{% else %}rc-delta-neutral{% endif %}">
-          正确率 {% if item.delta_vs_prev.accuracy_delta > 0 %}↑{% elif item.delta_vs_prev.accuracy_delta < 0 %}↓{% endif %}
-          {{ item.delta_vs_prev.accuracy_delta | abs }}{% if item.delta_vs_prev.accuracy_delta != 0 %}%{% endif %}
-        </span>
-        <span class="{% if item.delta_vs_prev.time_delta < 0 %}rc-delta-up{% elif item.delta_vs_prev.time_delta > 0 %}rc-delta-down{% else %}rc-delta-neutral{% endif %}">
-          耗时 {% if item.delta_vs_prev.time_delta < 0 %}↓{% elif item.delta_vs_prev.time_delta > 0 %}↑{% endif %}
-          {{ (item.delta_vs_prev.time_delta | abs) | format_time_sec }}
-        </span>
+    <article class="rc-report-card" data-attempt-id="{{ item.attempt_id }}">
+      <div class="rc-card-tags">
+        {% if item.is_latest %}
+        <span class="rc-tag rc-tag--latest">最近一次</span>
         {% endif %}
-      </div>
-      <div class="rc-report-actions">
+        {% if item.is_best_for_exam %}
+        <span class="rc-tag rc-tag--best">当前最佳</span>
+        {% endif %}
         {% if item.status == 'finished' %}
-        <a href="{{ url_for('diagnostic.report', attempt_id=item.attempt_id) }}" class="btn btn-sm btn-primary">查看报告</a>
+        <span class="rc-tag rc-tag--status">已完成</span>
         {% elif item.status == 'in_progress' %}
-        <a href="{{ url_for('diagnostic.attempt', attempt_id=item.attempt_id) }}" class="btn btn-sm btn-primary">继续答题</a>
+        <span class="rc-tag rc-tag--status rc-tag--in_progress">进行中</span>
         {% endif %}
-        {% if item.practice.exists and item.practice.practice_set_id %}
-          {% if item.practice.completed %}
-        <span class="rc-practice-completed">已完成</span>
-          {% else %}
-        <a href="{{ url_for('diagnostic.practice', practice_set_id=item.practice.practice_set_id) }}" class="btn btn-sm btn-outline-primary">开始练习</a>
+      </div>
+      <div class="rc-card-main">
+        <div class="rc-card-left">
+          <div class="rc-card-row rc-card-row--1">
+            <h3 class="rc-card-title">{{ item.exam_title }}</h3>
+            <span class="rc-card-competition">{{ item.competition_name }}</span>
+          </div>
+          <div class="rc-card-row rc-card-row--2">
+            <span class="rc-card-stat">得分：<strong>{{ item.score }}/{{ item.total }}</strong></span>
+            <span class="rc-card-stat">正确率：<strong>{{ item.accuracy_percent | format_percent1 }}</strong></span>
+            {% if item.benchmark_top_percent is defined and item.benchmark_top_percent is not none %}
+            <span class="rc-card-stat">内部参考位置：<strong>前 {{ item.benchmark_top_percent }}%</strong></span>
+            {% endif %}
+            <span class="rc-card-stat">总耗时：<strong>{{ item.total_time_sec | format_time_sec }}</strong></span>
+          </div>
+          <div class="rc-card-row rc-card-row--3">
+            <span class="rc-card-time">{{ item.submitted_at_str }}</span>
+            {% if item.ability_label %}
+            <span class="rc-card-ability rc-ability-{{ item.ability_label }}">{{ item.ability_label }}</span>
+            {% endif %}
+            {% if item.attempt_rank and item.exam_history and item.exam_history|length > 1 %}
+            <span class="rc-card-rank">本卷第 {{ item.attempt_rank }} 次完成</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="rc-card-actions">
+          {% if item.status == 'finished' %}
+          <a href="{{ url_for('diagnostic.report', attempt_id=item.attempt_id) }}" class="btn btn-primary rc-btn-main">查看报告</a>
+          {% elif item.status == 'in_progress' %}
+          <a href="{{ url_for('diagnostic.attempt', attempt_id=item.attempt_id) }}" class="btn btn-primary rc-btn-main">继续答题</a>
           {% endif %}
-        {% endif %}
-        {% if item.exam_history and item.exam_history|length > 1 %}
-        <a href="#" class="rc-same-exam-toggle" data-exam-id="{{ item.exam_id }}" data-card-id="{{ item.attempt_id }}">
-          同卷历史 ({{ item.exam_history|length }}次)
-        </a>
-        {% endif %}
+          {% if item.practice.exists and item.practice.practice_set_id %}
+          {% if item.practice.completed %}
+          <span class="rc-practice-done">已完成</span>
+          {% else %}
+          <a href="{{ url_for('diagnostic.practice', practice_set_id=item.practice.practice_set_id) }}" class="btn btn-outline-secondary rc-btn-sub">开始练习</a>
+          {% endif %}
+          {% endif %}
+          {% if item.exam_history and item.exam_history|length > 1 %}
+          <a href="#" class="rc-link rc-same-exam-toggle" data-exam-id="{{ item.exam_id }}" data-card-id="{{ item.attempt_id }}">同卷历史 ({{ item.exam_history|length }}次)</a>
+          {% endif %}
+        </div>
       </div>
       {% if item.exam_history and item.exam_history|length > 1 %}
       <div class="rc-same-exam-panel" id="panel-{{ item.attempt_id }}" style="display:none;">
-        <table>
+        <table class="rc-history-table">
           <thead><tr><th>时间</th><th>正确率</th><th>耗时</th><th></th></tr></thead>
           <tbody>
-            {% for h in item.exam_history[:5] %}
-            <tr>
-              <td>{{ h.submitted_at_str }}</td>
-              <td>{{ h.accuracy_percent | format_percent1 }}</td>
-              <td>{{ h.total_time_sec | format_time_sec }}</td>
-              <td><a href="{{ url_for('diagnostic.report', attempt_id=h.attempt_id) }}">查看</a></td>
-            </tr>
-            {% endfor %}
+          {% for h in item.exam_history[:5] %}
+          <tr>
+            <td>{{ h.submitted_at_str }}</td>
+            <td>{{ h.accuracy_percent | format_percent1 }}</td>
+            <td>{{ h.total_time_sec | format_time_sec }}</td>
+            <td><a href="{{ url_for('diagnostic.report', attempt_id=h.attempt_id) }}">查看</a></td>
+          </tr>
+          {% endfor %}
           </tbody>
         </table>
-        <p class="mb-0 mt-2"><a href="{{ url_for('diagnostic.reports', exam=item.exam_id) }}">查看该卷全部历史报告</a></p>
+        <p class="rc-history-more"><a href="{{ url_for('diagnostic.reports', exam=item.exam_id) }}">查看该卷全部历史报告</a></p>
       </div>
       {% endif %}
-    </div>
+    </article>
     {% endfor %}
     {% else %}
     <div class="rc-empty">
@@ -146,7 +158,6 @@
     {% endif %}
   </div>
 
-  {# C) Pagination #}
   {% if reports_view.pagination.total_pages > 1 %}
   <nav class="rc-pagination">
     {% set p = reports_view.pagination %}
@@ -155,7 +166,7 @@
     {% if p.has_prev %}
     <a href="{{ base_url }}&page={{ p.page - 1 }}" class="btn btn-sm btn-outline-secondary">上一页</a>
     {% endif %}
-    <span class="align-self-center small text-muted">第 {{ p.page }}/{{ p.total_pages }} 页，共 {{ p.total }} 条</span>
+    <span class="rc-pagination-info">第 {{ p.page }}/{{ p.total_pages }} 页，共 {{ p.total }} 条</span>
     {% if p.has_next %}
     <a href="{{ base_url }}&page={{ p.page + 1 }}" class="btn btn-sm btn-outline-secondary">下一页</a>
     {% endif %}
@@ -165,4 +176,55 @@
 {% endblock %}
 {% block extra_js %}
 <script src="{{ url_for('static', filename='diagnostic/report_center.js') }}"></script>
+<script>
+(function () {
+  var form = document.getElementById('rcFilterForm');
+  var rangeInput = document.getElementById('filterRange');
+  var searchInput = document.getElementById('rcSearch');
+  var resetBtn = document.getElementById('rcReset');
+
+  function submitForm() { if (form) form.submit(); }
+
+  document.querySelectorAll('.rc-range-chip').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var r = this.getAttribute('data-range');
+      if (rangeInput) rangeInput.value = r;
+      document.querySelectorAll('.rc-range-chip').forEach(function (b) { b.classList.remove('active'); });
+      this.classList.add('active');
+      submitForm();
+    });
+  });
+
+  var searchTimeout;
+  if (searchInput) {
+    searchInput.addEventListener('input', function () {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(submitForm, 400);
+    });
+  }
+
+  ['filterCompetition', 'filterExam', 'filterSort'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('change', submitForm);
+  });
+
+  document.querySelectorAll('.rc-toolbar-check-input').forEach(function (cb) {
+    cb.addEventListener('change', submitForm);
+  });
+
+  if (resetBtn) {
+    resetBtn.addEventListener('click', function () {
+      if (form) {
+        form.reset();
+        if (rangeInput) rangeInput.value = 'all';
+        document.querySelectorAll('.rc-range-chip').forEach(function (b) {
+          b.classList.remove('active');
+          if (b.getAttribute('data-range') === 'all') b.classList.add('active');
+        });
+        submitForm();
+      }
+    });
+  }
+})();
+</script>
 {% endblock %}

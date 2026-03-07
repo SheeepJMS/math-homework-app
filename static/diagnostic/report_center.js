@@ -14,12 +14,13 @@
     });
   });
 
-  document.querySelectorAll('.rc-range-btns button[data-range]').forEach(function (btn) {
+  document.querySelectorAll('.rc-range-chips .rc-range-chip[data-range], .rc-range-btns button[data-range]').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var r = this.getAttribute('data-range');
       var inp = document.getElementById('filterRange');
       if (inp) inp.value = r;
-      document.querySelectorAll('.rc-range-btns button').forEach(function (b) { b.classList.remove('active'); });
+      var container = this.closest('.rc-range-chips') || this.closest('.rc-range-btns');
+      if (container) container.querySelectorAll('button, .rc-range-chip').forEach(function (b) { b.classList.remove('active'); });
       this.classList.add('active');
       var form = this.closest('form');
       if (form) form.submit();
