@@ -69,18 +69,15 @@
           <div class="metric-label">总耗时</div>
         </div>
       </div>
-      <div class="mini-card">
+      <div class="mini-card mini-card--rank">
         <div class="icon-wrap info"><i data-lucide="award"></i></div>
-        <div>
-          <div class="metric-value">{% if display_rank_top_percent is not none %}前 {{ display_rank_top_percent | round(1) }}%{% else %}—{% endif %}</div>
+        <div class="mini-card-rank-inner">
+          <div class="metric-value metric-value--rank">
+            {% if display_rank_top_percent is not none %}
+            <span class="rank-prefix">前</span><span class="rank-percent">{{ display_rank_top_percent | round(1) }}%</span>
+            {% else %}—{% endif %}
+          </div>
           <div class="metric-label">总排名位置</div>
-        </div>
-      </div>
-      <div class="mini-card">
-        <div class="icon-wrap warning"><i data-lucide="minus-circle"></i></div>
-        <div>
-          <div class="metric-value">{{ blank_count | default(0) }}</div>
-          <div class="metric-label">空题数</div>
         </div>
       </div>
     </div>
