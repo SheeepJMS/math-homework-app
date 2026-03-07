@@ -138,44 +138,45 @@
     });
   }
 
-  function initWeakBarChart(canvasId, weakKps) {
+  function initSixPanelRadarChart(canvasId, sixPanelRadar) {
     var ctx = document.getElementById(canvasId);
     if (!ctx) return;
-    weakKps = safeArray(weakKps);
-    if (weakKps.length === 0) return;
+    sixPanelRadar = safeArray(sixPanelRadar);
     if (typeof Chart === 'undefined') return;
-    var labels = weakKps.map(function (w) { return (w.kp_name || '').substring(0, 12); });
-    var wrongCounts = weakKps.map(function (w) { return w.wrong_count || 0; });
-    var nQuestions = weakKps.map(function (w) { return w.n_questions || 1; });
-    var pcts = wrongCounts.map(function (w, i) {
-      return Math.round(100 * w / (nQuestions[i] || 1));
-    });
+    var labels = sixPanelRadar.length ? sixPanelRadar.map(function (r) { return r.label || ''; }) : ['Number Theory', 'Algebra', 'Geometry', 'Counting', 'Word Problems', 'Sequences'];
+    var values = sixPanelRadar.length ? sixPanelRadar.map(function (r) { return Math.min(100, Math.max(0, Number(r.value_0to100) || 0)); }) : [0, 0, 0, 0, 0, 0];
     new Chart(ctx, {
-      type: 'bar',
+      type: 'radar',
       data: {
         labels: labels,
         datasets: [{
-          label: '错误率',
-          data: pcts,
-          backgroundColor: tokens.danger,
-          borderRadius: 4,
+          label: '掌握度',
+          data: values,
+          borderColor: tokens.brand,
+          backgroundColor: tokens.brandFill,
+          borderWidth: 1.5,
+          pointBackgroundColor: values.map(function (v) { return v > 0 ? tokens.brand : tokens.muted; }),
+          pointRadius: 3,
         }],
       },
       options: {
-        indexAxis: 'y',
         responsive: true,
-        maintainAspectRatio: false,
+        maintainAspectRatio: true,
         scales: {
-          x: { min: 0, max: 100, grid: { color: tokens.border }, ticks: { color: tokens.muted } },
-          y: { grid: { display: false }, ticks: { color: tokens.muted } },
+          r: {
+            min: 0,
+            max: 100,
+            ticks: { stepSize: 25, color: tokens.muted },
+            pointLabels: { font: { size: 11 }, color: tokens.muted },
+            grid: { color: tokens.border },
+          },
         },
         plugins: {
           legend: { display: false },
           tooltip: {
             callbacks: {
               label: function (ctx) {
-                var i = ctx.dataIndex;
-                return wrongCounts[i] + '/' + nQuestions[i] + ' 题';
+                return (ctx.dataset.label || '') + ': ' + ctx.raw + '%';
               },
             },
           },
@@ -188,6 +189,6 @@
     data = data || {};
     initTrendChart('trendChart', data.chart_trend_labels, data.chart_trend_values);
     initParticipationGauge('participationGauge', data.weekly_participation);
-    initWeakBarChart('weakBarChart', data.weak_kps || []);
+    initSixPanelRadarChart('sixPanelRadarChart', data.six_panel_radar || []);
   };
 })();

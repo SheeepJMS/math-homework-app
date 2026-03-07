@@ -291,8 +291,15 @@
 .dashboard-report-list li:last-child { border-bottom: none; }
 .dashboard-report-list .report-main { min-width: 0; }
 .dashboard-report-list .report-title { font-weight: 500; display: block; }
-.dashboard-report-list .report-meta { font-size: var(--small); color: var(--muted); }
+.dashboard-report-list .report-meta { font-size: var(--small); color: var(--muted); display: block; margin-top: 2px; }
 .dashboard-report-list .report-actions { display: flex; gap: var(--s-2); flex-shrink: 0; justify-content: flex-end; }
+.dashboard-report-list--enhanced .report-title { font-weight: 600; }
+.report-ability-badge { font-size: 10px; padding: 1px 6px; border-radius: 4px; margin-left: var(--s-2); font-weight: 500; }
+.report-ability-基础 { background: #fef3c7; color: #92400e; }
+.report-ability-中游 { background: #dbeafe; color: #1e40af; }
+.report-ability-中上 { background: #d1fae5; color: #065f46; }
+.dashboard-radar-wrap { height: 220px; }
+.six-panel-summary { line-height: 1.5; }
 
 .dashboard-empty.small { padding: var(--s-4); }
 .dashboard-empty.small .icon-empty { font-size: 22px; }

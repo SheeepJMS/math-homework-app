@@ -1327,6 +1327,9 @@ def _build_dashboard_data(user, db):
     stats_30d = None
     recent_reports = []
     weak_kps = []
+    _SIX_PANELS_DEFAULT = ['Number Theory', 'Algebra', 'Geometry', 'Counting', 'Word Problems', 'Sequences']
+    six_panel_radar = [{'label': p, 'value_0to100': 0} for p in _SIX_PANELS_DEFAULT]
+    six_panel_weak_summary = ''
     hero = {}
     chart_bar_labels = []
     chart_bar_time = []
@@ -1352,12 +1355,19 @@ def _build_dashboard_data(user, db):
             st = _attempt_quick_stats(att, db)
             trend.append({'label': '第%d次' % (i + 1), 'accuracy_percent': st['accuracy_percent']})
         trend.reverse()
+        from diagnostic.roadmap_config import infer_contest_key
+        from diagnostic.benchmark import get_benchmark_summary
         for att in finished[:5]:
             st = _attempt_quick_stats(att, db)
             sub = getattr(att, 'finished_at', None) or getattr(att, 'started_at', None)
             total_time_sec = round((att.total_time_ms or 0) / 1000, 0)
             ps = att.practice_sets[-1] if att.practice_sets else None
-            recent_reports.append({
+            exam = getattr(att, 'exam', None)
+            comp = getattr(exam, 'competition', None) if exam else None
+            comp_name = getattr(comp, 'name', None) if comp else None
+            exam_title = getattr(exam, 'title', None) or ''
+            contest_key = infer_contest_key(comp_name, exam_title) if exam else None
+            row = {
                 'attempt_id': att.id,
                 'exam_title': getattr(att.exam, 'title', None) or 'N/A',
                 'submitted_at': sub,
@@ -1365,7 +1375,24 @@ def _build_dashboard_data(user, db):
                 'score': st['score'], 'score_max': st['score_max'], 'accuracy_percent': st['accuracy_percent'],
                 'total_time_sec': total_time_sec,
                 'practice_set_id': ps.id if ps else None,
-            })
+            }
+            if contest_key and st.get('score') is not None:
+                try:
+                    bm = get_benchmark_summary(contest_key, float(st['score']), db)
+                    if bm:
+                        pct_above = bm.get('percentile_estimate') or 0
+                        top_pct = round(100 - pct_above, 1)
+                        row['benchmark_top_percent'] = top_pct
+                        row['benchmark_mean'] = bm.get('mean_score')
+                        if pct_above < 33:
+                            row['ability_label'] = '基础'
+                        elif pct_above < 66:
+                            row['ability_label'] = '中游'
+                        else:
+                            row['ability_label'] = '中上'
+                except Exception:
+                    pass
+            recent_reports.append(row)
 
         finished_30d_all = db.session.query(DiagAttempt).filter(
             DiagAttempt.user_id == user.id,
@@ -1422,6 +1449,43 @@ def _build_dashboard_data(user, db):
             {'kp_name': k, 'wrong_count': kp_wrong.get(k, 0), 'n_questions': kp_total.get(k, 1)}
             for k in set(kp_wrong.keys()) | set(kp_total.keys())
         ], key=lambda x: -x['wrong_count'])[:3]
+
+        # 六大板块能力图谱：固定 Number Theory, Algebra, Geometry, Counting, Word Problems, Sequences
+        SIX_PANELS = ['Number Theory', 'Algebra', 'Geometry', 'Counting', 'Word Problems', 'Sequences']
+        _PANEL_KEYWORDS = {
+            'Number Theory': ['number theory', '数论', 'numbertheory'],
+            'Algebra': ['algebra', '代数'],
+            'Geometry': ['geometry', '几何'],
+            'Counting': ['counting', '计数', '组合', 'combinatorics'],
+            'Word Problems': ['word problems', '应用题', 'wordproblems', '应用'],
+            'Sequences': ['sequences', '数列', 'sequence'],
+        }
+
+        def _kp_to_panel(kp_name):
+            k = (kp_name or '').strip().lower()
+            for panel, keywords in _PANEL_KEYWORDS.items():
+                if any(kw in k for kw in keywords):
+                    return panel
+            for p in SIX_PANELS:
+                if p.lower() == k:
+                    return p
+            return None
+
+        panel_wrong = {p: 0 for p in SIX_PANELS}
+        panel_total = {p: 0 for p in SIX_PANELS}
+        for kp_name in set(kp_wrong.keys()) | set(kp_total.keys()):
+            panel = _kp_to_panel(kp_name)
+            if panel and panel in SIX_PANELS:
+                panel_wrong[panel] += kp_wrong.get(kp_name, 0)
+                panel_total[panel] += kp_total.get(kp_name, 1)
+        six_panel_radar = []
+        for p in SIX_PANELS:
+            n = panel_total[p] or 1
+            wrong = panel_wrong[p]
+            value = round(max(0, 100 * (1 - wrong / n)), 0)
+            six_panel_radar.append({'label': p, 'value_0to100': value})
+        weak_panels = sorted([r for r in six_panel_radar if r['value_0to100'] < 70], key=lambda x: x['value_0to100'])[:3]
+        six_panel_weak_summary = '当前 %s 为主要薄弱区域。' % ('、'.join([w['label'] for w in weak_panels]) or '暂无数据') if weak_panels else '各板块均有数据后将显示薄弱区域总结。'
 
         last = finished[0]
         order = db.session.query(DiagExamQuestion).filter_by(exam_id=last.exam_id).order_by(DiagExamQuestion.q_index).all()
@@ -1565,6 +1629,8 @@ def _build_dashboard_data(user, db):
         'chart_bar_slow_indices': chart_bar_slow_indices,
         'hero': hero,
         'practice_pack_home': practice_pack_home,
+        'six_panel_radar': six_panel_radar,
+        'six_panel_weak_summary': six_panel_weak_summary,
         'weekly_participation': weekly_participation,
         'exam_tree': exam_tree,
     }
