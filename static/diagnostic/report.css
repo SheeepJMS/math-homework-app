@@ -491,9 +491,23 @@
   margin-bottom: 0;
 }
 
-/* 参考得分位置（含正态分布示意） */
+/* 参考得分位置：左侧文字，右侧正态分布图 */
 .benchmark-card .card-body {
   padding: var(--s-5);
+}
+.benchmark-card-body--split {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-5);
+  align-items: center;
+}
+.benchmark-text {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.benchmark-chart {
+  flex: 0 1 280px;
+  min-width: 0;
 }
 .benchmark-list {
   list-style: none;
@@ -510,27 +524,19 @@
   line-height: 1.5;
 }
 
-.benchmark-distribution-wrap {
-  margin-top: var(--s-3);
-  padding: var(--s-3) 0;
-  border-top: 1px solid var(--border);
-}
 .benchmark-distribution-svg {
   width: 100%;
-  height: 72px;
+  height: 80px;
   display: block;
   margin-bottom: var(--s-2);
 }
 .benchmark-curve {
   vector-effect: non-scaling-stroke;
 }
-.benchmark-marker {
+.benchmark-dot-on-curve {
   vector-effect: non-scaling-stroke;
 }
-.benchmark-marker-dot {
-  vector-effect: non-scaling-stroke;
-}
-.benchmark-distribution-labels {
+.benchmark-chart-labels {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -538,24 +544,17 @@
   color: var(--muted);
   padding: 0 2px;
 }
-.benchmark-distribution-wrap {
-  position: relative;
-}
-.benchmark-distribution-labels {
-  position: relative;
-  min-height: 1.8em;
-}
-.benchmark-distribution-labels .benchmark-marker-label {
-  position: absolute;
-  top: 0;
+.benchmark-dot-caption {
   color: var(--danger);
   font-weight: 600;
-  white-space: nowrap;
-  pointer-events: none;
 }
-@media (max-width: 480px) {
-  .benchmark-distribution-labels .benchmark-marker-label {
-    font-size: 11px;
+@media (max-width: 600px) {
+  .benchmark-card-body--split {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .benchmark-chart {
+    flex: 1 1 auto;
   }
 }
 
