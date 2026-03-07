@@ -397,14 +397,97 @@
   max-width: 280px;
 }
 
-/* ========== Competition Roadmap 竞赛路线规划 ========== */
-#roadmap-body .roadmap-loading { display: flex; align-items: center; padding: var(--s-4); color: var(--muted); }
-#roadmap-body .roadmap-path-title { font-size: var(--small); color: var(--text); }
-#roadmap-body .roadmap-step { font-size: var(--small); }
-#roadmap-body .roadmap-next,
-#roadmap-body .roadmap-practice { font-size: var(--base); }
-#roadmap-body .roadmap-training li { padding-left: var(--s-2); }
-.roadmap-paths--compact .roadmap-path-title { font-size: 11px; color: var(--muted); }
+/* ========== Competition Roadmap 竞赛路线规划（专家级路径指导卡） ========== */
+.roadmap-card-body { padding: 0 !important; }
+#roadmap-body .roadmap-loading { display: flex; align-items: center; padding: var(--s-5); color: var(--muted); }
+.roadmap-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--s-3);
+  padding: var(--s-5) var(--s-5) var(--s-3);
+  border-bottom: 1px solid var(--border);
+}
+.roadmap-title { font-size: var(--h2); font-weight: 700; color: var(--text); margin: 0; }
+.roadmap-desc { font-size: var(--small); color: var(--muted); }
+.roadmap-badge-auto {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--brand);
+  background: var(--brand-bg);
+  padding: 4px 10px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.roadmap-grade-hint {
+  padding: var(--s-2) var(--s-5);
+  background: #fefce8;
+  color: #854d0e;
+  font-size: var(--small);
+  border-bottom: 1px solid #fef08a;
+}
+.roadmap-main {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-5);
+  padding: var(--s-5);
+  align-items: start;
+}
+@media (max-width: 767px) {
+  .roadmap-main { grid-template-columns: 1fr; }
+}
+.roadmap-left .roadmap-path-title { font-size: var(--small); font-weight: 600; color: var(--text); margin-bottom: var(--s-2); }
+.roadmap-path-title--muted { font-size: 11px; color: var(--muted); font-weight: 500; }
+.roadmap-step { font-size: 11px; padding: 2px 8px; }
+.roadmap-step-corresponding { background: #e0e7ff !important; color: #3730a3; border: 1px solid #818cf8; }
+.roadmap-right { min-width: 0; }
+.roadmap-recommendation-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--s-4);
+}
+.roadmap-rec-row { margin-bottom: var(--s-2); }
+.roadmap-rec-row:last-of-type { margin-bottom: 0; }
+.roadmap-rec-label { font-size: var(--small); color: var(--muted); display: block; margin-bottom: 2px; }
+.roadmap-rec-value { font-weight: 600; color: var(--text); }
+.roadmap-rec-value--primary { font-size: var(--base); color: var(--brand); }
+.roadmap-reason { font-size: var(--small); line-height: 1.5; }
+.roadmap-suggestions ul { padding-left: 1.1em; }
+.roadmap-practice-section {
+  padding: var(--s-5);
+  border-top: 1px solid var(--border);
+}
+.roadmap-practice-label { font-size: var(--small); font-weight: 600; color: var(--text); margin-bottom: var(--s-3); }
+.roadmap-practice-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin-bottom: var(--s-4);
+}
+.roadmap-practice-card {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font-size: var(--small);
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.roadmap-practice-card:hover { border-color: var(--brand); box-shadow: 0 2px 8px rgba(37, 99, 235, 0.12); color: var(--text); }
+.roadmap-practice-card-name { font-weight: 500; }
+.roadmap-practice-card-type { color: var(--muted); font-size: 11px; }
+.roadmap-practice-card-btn {
+  margin-left: auto;
+  color: var(--brand);
+  font-weight: 600;
+}
+.roadmap-cta-main { display: inline-block; }
 .dashboard-third-screen .dashboard-card .card-header { font-weight: 600; }
 
 /* 首页 AI 训练包卡片（复用 report 的 practice-pack-*） */

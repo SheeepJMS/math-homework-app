@@ -68,6 +68,23 @@ CONTEST_CATALOG = [
 CANADA_SEQUENCE = ['Gauss7', 'Gauss8', 'Pascal', 'Cayley', 'Fermat', 'Euclid']
 AMC_SEQUENCE = ['AMC8', 'AMC10', 'AMC12', 'AIME']
 
+# Waterloo 阶段 -> 对应 AMC 参考级别（仅展示用，不独立给“下一目标”）
+WATERLOO_TO_AMC = {
+    'Gauss7': 'AMC8',
+    'Gauss8': 'AMC8',
+    'Pascal': 'AMC10',
+    'Cayley': 'AMC10',
+    'Fermat': 'AMC12',
+    'Euclid': 'AIME',
+}
+
+
+def get_corresponding_amc(waterloo_stage_or_next):
+    """根据 Waterloo 当前阶段或下一目标返回对应 AMC 级别 key。"""
+    if not waterloo_stage_or_next:
+        return 'AMC8'
+    return WATERLOO_TO_AMC.get(waterloo_stage_or_next, 'AMC8')
+
 
 def get_catalog_by_key():
     """Return dict contest_key -> config."""

@@ -1070,6 +1070,7 @@ def _build_roadmap_data(user, db):
         get_catalog_by_key, get_sequence_for_path, infer_contest_key,
         grade_eligible, months_near, CONTEST_CATALOG,
         AIME_AMC10_THRESHOLD, AIME_AMC12_THRESHOLD,
+        get_corresponding_amc,
     )
     as_of = datetime.utcnow()
     # Infer grade from birth_year (North America: grade 1 ≈ age 6–7)
@@ -1160,8 +1161,14 @@ def _build_roadmap_data(user, db):
                     next_target = c
                     break
 
-        # AIME override for AMC path
-        if path_id == PATH_AMC and sequence == get_sequence_for_path(PATH_AMC):
+        # AMC 路径不再独立给“下一目标”，仅用于展示对应 AMC 水平；主下一目标只来自 Waterloo
+        if path_id == PATH_AMC:
+            next_target = None
+            next_target_month_name = None
+            month_num = None
+
+        # AIME override for AMC path (only when we still compute AMC next_target; now disabled above)
+        if path_id == PATH_AMC and sequence == get_sequence_for_path(PATH_AMC) and next_target:
             cutoff_12m = as_of - timedelta(days=365)
             for a in attempt_contest_scores:
                 if a['contest_key'] not in ('AMC10', 'AMC12') or (a.get('finished_at') and a['finished_at'] < cutoff_12m):
@@ -1234,14 +1241,65 @@ def _build_roadmap_data(user, db):
         PATH_CANADA: build_path(PATH_CANADA),
         PATH_AMC: build_path(PATH_AMC),
     }
+    # 单目标逻辑：仅 Waterloo 提供“下一目标”；AMC 只作“对应 AMC 水平”展示
+    canada = paths[PATH_CANADA]
+    next_key = canada.get('current_stage') or canada.get('next_target')
+    corresponding_amc_key = get_corresponding_amc(next_key)
+    corresponding_amc_cfg = catalog.get(corresponding_amc_key, {})
+    canada['corresponding_amc_level'] = corresponding_amc_key
+    canada['corresponding_amc_display_name'] = corresponding_amc_cfg.get('display_name', corresponding_amc_key)
+
+    # 推荐理由（一句或两句）
+    if canada.get('next_target'):
+        canada['recommendation_reason'] = (
+            '当前阶段更适合先完成 Waterloo 路线基础准备。'
+            '对应 AMC 水平为 %s，可作为补充训练方向。' % canada['corresponding_amc_display_name']
+        )
+    elif next_key:
+        canada['recommendation_reason'] = (
+            '你已完成当前阶段，建议巩固后再进阶。'
+            '对应 AMC 水平为 %s，可作为补充训练方向。' % canada['corresponding_amc_display_name']
+        )
+    else:
+        canada['recommendation_reason'] = (
+            '根据当前年级与赛历，建议从 Waterloo 路线入门。'
+            '完成试卷后系统将为你推荐下一阶段目标。'
+        )
+
+    # 训练建议（短句列表）
+    training_suggestions = []
+    if canada.get('next_target'):
+        next_name = catalog.get(canada['next_target'], {}).get('display_name', canada['next_target'])
+        training_suggestions.append('优先完成 %s 基础卷' % next_name)
+        training_suggestions.append('再做 2 套近年真题巩固')
+    else:
+        training_suggestions.append('建议继续当前阶段练习')
+    training_suggestions.append('同步强化报告中的薄弱知识点')
+    if not grade:
+        training_suggestions.append('填写出生年份后可获得更精准的年级推荐')
+    canada['training_suggestions'] = training_suggestions[:4]
+
+    # 推荐练习：Canada 已有最多 3 条；可补一条对应 AMC 补充（总不超过 3 条，或保持 3+1 共 4 条展示）
+    rp = canada.get('recommended_practice') or []
+    amc_label = canada['corresponding_amc_display_name'] + ' 补充训练'
+    if len(rp) < 3 and amc_label not in [p.get('label') for p in rp]:
+        rp.append({
+            'label': amc_label,
+            'contest': corresponding_amc_key,
+            'search_query': canada['corresponding_amc_display_name'],
+            'type': '补充',
+        })
+    canada['recommended_practice'] = rp[:3]
+
     current_app.logger.info(
-        'roadmap built user_id=%s grade=%s canada_next=%s amc_next=%s',
+        'roadmap built user_id=%s grade=%s waterloo_next=%s amc_level=%s',
         user.id, grade,
-        paths.get(PATH_CANADA, {}).get('next_target'),
-        paths.get(PATH_AMC, {}).get('next_target'),
+        canada.get('next_target'),
+        corresponding_amc_key,
     )
     return {
         'student_grade': grade,
+        'grade_missing_hint': grade is None,
         'as_of_date': as_of.isoformat() + 'Z',
         'paths': paths,
     }
