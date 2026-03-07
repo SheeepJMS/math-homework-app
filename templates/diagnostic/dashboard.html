@@ -83,10 +83,23 @@
             {% endif %}
           </div>
           <div class="report-card-actions">
+            <div class="report-card-status-line">
+              <span class="report-badge report-badge--done">已完成</span>
+              {% if r.practice_set_id and r.practice_completed %}
+              <span class="report-badge report-badge--practice-done">训练已完成</span>
+              {% endif %}
+            </div>
+            <p class="report-card-hint">
+              {% if r.practice_set_id and r.practice_completed %}
+              可查看结果或再练一组
+              {% else %}
+              可查看报告或开始练习
+              {% endif %}
+            </p>
             <a href="{{ url_for('diagnostic.report', attempt_id=r.attempt_id) }}" class="btn btn-primary btn-report-main">查看报告</a>
             {% if r.practice_set_id %}
               {% if r.practice_completed %}
-            <span class="report-practice-completed">已完成</span>
+            <a href="{{ url_for('diagnostic.exams') }}" class="btn btn-outline-secondary btn-report-sub">再练一组</a>
               {% else %}
             <a href="{{ url_for('diagnostic.practice', practice_set_id=r.practice_set_id) }}" class="btn btn-outline-secondary btn-report-sub">开始练习</a>
               {% endif %}
@@ -113,38 +126,21 @@
 
   {# ========== 第二屏：六大板块能力图谱 + 竞赛路线规划 ========== #}
   <div class="dashboard-mid-grid">
-    <div class="dashboard-card dashboard-module dashboard-radar-module">
+    <div class="dashboard-card dashboard-module dashboard-six-panel-module">
       <div class="card-header card-header--flex">
-        <span class="card-header-title"><i data-lucide="hexagon" class="me-2"></i>六大板块能力图谱</span>
+        <span class="card-header-title"><i data-lucide="hexagon" class="me-2"></i>六大板块能力分布</span>
       </div>
-      <div class="card-body card-body--radar">
-        <div class="radar-two-col">
-          <div class="radar-chart-col">
-            <div class="dashboard-radar-wrap">
-              <canvas id="sixPanelRadarChart"></canvas>
-            </div>
+      <div class="card-body card-body--six-panel">
+        <div class="six-panel-bars">
+          {% for p in (six_panel_radar or []) %}
+          <div class="six-panel-row">
+            <span class="six-panel-name">{{ p.label }}</span>
+            <span class="six-panel-value">{{ p.value_0to100 }}%</span>
+            <div class="six-panel-bar"><div class="six-panel-fill" style="width: {{ p.value_0to100 }}%;"></div></div>
           </div>
-          <div class="radar-interpret-col">
-            <div class="radar-interpret-card">
-              <h6 class="radar-interpret-title">当前能力分析</h6>
-              <p class="radar-interpret-row"><span class="radar-interpret-label">优势板块：</span>{{ (six_panel_strong_labels or []) | join('、') or '无' }}</p>
-              <p class="radar-interpret-row"><span class="radar-interpret-label">主要薄弱：</span>{{ (six_panel_weak_labels or []) | join('、') or '暂无' }}</p>
-              <p class="radar-interpret-suggest mb-0">{{ six_panel_weak_summary or '各板块均有数据后将显示薄弱区域总结。' }}</p>
-            </div>
-          </div>
+          {% endfor %}
         </div>
-        <div class="radar-table-wrap">
-          <div class="radar-table-title">六大板块掌握度</div>
-          <div class="radar-table">
-            {% for p in (six_panel_radar or []) %}
-            <div class="radar-table-row">
-              <span class="radar-table-name">{{ p.label }}</span>
-              <span class="radar-table-value">{{ p.value_0to100 }}%</span>
-              <div class="radar-table-bar"><div class="radar-table-fill" style="width: {{ p.value_0to100 }}%;"></div></div>
-            </div>
-            {% endfor %}
-          </div>
-        </div>
+        <p class="six-panel-summary">{{ six_panel_weak_summary or '各板块均有数据后将显示薄弱区域总结。' }}</p>
       </div>
     </div>
     <div class="dashboard-card roadmap-card-wrap dashboard-module" id="roadmap-card" style="align-self: start;" data-exams-url="{{ url_for('diagnostic.exams') }}">
@@ -168,7 +164,23 @@
             <span class="roadmap-badge-auto">自动推荐</span>
           </div>
           <div class="roadmap-grade-hint d-none" id="roadmap-grade-hint">当前未填写年级，系统根据已有做题记录提供通用竞赛建议。填写年级后可获得更准确推荐。</div>
-          <div class="roadmap-main roadmap-main--three">
+          <div class="roadmap-layer roadmap-layer--core">
+            <div class="roadmap-core-card">
+              <div class="roadmap-core-row" id="roadmap-current-block">
+                <span class="roadmap-core-label">当前阶段</span>
+                <span class="roadmap-core-value" id="roadmap-current"></span>
+              </div>
+              <div class="roadmap-core-row" id="roadmap-next-block">
+                <span class="roadmap-core-label">下一目标</span>
+                <span class="roadmap-core-value roadmap-core-value--primary" id="roadmap-next"></span>
+              </div>
+              <div class="roadmap-core-row" id="roadmap-amc-block">
+                <span class="roadmap-core-label">对应 AMC 水平</span>
+                <span class="roadmap-core-value" id="roadmap-amc-level"></span>
+              </div>
+            </div>
+          </div>
+          <div class="roadmap-layer roadmap-layer--two-col">
             <div class="roadmap-left roadmap-col-stepper">
               <div class="roadmap-path mb-3" id="roadmap-path-waterloo">
                 <div class="roadmap-path-title">Waterloo 路线</div>
@@ -177,22 +189,6 @@
               <div class="roadmap-path">
                 <div class="roadmap-path-title roadmap-path-title--muted">对应 AMC 水平</div>
                 <div class="roadmap-stepper d-flex flex-wrap gap-1 align-items-center" id="roadmap-stepper-amc"></div>
-              </div>
-            </div>
-            <div class="roadmap-center roadmap-col-core">
-              <div class="roadmap-core-card">
-                <div class="roadmap-core-row" id="roadmap-current-block">
-                  <span class="roadmap-core-label">当前阶段</span>
-                  <span class="roadmap-core-value" id="roadmap-current"></span>
-                </div>
-                <div class="roadmap-core-row" id="roadmap-next-block">
-                  <span class="roadmap-core-label">下一目标</span>
-                  <span class="roadmap-core-value roadmap-core-value--primary" id="roadmap-next"></span>
-                </div>
-                <div class="roadmap-core-row" id="roadmap-amc-block">
-                  <span class="roadmap-core-label">对应 AMC 水平</span>
-                  <span class="roadmap-core-value" id="roadmap-amc-level"></span>
-                </div>
               </div>
             </div>
             <div class="roadmap-right roadmap-col-reason">

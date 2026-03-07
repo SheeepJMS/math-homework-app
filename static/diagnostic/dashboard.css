@@ -307,13 +307,38 @@
 .report-ability-基础 { background: #fef3c7; color: #92400e; }
 .report-ability-中游 { background: #dbeafe; color: #1e40af; }
 .report-ability-中上 { background: #d1fae5; color: #065f46; }
-.report-card-actions { display: flex; flex-direction: column; gap: var(--s-2); align-items: flex-end; flex-shrink: 0; }
-.report-practice-completed {
-  font-size: 13px;
+.report-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+.report-card-status-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  justify-content: flex-end;
+}
+.report-badge {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 6px;
+}
+.report-badge--done {
+  background: var(--success-bg);
+  color: var(--success);
+}
+.report-badge--practice-done {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+.report-card-hint {
+  font-size: 12px;
   color: var(--muted);
-  padding: var(--s-2) var(--s-4);
-  min-width: 100px;
-  text-align: center;
+  margin: 0 0 var(--s-1);
+  text-align: right;
 }
 .btn-report-main { min-width: 100px; font-size: 14px; padding: var(--s-2) var(--s-4); }
 .btn-report-sub { min-width: 100px; font-size: 13px; padding: var(--s-2) var(--s-4); }
@@ -322,47 +347,32 @@
   .report-card-actions { flex-direction: row; align-self: stretch; justify-content: flex-end; }
 }
 
-/* 六大板块：两栏布局 + 能力解读 + 简表 */
-.card-body--radar { padding: var(--s-5) var(--s-6); }
-.radar-two-col {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--s-6);
-  align-items: start;
-  margin-bottom: var(--s-6);
-}
-.dashboard-radar-wrap { height: 320px; min-height: 280px; }
-.radar-chart-col { min-width: 0; }
-.radar-interpret-col { min-width: 0; }
-.radar-interpret-card {
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  padding: var(--s-5);
-}
-.radar-interpret-title { font-size: 16px; font-weight: 700; color: var(--text); margin: 0 0 var(--s-3); }
-.radar-interpret-row { font-size: 14px; color: var(--text); margin-bottom: var(--s-2); }
-.radar-interpret-label { color: var(--muted); margin-right: var(--s-1); }
-.radar-interpret-suggest { font-size: 13px; color: var(--muted); line-height: 1.5; }
-.radar-table-wrap { border-top: 1px solid var(--border); padding-top: var(--s-4); }
-.radar-table-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: var(--s-3); }
-.radar-table-row {
+/* 六大板块能力分布：横向能力条 */
+.card-body--six-panel { padding: var(--s-5) var(--s-6); }
+.six-panel-bars { margin-bottom: var(--s-5); }
+.six-panel-row {
   display: grid;
   grid-template-columns: 140px 44px 1fr;
   align-items: center;
   gap: var(--s-3);
-  margin-bottom: var(--s-2);
+  margin-bottom: var(--s-3);
   font-size: 14px;
 }
-.radar-table-name { color: var(--text); }
-.radar-table-value { font-weight: 600; color: var(--text); text-align: right; }
-.radar-table-bar { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
-.radar-table-fill { height: 100%; background: var(--brand); border-radius: 4px; transition: width 0.3s; }
+.six-panel-name { color: var(--text); font-weight: 500; }
+.six-panel-value { font-weight: 600; color: var(--text); text-align: right; }
+.six-panel-bar { height: 10px; background: var(--border); border-radius: 5px; overflow: hidden; }
+.six-panel-fill { height: 100%; background: var(--brand); border-radius: 5px; transition: width 0.3s; }
+.six-panel-summary {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--border);
+}
 @media (max-width: 767px) {
-  .radar-two-col { grid-template-columns: 1fr; }
-  .dashboard-radar-wrap { height: 260px; }
-  .radar-table-row { grid-template-columns: 1fr 44px; }
-  .radar-table-row .radar-table-bar { grid-column: 1 / -1; }
+  .six-panel-row { grid-template-columns: 1fr 44px; }
+  .six-panel-row .six-panel-bar { grid-column: 1 / -1; }
 }
 
 .dashboard-empty.small { padding: var(--s-4); }
@@ -497,22 +507,21 @@
   font-size: var(--small);
   border-bottom: 1px solid #fef08a;
 }
-.roadmap-main {
+.roadmap-layer {
+  padding: 0 var(--s-5) var(--s-5);
+}
+.roadmap-layer--core {
+  padding: var(--s-5);
+}
+.roadmap-layer--two-col {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--s-5);
-  padding: var(--s-5);
+  padding: 0 var(--s-5) var(--s-5);
   align-items: start;
 }
-.roadmap-main--three {
-  grid-template-columns: 1fr 1.2fr 1fr;
-  gap: var(--s-5);
-}
-@media (max-width: 991px) {
-  .roadmap-main--three { grid-template-columns: 1fr; }
-}
 @media (max-width: 767px) {
-  .roadmap-main { grid-template-columns: 1fr; }
+  .roadmap-layer--two-col { grid-template-columns: 1fr; }
 }
 .roadmap-col-stepper .roadmap-path-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: var(--s-2); }
 .roadmap-path-title--muted { font-size: 12px; color: var(--muted); font-weight: 500; }

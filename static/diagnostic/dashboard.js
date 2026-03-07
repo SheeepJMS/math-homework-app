@@ -189,6 +189,5 @@
     data = data || {};
     initTrendChart('trendChart', data.chart_trend_labels, data.chart_trend_values);
     initParticipationGauge('participationGauge', data.weekly_participation);
-    initSixPanelRadarChart('sixPanelRadarChart', data.six_panel_radar || []);
   };
 })();
