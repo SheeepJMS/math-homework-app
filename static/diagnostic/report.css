@@ -751,6 +751,17 @@
   margin: 0;
   text-align: center;
 }
+.practice-pack-completed {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--s-3, 12px) var(--s-4, 16px);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--success, #16a34a);
+  background: var(--success-bg, #eaf7ef);
+  border-radius: var(--r-md, 12px);
+}
 
 /* ========== 专家诊断型模块 ========== */
 .expert-grid {

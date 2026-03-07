@@ -85,7 +85,11 @@
           <div class="report-card-actions">
             <a href="{{ url_for('diagnostic.report', attempt_id=r.attempt_id) }}" class="btn btn-primary btn-report-main">查看报告</a>
             {% if r.practice_set_id %}
+              {% if r.practice_completed %}
+            <span class="report-practice-completed">已完成</span>
+              {% else %}
             <a href="{{ url_for('diagnostic.practice', practice_set_id=r.practice_set_id) }}" class="btn btn-outline-secondary btn-report-sub">开始练习</a>
+              {% endif %}
             {% endif %}
           </div>
         </div>

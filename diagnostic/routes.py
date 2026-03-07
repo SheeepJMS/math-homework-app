@@ -625,7 +625,7 @@ def history():
 def reports():
     """报告中心：搜索、过滤、分页、delta 对比、同卷历史。"""
     db = _get_db()
-    from app import DiagAttempt, DiagExam, DiagCompetition, DiagPracticeSet
+    from app import DiagAttempt, DiagExam, DiagCompetition, DiagPracticeSet, DiagPracticeAttempt
     user = get_diag_user_from_cookie()
 
     q = (request.args.get('q') or '').strip()
@@ -729,7 +729,12 @@ def reports():
             }
 
         ps = att.practice_sets[-1] if att.practice_sets else None
-        practice_info = {'exists': ps is not None, 'practice_set_id': ps.id if ps else None}
+        practice_completed = False
+        if ps and user.id:
+            practice_completed = db.session.query(DiagPracticeAttempt).filter_by(
+                practice_set_id=ps.id, user_id=user.id
+            ).first() is not None
+        practice_info = {'exists': ps is not None, 'practice_set_id': ps.id if ps else None, 'completed': practice_completed}
 
         exam_title = getattr(exam, 'title', None) or 'N/A'
         if att.status != 'finished':
@@ -1311,6 +1316,7 @@ def _build_dashboard_data(user, db):
     from app import (
         DiagAttempt, DiagAttemptAnswer, DiagExam, DiagExamQuestion, DiagCompetition,
         DiagQuestion, DiagQuestionKp, DiagKnowledgePoint, DiagPracticeSet, DiagPracticeSetItem,
+        DiagPracticeAttempt,
     )
     user_display_name = getattr(user, 'username', None) or 'N/A'
     cutoff_30d = datetime.utcnow() - timedelta(days=30)
@@ -1394,6 +1400,15 @@ def _build_dashboard_data(user, db):
                             row['ability_label'] = '中上'
                 except Exception:
                     pass
+            # 该报告关联的练习包是否已被当前用户完成（每人每包只能提交一次）
+            row['practice_completed'] = False
+            if row.get('practice_set_id') and user.id:
+                _completed = db.session.query(DiagPracticeAttempt).filter_by(
+                    practice_set_id=row['practice_set_id'],
+                    user_id=user.id,
+                ).first()
+                if _completed:
+                    row['practice_completed'] = True
             recent_reports.append(row)
 
         finished_30d_all = db.session.query(DiagAttempt).filter(
@@ -1557,8 +1572,8 @@ def _build_dashboard_data(user, db):
     else:
         hero_summary = '暂无测验记录，去完成一次诊断即可获得专属分析。'
 
-    # 首页 AI 训练包：取最近一次报告的 practice_set
-    practice_pack_home = {'exists': False, 'practice_set_id': None, 'count': 0, 'est_minutes': 0, 'weak_kp_names': weak_kp_names[:3]}
+    # 首页 AI 训练包：取最近一次报告的 practice_set；若该包已被当前用户完成则标记 completed
+    practice_pack_home = {'exists': False, 'practice_set_id': None, 'count': 0, 'est_minutes': 0, 'weak_kp_names': weak_kp_names[:3], 'completed': False}
     if recent_reports and recent_reports[0].get('practice_set_id'):
         ps_id = recent_reports[0]['practice_set_id']
         pack_count = db.session.query(DiagPracticeSetItem).filter_by(practice_set_id=ps_id).count()
@@ -1568,7 +1583,15 @@ def _build_dashboard_data(user, db):
             'count': pack_count,
             'est_minutes': round(pack_count * 0.5, 1) if pack_count else 0,
             'weak_kp_names': weak_kp_names[:3],
+            'completed': False,
         }
+        if user.id:
+            _home_done = db.session.query(DiagPracticeAttempt).filter_by(
+                practice_set_id=ps_id,
+                user_id=user.id,
+            ).first()
+            if _home_done:
+                practice_pack_home['completed'] = True
 
     hero_action_line = '建议先完成一组 %d 分钟基础训练，再进入下一阶段竞赛练习。' % (practice_pack_home.get('est_minutes') or practice_minutes)
 
@@ -1589,7 +1612,7 @@ def _build_dashboard_data(user, db):
             break
 
     cta_primary = '继续上次试卷' if in_progress_att else (
-        '开始针对性训练' if practice_pack_home.get('exists') and practice_pack_home.get('practice_set_id') else '开始推荐试卷'
+        '开始针对性训练' if practice_pack_home.get('exists') and practice_pack_home.get('practice_set_id') and not practice_pack_home.get('completed') else '开始推荐试卷'
     )
     hero = {
         'summary_text': hero_summary,
@@ -1971,7 +1994,7 @@ def _build_report_data(att, user, db):
     """组装报告数据结构，缺失字段安全降级为 N/A 或空。优先使用 CSV 导入的答案/解析/知识点。"""
     from sqlalchemy import func
     from app import (DiagAttempt, DiagAttemptAnswer, DiagExamQuestion, DiagQuestion,
-                     DiagKnowledgePoint, DiagPracticeSetItem, DiagQuestionAnswer, DiagQuestionKp)
+                     DiagKnowledgePoint, DiagPracticeSetItem, DiagPracticeAttempt, DiagQuestionAnswer, DiagQuestionKp)
     exam = att.exam
     competition = getattr(exam, 'competition', None) if exam else None
     answers = db.session.query(DiagAttemptAnswer).filter_by(attempt_id=att.id).order_by(DiagAttemptAnswer.question_id).all()
@@ -2103,6 +2126,11 @@ def _build_report_data(att, user, db):
     ps_count = len(practice_items)
     est_minutes = max(1, ps_count * 2)
     ps_kps = list(set(kp_stats.keys()))[:5]
+    practice_completed = False
+    if practice_set and user and user.id:
+        practice_completed = db.session.query(DiagPracticeAttempt).filter_by(
+            practice_set_id=practice_set.id, user_id=user.id
+        ).first() is not None
     # 总排名位置（百分比）：同试卷已完成尝试中，得分率超过多少比例的人 → 显示为「前 X%」
     rank_top_percent = None
     if len(finished_ids) > 1:
@@ -2148,6 +2176,7 @@ def _build_report_data(att, user, db):
             'count': ps_count,
             'est_minutes': est_minutes,
             'kps': ps_kps,
+            'completed': practice_completed,
         },
         'chart_line_x': [pq['qnum'] for pq in per_question],
         'chart_line_y': _avg_score_per_question_all_students(db, order, finished_ids) if order else [],

@@ -102,7 +102,11 @@
         <a href="{{ url_for('diagnostic.attempt', attempt_id=item.attempt_id) }}" class="btn btn-sm btn-primary">继续答题</a>
         {% endif %}
         {% if item.practice.exists and item.practice.practice_set_id %}
+          {% if item.practice.completed %}
+        <span class="rc-practice-completed">已完成</span>
+          {% else %}
         <a href="{{ url_for('diagnostic.practice', practice_set_id=item.practice.practice_set_id) }}" class="btn btn-sm btn-outline-primary">开始练习</a>
+          {% endif %}
         {% endif %}
         {% if item.exam_history and item.exam_history|length > 1 %}
         <a href="#" class="rc-same-exam-toggle" data-exam-id="{{ item.exam_id }}" data-card-id="{{ item.attempt_id }}">

@@ -55,11 +55,17 @@
           </div>
           <div class="practice-pack-cta">
             {% if practice_pack_home and practice_pack_home.exists and practice_pack_home.practice_set_id %}
+              {% if practice_pack_home.completed %}
+            <span class="practice-pack-completed">✓ 已完成</span>
+            <p class="practice-pack-cta-hint">该训练包已完成，不可重复练习。</p>
+              {% else %}
             <a class="btn btn-primary practice-pack-btn" href="{{ url_for('diagnostic.practice', practice_set_id=practice_pack_home.practice_set_id) }}">🚀 开始针对性训练</a>
+            <p class="practice-pack-cta-hint">完成训练后系统将更新你的能力评估。</p>
+              {% endif %}
             {% else %}
             <a class="btn btn-primary practice-pack-btn" href="{{ url_for('diagnostic.reports') }}">查看报告获取训练包</a>
-            {% endif %}
             <p class="practice-pack-cta-hint">完成训练后系统将更新你的能力评估。</p>
+            {% endif %}
           </div>
         </div>
       </div>

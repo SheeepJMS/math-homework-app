@@ -148,11 +148,17 @@
               </div>
               <div class="practice-pack-cta">
                 {% if practice_summary and practice_summary.exists and practice_summary.practice_set_id %}
+                  {% if practice_summary.completed %}
+                  <span class="practice-pack-completed">✓ 已完成</span>
+                  <p class="practice-pack-cta-hint">该训练包已完成，不可重复练习。</p>
+                  {% else %}
                   <a class="btn btn-primary practice-pack-btn" href="{{ url_for('diagnostic.practice', practice_set_id=practice_summary.practice_set_id) }}">🚀 开始针对性训练</a>
+                  <p class="practice-pack-cta-hint">完成训练后系统将更新你的能力评估。</p>
+                  {% endif %}
                 {% else %}
                   <button class="btn btn-primary practice-pack-btn" disabled>🚀 开始针对性训练</button>
+                  <p class="practice-pack-cta-hint">完成训练后系统将更新你的能力评估。</p>
                 {% endif %}
-                <p class="practice-pack-cta-hint">完成训练后系统将更新你的能力评估。</p>
               </div>
             </div>
           </div>
