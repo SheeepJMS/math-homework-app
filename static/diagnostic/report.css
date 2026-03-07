@@ -126,9 +126,10 @@
 
 @media (min-width: 768px) {
   .metrics-grid {
-    grid-template-columns: 1.5fr 1.5fr repeat(4, 1fr);
+    grid-template-columns: 1.5fr 1.5fr 1fr 1fr 1fr 1fr;
     gap: var(--s-4);
   }
+  .mini-card--rank { grid-column: span 2; }
 }
 
 @media (max-width: 767px) {
@@ -277,6 +278,33 @@
   color: var(--muted);
   margin-top: 2px;
   white-space: nowrap;
+}
+
+/* 总排名位置卡片：占两列，内部百分比布局优化 */
+.mini-card--rank {
+  min-width: 0;
+}
+.mini-card--rank .mini-card-rank-inner {
+  flex: 1;
+  min-width: 0;
+}
+.mini-card--rank .metric-value--rank {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25em;
+  flex-wrap: nowrap;
+}
+.mini-card--rank .rank-prefix {
+  font-size: 0.65em;
+  font-weight: 600;
+  color: var(--muted);
+  line-height: 1.2;
+}
+.mini-card--rank .rank-percent {
+  font-size: 1.35em;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
 }
 
 /* ========== 报告标题区 ========== */
