@@ -601,16 +601,93 @@ def logout():
     return resp
 
 
+def _build_recommended_exams(dashboard):
+    """从 dashboard 数据中抽取 2–4 条推荐试卷，用于试卷中心首屏。"""
+    recommended_exams = []
+    grouped = dashboard.get('exams_grouped', []) or []
+    hero = dashboard.get('hero', {}) or {}
+
+    # 1. 进行中（优先）
+    for cat in grouped:
+        for cont in cat.get('contests', []):
+            for ex in cont.get('exams', []):
+                if ex.get('status') == 'in_progress' and ex.get('in_progress'):
+                    recommended_exams.append({
+                        'exam_id': ex['exam_id'], 'exam_title': ex.get('exam_title', 'N/A'),
+                        'category_name': cat.get('category_name', ''), 'contest_name': cont.get('contest_name', ''),
+                        'status': 'in_progress', 'tag': '继续', 'action_type': 'continue',
+                        'attempt_id': ex['in_progress'].get('attempt_id'),
+                        'exam_count': len(cont.get('exams', [])),
+                    })
+                    break
+            if recommended_exams:
+                break
+        if recommended_exams:
+            break
+
+    # 2. 与 hero 一致的推荐（当前阶段 / 推荐 / 可重做）
+    rec = hero.get('recommended_exam')
+    if rec:
+        for cat in grouped:
+            for cont in cat.get('contests', []):
+                for ex in cont.get('exams', []):
+                    if ex.get('exam_id') != rec.get('exam_id'):
+                        continue
+                    if any(r['exam_id'] == ex['exam_id'] for r in recommended_exams):
+                        break
+                    tag = '当前阶段' if rec.get('type') == 'continue' else ('可重做' if rec.get('type') == 'retry' else '推荐')
+                    recommended_exams.append({
+                        'exam_id': ex['exam_id'], 'exam_title': ex.get('exam_title', 'N/A'),
+                        'category_name': cat.get('category_name', ''), 'contest_name': cont.get('contest_name', ''),
+                        'status': ex.get('status'), 'tag': tag, 'action_type': rec.get('type'),
+                        'attempt_id': rec.get('attempt_id'),
+                        'last_attempt_id': ex.get('last_finished', {}).get('attempt_id') if ex.get('last_finished') else None,
+                        'can_retry': ex.get('retry_policy', {}).get('can_retry'), 'exam_count': len(cont.get('exams', [])),
+                    })
+                    break
+                else:
+                    continue
+                break
+            else:
+                continue
+            break
+
+    # 3. 补足至 2–4 条：未开始的试卷
+    for cat in grouped:
+        for cont in cat.get('contests', []):
+            for ex in cont.get('exams', []):
+                if ex.get('status') != 'not_started' or len(recommended_exams) >= 4:
+                    continue
+                if any(r['exam_id'] == ex['exam_id'] for r in recommended_exams):
+                    continue
+                recommended_exams.append({
+                    'exam_id': ex['exam_id'], 'exam_title': ex.get('exam_title', 'N/A'),
+                    'category_name': cat.get('category_name', ''), 'contest_name': cont.get('contest_name', ''),
+                    'status': 'not_started', 'tag': '推荐', 'action_type': 'start',
+                    'exam_count': len(cont.get('exams', [])),
+                })
+                if len(recommended_exams) >= 4:
+                    break
+            if len(recommended_exams) >= 4:
+                break
+        if len(recommended_exams) >= 4:
+            break
+
+    return recommended_exams[:4]
+
+
 @diagnostic_bp.route('/exams')
 @require_diag_login
 def exams():
-    """试卷中心：展示四级树结构 + 待考试卷列表。"""
+    """试卷中心：展示四级树结构 + 推荐试卷 + 待考试卷列表。"""
     db = _get_db()
     user = get_diag_user_from_cookie()
     dashboard = _build_dashboard_data(user, db)
+    recommended_exams = _build_recommended_exams(dashboard)
     return render_template('diagnostic/exam_center.html', user=user,
                           exams_grouped=dashboard.get('exams_grouped', []),
-                          exam_tree=dashboard.get('exam_tree', []))
+                          exam_tree=dashboard.get('exam_tree', []),
+                          recommended_exams=recommended_exams)
 
 
 @diagnostic_bp.route('/history')

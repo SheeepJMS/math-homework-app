@@ -1,0 +1,95 @@
+{# 竞赛目录：学科 → 竞赛大类(accordion) → 具体竞赛(行卡) → 年份(卡片) #}
+{% if exam_tree and exam_tree|length > 0 %}
+<div class="ec-directory">
+  {% for sub in exam_tree %}
+  <div class="ec-subject" data-subject="{{ sub.subject | lower }}">
+    <h3 class="ec-subject-title">{{ sub.subject }}</h3>
+    {% for cat in sub.categories %}
+    {% set cat_total = [] %}
+    {% for c in cat.contests %}{% set _ = cat_total.append(c.years | length) %}{% endfor %}
+    <div class="ec-accordion" data-category="{{ cat.category | lower }}" id="acc-{{ loop.index }}">
+      <button type="button" class="ec-accordion-toggle" aria-expanded="false">
+        <span class="ec-accordion-label">{{ cat.category }}</span>
+        <span class="ec-accordion-count">{{ cat_total | sum }} 套试卷</span>
+        <i data-lucide="chevron-down" class="ec-accordion-chevron"></i>
+      </button>
+      <div class="ec-accordion-body">
+        {% for cont in cat.contests %}
+        {% set years_list = cont.years %}
+        {% set completed_count = years_list | selectattr('status', 'equalto', 'completed') | list | length %}
+        {% set last_done = years_list | selectattr('last_finished') | first %}
+        <div class="ec-contest-block" data-contest="{{ cont.contest | lower }}">
+          <div class="ec-contest-row" data-title="{{ cont.contest | lower }}" data-category="{{ cat.category | lower }}" data-contest="{{ cont.contest | lower }}">
+            <div class="ec-contest-info">
+              <span class="ec-contest-name">{{ cont.contest }}</span>
+              <span class="ec-contest-meta">{{ years_list | length }} 套历年卷</span>
+              {% if completed_count > 0 %}
+              <span class="ec-contest-meta">已完成 {{ completed_count }}</span>
+              {% endif %}
+              {% if last_done and last_done.last_finished %}
+              <span class="ec-contest-score">最近 {{ last_done.last_finished.score }}/{{ last_done.last_finished.total }} · {{ last_done.last_finished.accuracy_percent | format_percent1 }}</span>
+              {% endif %}
+            </div>
+            <button type="button" class="ec-contest-toggle" aria-label="展开年份">
+              <i data-lucide="chevron-down"></i>
+            </button>
+          </div>
+          <div class="ec-years-block" data-contest="{{ cont.contest | lower }}">
+            <div class="ec-years-grid">
+              {% for yr in years_list %}
+              <div class="ec-year-card ec-year-row tree-year-row" data-title="{{ yr.exam_title | lower }}" data-subject="{{ sub.subject | lower }}" data-category="{{ cat.category | lower }}" data-contest="{{ cont.contest | lower }}" data-year="{{ yr.year }}">
+                <div class="ec-year-header">
+                  <span class="ec-year-title">{{ yr.exam_title }}</span>
+                  {% if yr.status == 'in_progress' %}
+                  <span class="ec-year-status ec-status--in_progress">进行中</span>
+                  {% elif yr.status == 'completed' %}
+                  <span class="ec-year-status ec-status--completed">已完成</span>
+                  {% else %}
+                  <span class="ec-year-status ec-status--not_started">未开始</span>
+                  {% endif %}
+                </div>
+                <div class="ec-year-meta">
+                  {% if yr.in_progress %}
+                  <span>已做 {{ yr.in_progress.answered }}/{{ yr.in_progress.total }} · {{ yr.in_progress.time_sec | format_time_sec }}</span>
+                  {% elif yr.last_finished %}
+                  <span>{{ yr.last_finished.finished_at_str }} · {{ yr.last_finished.score }}/{{ yr.last_finished.total }} · {{ yr.last_finished.accuracy_percent | format_percent1 }}</span>
+                  {% else %}
+                  <span>未参加</span>
+                  {% endif %}
+                </div>
+                {% if yr.status == 'completed' and yr.retry_policy and not yr.retry_policy.can_retry and yr.retry_policy.next_retry_at %}
+                <div class="ec-year-cooldown">可在 {{ yr.retry_policy.next_retry_at | format_date }} 后重做</div>
+                {% endif %}
+                <div class="ec-year-actions">
+                  {% if yr.status == 'in_progress' %}
+                  <a href="{{ url_for('diagnostic.attempt', attempt_id=yr.in_progress_attempt_id) }}" class="btn btn-sm btn-primary">继续做卷</a>
+                  {% elif yr.status == 'completed' %}
+                    {% if yr.retry_policy and yr.retry_policy.can_retry %}
+                  <a href="{{ url_for('diagnostic.report', attempt_id=yr.last_attempt_id) }}" class="btn btn-sm btn-outline-primary">查看报告</a>
+                  <a href="{{ url_for('diagnostic.start_exam', exam_id=yr.exam_id) }}" class="btn btn-sm btn-primary">重做</a>
+                    {% else %}
+                  <a href="{{ url_for('diagnostic.report', attempt_id=yr.last_attempt_id) }}" class="btn btn-sm btn-primary">查看报告</a>
+                  <span class="btn btn-sm btn-outline-secondary disabled">重做</span>
+                    {% endif %}
+                  {% else %}
+                  <a href="{{ url_for('diagnostic.start_exam', exam_id=yr.exam_id) }}" class="btn btn-sm btn-primary">开始做卷</a>
+                  {% endif %}
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="exam-center-empty">
+  <div class="icon-empty"><i data-lucide="folder-open"></i></div>
+  <p class="mb-0">暂无已发布的试卷。</p>
+</div>
+{% endif %}

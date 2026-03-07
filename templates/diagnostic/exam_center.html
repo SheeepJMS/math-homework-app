@@ -2,59 +2,156 @@
 {% block title %}试卷中心 - 诊断系统{% endblock %}
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='diagnostic/dashboard.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='diagnostic/exam_tree.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='diagnostic/exam_center.css') }}">
 {% endblock %}
 {% block content %}
-<div class="dashboard-page">
-  <h2 class="mb-4"><i data-lucide="pencil" class="me-2"></i>试卷中心</h2>
-  <p class="text-muted small mb-4">按学科 → 竞赛大类 → 具体竞赛 → 年份 四级结构浏览，支持搜索过滤。</p>
+<div class="exam-center-page">
+  {# 第一屏：标题 + 说明 + 搜索 + 快速筛选 #}
+  <header class="exam-center-hero">
+    <h1 class="exam-center-title"><i data-lucide="layout-grid" class="me-2"></i>试卷中心</h1>
+    <p class="exam-center-subtitle">选择适合你的竞赛试卷，开始诊断测试与训练</p>
+    <div class="exam-center-search-wrap">
+      <input type="text" id="examCenterSearch" class="exam-center-search" placeholder="搜索 Gauss 2025、AMC 8、Pascal…" autocomplete="off">
+    </div>
+    <div class="exam-center-filters" id="examCenterFilters">
+      <button type="button" class="ec-filter-chip active" data-filter="">全部</button>
+      <button type="button" class="ec-filter-chip" data-filter="waterloo">Waterloo</button>
+      <button type="button" class="ec-filter-chip" data-filter="amc">AMC</button>
+      <button type="button" class="ec-filter-chip" data-filter="ubc">UBC</button>
+    </div>
+  </header>
 
-  {% include 'diagnostic/_exam_tree.html' %}
+  {# 推荐试卷（首屏重点） #}
+  {% if recommended_exams and recommended_exams|length > 0 %}
+  <section class="exam-center-section exam-center-recommended">
+    <h2 class="ec-section-title">推荐试卷</h2>
+    <div class="ec-recommended-grid">
+      {% for rec in recommended_exams %}
+      <div class="ec-recommended-card" data-exam-id="{{ rec.exam_id }}" data-category="{{ rec.category_name | lower }}">
+        <span class="ec-rec-tag ec-rec-tag--{{ rec.tag | replace(' ', '-') }}">{{ rec.tag }}</span>
+        <div class="ec-rec-name">{{ rec.exam_title }}</div>
+        <div class="ec-rec-meta">
+          <span>{{ rec.category_name }}</span>
+          <span>·</span>
+          <span>{{ rec.exam_count }} 套历年卷</span>
+        </div>
+        <div class="ec-rec-status">
+          {% if rec.status == 'in_progress' %}
+          <span class="ec-status ec-status--in_progress">进行中</span>
+          {% elif rec.status == 'completed' %}
+          <span class="ec-status ec-status--completed">已完成</span>
+          {% else %}
+          <span class="ec-status ec-status--not_started">未开始</span>
+          {% endif %}
+        </div>
+        <div class="ec-rec-actions">
+          {% if rec.action_type == 'continue' and rec.attempt_id %}
+          <a href="{{ url_for('diagnostic.attempt', attempt_id=rec.attempt_id) }}" class="btn btn-primary ec-rec-btn">继续做卷</a>
+          {% elif rec.action_type == 'retry' and rec.can_retry %}
+          <a href="{{ url_for('diagnostic.start_exam', exam_id=rec.exam_id) }}" class="btn btn-primary ec-rec-btn">重做</a>
+          <a href="{{ url_for('diagnostic.report', attempt_id=rec.last_attempt_id) }}" class="btn btn-outline-secondary ec-rec-btn">查看报告</a>
+          {% elif rec.status == 'completed' %}
+          <a href="{{ url_for('diagnostic.report', attempt_id=rec.last_attempt_id) }}" class="btn btn-primary ec-rec-btn">查看报告</a>
+          {% else %}
+          <a href="{{ url_for('diagnostic.start_exam', exam_id=rec.exam_id) }}" class="btn btn-primary ec-rec-btn">开始做卷</a>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {# 完整竞赛目录 #}
+  <section class="exam-center-section exam-center-directory">
+    <h2 class="ec-section-title">竞赛目录</h2>
+    {% include 'diagnostic/_exam_center_directory.html' %}
+  </section>
 </div>
 {% endblock %}
 {% block extra_js %}
 <script>
-  document.addEventListener('DOMContentLoaded', function () {
-    var search = document.getElementById('examTreeSearch');
-    function applyFilter(q) {
-      if (!search) return;
-      q = (q || '').toLowerCase().trim();
-      document.querySelectorAll('.tree-year-row').forEach(function (row) {
-        var title = (row.getAttribute('data-title') || '').toLowerCase();
-        var sub = (row.getAttribute('data-subject') || '').toLowerCase();
-        var cat = (row.getAttribute('data-category') || '').toLowerCase();
-        var cont = (row.getAttribute('data-contest') || '').toLowerCase();
-        var yr = (row.getAttribute('data-year') || '').toString();
-        var match = !q || title.indexOf(q) >= 0 || sub.indexOf(q) >= 0 || cat.indexOf(q) >= 0 || cont.indexOf(q) >= 0 || yr.indexOf(q) >= 0;
-        row.style.display = match ? '' : 'none';
-      });
-      function hasVisibleDescendant(el) {
-        var rows = el.querySelectorAll('.tree-year-row');
-        for (var i = 0; i < rows.length; i++) { if (rows[i].style.display !== 'none') return true; }
-        var children = el.querySelectorAll(':scope > .tree-children > .tree-node');
-        for (var j = 0; j < children.length; j++) { if (hasVisibleDescendant(children[j])) return true; }
-        return false;
-      }
-      document.querySelectorAll('.tree-level-3, .tree-level-2, .tree-level-1').forEach(function (node) {
-        node.style.display = hasVisibleDescendant(node) ? '' : 'none';
-      });
-    }
-    if (search) {
-      var params = new URLSearchParams(window.location.search);
-      var q = params.get('q');
-      if (q) {
-        search.value = q;
-        applyFilter(q);
-        document.querySelectorAll('.tree-level-1, .tree-level-2, .tree-level-3').forEach(function (n) { n.classList.remove('collapsed'); });
-      }
-      search.addEventListener('input', function () { applyFilter(this.value); });
-    }
-    var firstSub = document.querySelector('.tree-level-1');
-    if (firstSub) {
-      firstSub.classList.remove('collapsed');
-      var firstCat = firstSub.querySelector('.tree-level-2');
-      if (firstCat) firstCat.classList.remove('collapsed');
-    }
+document.addEventListener('DOMContentLoaded', function () {
+  var search = document.getElementById('examCenterSearch');
+  var filters = document.getElementById('examCenterFilters');
+  var params = new URLSearchParams(window.location.search);
+  var q = (params.get('q') || '').trim();
+  if (q && search) { search.value = q; }
+
+  function getActiveFilter() {
+    var chip = filters && filters.querySelector('.ec-filter-chip.active');
+    return chip ? (chip.getAttribute('data-filter') || '') : '';
+  }
+
+  function applyFilter() {
+    var q = (search && search.value || '').toLowerCase().trim();
+    var catFilter = getActiveFilter();
+    document.querySelectorAll('.ec-year-row').forEach(function (row) {
+      var title = (row.getAttribute('data-title') || '').toLowerCase();
+      var subject = (row.getAttribute('data-subject') || '').toLowerCase();
+      var category = (row.getAttribute('data-category') || '').toLowerCase();
+      var contest = (row.getAttribute('data-contest') || '').toLowerCase();
+      var year = (row.getAttribute('data-year') || '').toString();
+      var matchQ = !q || title.indexOf(q) >= 0 || subject.indexOf(q) >= 0 || category.indexOf(q) >= 0 || contest.indexOf(q) >= 0 || year.indexOf(q) >= 0;
+      var matchCat = !catFilter || category.indexOf(catFilter) >= 0 || contest.indexOf(catFilter) >= 0;
+      row.style.display = (matchQ && matchCat) ? '' : 'none';
+    });
+    document.querySelectorAll('.ec-contest-block').forEach(function (block) {
+      var rows = block.querySelectorAll('.ec-year-row');
+      var visible = Array.prototype.some.call(rows, function (r) { return r.style.display !== 'none'; });
+      block.style.display = visible ? '' : 'none';
+    });
+    document.querySelectorAll('.ec-accordion').forEach(function (acc) {
+      var blocks = acc.querySelectorAll('.ec-contest-block');
+      var visible = Array.prototype.some.call(blocks, function (b) { return b.style.display !== 'none'; });
+      acc.style.display = visible ? '' : 'none';
+    });
+    document.querySelectorAll('.ec-subject').forEach(function (sub) {
+      var accs = sub.querySelectorAll('.ec-accordion');
+      var visible = Array.prototype.some.call(accs, function (a) { return a.style.display !== 'none'; });
+      sub.style.display = visible ? '' : 'none';
+    });
+    document.querySelectorAll('.ec-recommended-card').forEach(function (card) {
+      var category = (card.getAttribute('data-category') || '').toLowerCase();
+      var matchCat = !catFilter || category.indexOf(catFilter) >= 0;
+      card.style.display = matchCat ? '' : 'none';
+    });
+  }
+
+  if (search) {
+    search.addEventListener('input', applyFilter);
+  }
+  if (filters) {
+    filters.addEventListener('click', function (e) {
+      var chip = e.target.closest('.ec-filter-chip');
+      if (!chip) return;
+      filters.querySelectorAll('.ec-filter-chip').forEach(function (c) { c.classList.remove('active'); });
+      chip.classList.add('active');
+      applyFilter();
+    });
+  }
+
+  document.querySelectorAll('.ec-accordion-toggle').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var acc = this.closest('.ec-accordion');
+      if (acc) acc.classList.toggle('ec-accordion--open');
+    });
   });
+  document.querySelectorAll('.ec-contest-toggle').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var row = this.closest('.ec-contest-row');
+      var block = row && row.nextElementSibling;
+      if (block && block.classList.contains('ec-years-block')) {
+        block.classList.toggle('ec-years-block--open');
+        if (row) row.classList.toggle('ec-contest-row--open', block.classList.contains('ec-years-block--open'));
+      }
+    });
+  });
+
+  var firstAcc = document.querySelector('.ec-accordion');
+  if (firstAcc) firstAcc.classList.add('ec-accordion--open');
+  applyFilter();
+});
 </script>
 {% endblock %}

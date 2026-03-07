@@ -1,0 +1,397 @@
+/**
+ * 试卷中心 - 竞赛试卷浏览中心
+ * 风格：蓝白灰、卡片式、SaaS 感
+ */
+:root {
+  --ec-bg: #f6f7fb;
+  --ec-surface: #ffffff;
+  --ec-surface-2: #fbfcff;
+  --ec-border: #e6e8f0;
+  --ec-text: #111827;
+  --ec-muted: #6b7280;
+  --ec-brand: #2563eb;
+  --ec-brand-bg: #e8efff;
+  --ec-success: #16a34a;
+  --ec-success-bg: #eaf7ef;
+  --ec-warning: #f59e0b;
+  --ec-r-md: 12px;
+  --ec-r-lg: 16px;
+  --ec-s-2: 8px;
+  --ec-s-3: 12px;
+  --ec-s-4: 16px;
+  --ec-s-5: 20px;
+  --ec-s-6: 24px;
+}
+
+.exam-center-page {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  color: var(--ec-text);
+  padding-bottom: var(--ec-s-6);
+}
+
+/* ========== 第一屏：标题 + 搜索 + 筛选 ========== */
+.exam-center-hero {
+  margin-bottom: var(--ec-s-6);
+}
+.exam-center-title {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--ec-text);
+  margin: 0 0 var(--ec-s-2);
+}
+.exam-center-subtitle {
+  font-size: 15px;
+  color: var(--ec-muted);
+  margin: 0 0 var(--ec-s-5);
+}
+.exam-center-search-wrap {
+  max-width: 480px;
+  margin-bottom: var(--ec-s-4);
+}
+.exam-center-search {
+  width: 100%;
+  padding: var(--ec-s-3) var(--ec-s-4);
+  font-size: 15px;
+  border: 1px solid var(--ec-border);
+  border-radius: var(--ec-r-md);
+  background: var(--ec-surface);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.exam-center-search:focus {
+  outline: none;
+  border-color: var(--ec-brand);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+.exam-center-search::placeholder {
+  color: var(--ec-muted);
+}
+.exam-center-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ec-s-2);
+}
+.ec-filter-chip {
+  padding: var(--ec-s-2) var(--ec-s-4);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ec-muted);
+  background: var(--ec-surface);
+  border: 1px solid var(--ec-border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s, border-color 0.2s;
+}
+.ec-filter-chip:hover {
+  color: var(--ec-brand);
+  border-color: var(--ec-brand);
+}
+.ec-filter-chip.active {
+  color: #fff;
+  background: var(--ec-brand);
+  border-color: var(--ec-brand);
+}
+
+/* ========== 区块标题 ========== */
+.exam-center-section {
+  margin-bottom: var(--ec-s-6);
+}
+.ec-section-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ec-text);
+  margin: 0 0 var(--ec-s-4);
+}
+
+/* ========== 推荐试卷 ========== */
+.exam-center-recommended {
+  margin-bottom: var(--ec-s-6);
+}
+.ec-recommended-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--ec-s-4);
+}
+.ec-recommended-card {
+  background: var(--ec-surface);
+  border: 1px solid var(--ec-border);
+  border-radius: var(--ec-r-lg);
+  padding: var(--ec-s-5);
+  position: relative;
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+.ec-recommended-card:hover {
+  box-shadow: 0 4px 14px rgba(16, 24, 40, 0.08);
+  border-color: rgba(37, 99, 235, 0.3);
+}
+.ec-rec-tag {
+  position: absolute;
+  top: var(--ec-s-3);
+  right: var(--ec-s-3);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 6px;
+}
+.ec-rec-tag--推荐,
+.ec-rec-tag--当前阶段 {
+  background: var(--ec-brand-bg);
+  color: var(--ec-brand);
+}
+.ec-rec-tag--继续 {
+  background: #fef3c7;
+  color: #92400e;
+}
+.ec-rec-tag--可重做 {
+  background: var(--ec-success-bg);
+  color: var(--ec-success);
+}
+.ec-rec-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ec-text);
+  margin-bottom: var(--ec-s-2);
+  padding-right: 80px;
+}
+.ec-rec-meta {
+  font-size: 13px;
+  color: var(--ec-muted);
+  margin-bottom: var(--ec-s-2);
+}
+.ec-rec-status {
+  margin-bottom: var(--ec-s-4);
+}
+.ec-status {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+.ec-status--in_progress {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+.ec-status--completed {
+  background: var(--ec-success-bg);
+  color: var(--ec-success);
+}
+.ec-status--not_started {
+  background: #f3f4f6;
+  color: var(--ec-muted);
+}
+.ec-rec-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ec-s-2);
+}
+.ec-rec-btn {
+  font-size: 14px;
+  padding: var(--ec-s-2) var(--ec-s-4);
+}
+
+/* ========== 竞赛目录 ========== */
+.ec-directory {
+  margin-top: var(--ec-s-4);
+}
+.ec-subject-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ec-muted);
+  margin: 0 0 var(--ec-s-3);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.ec-accordion {
+  margin-bottom: var(--ec-s-3);
+  background: var(--ec-surface);
+  border: 1px solid var(--ec-border);
+  border-radius: var(--ec-r-lg);
+  overflow: hidden;
+}
+.ec-accordion-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--ec-s-3);
+  padding: var(--ec-s-4) var(--ec-s-5);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ec-text);
+  background: var(--ec-surface-2);
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.2s;
+}
+.ec-accordion-toggle:hover {
+  background: #f3f4f6;
+}
+.ec-accordion-label {
+  flex: 1;
+}
+.ec-accordion-count {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ec-muted);
+}
+.ec-accordion-chevron {
+  font-size: 16px;
+  color: var(--ec-muted);
+  transition: transform 0.2s;
+}
+.ec-accordion--open .ec-accordion-chevron {
+  transform: rotate(0deg);
+}
+.ec-accordion:not(.ec-accordion--open) .ec-accordion-chevron {
+  transform: rotate(-90deg);
+}
+.ec-accordion-body {
+  padding: var(--ec-s-2) var(--ec-s-5) var(--ec-s-5);
+}
+.ec-accordion:not(.ec-accordion--open) .ec-accordion-body {
+  display: none;
+}
+
+.ec-contest-block {
+  margin-bottom: var(--ec-s-4);
+}
+.ec-contest-block:last-child {
+  margin-bottom: 0;
+}
+.ec-contest-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ec-s-4);
+  padding: var(--ec-s-3) var(--ec-s-4);
+  background: var(--ec-surface-2);
+  border: 1px solid var(--ec-border);
+  border-radius: var(--ec-r-md);
+  margin-bottom: var(--ec-s-2);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.ec-contest-row:hover {
+  background: #f3f4f6;
+}
+.ec-contest-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ec-s-2) var(--ec-s-4);
+  min-width: 0;
+}
+.ec-contest-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ec-text);
+}
+.ec-contest-meta {
+  font-size: 13px;
+  color: var(--ec-muted);
+}
+.ec-contest-score {
+  font-size: 13px;
+  color: var(--ec-brand);
+  font-weight: 500;
+}
+.ec-contest-toggle {
+  flex-shrink: 0;
+  padding: var(--ec-s-2);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--ec-muted);
+  transition: transform 0.2s, color 0.2s;
+  transform: rotate(-90deg);
+}
+.ec-contest-row--open .ec-contest-toggle {
+  transform: rotate(0deg);
+}
+.ec-contest-toggle:hover {
+  color: var(--ec-brand);
+}
+.ec-years-block {
+  display: none;
+  padding-left: var(--ec-s-4);
+  margin-bottom: var(--ec-s-3);
+}
+.ec-years-block--open {
+  display: block;
+}
+.ec-years-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--ec-s-3);
+}
+
+/* ========== 年份试卷卡 ========== */
+.ec-year-card {
+  background: var(--ec-surface);
+  border: 1px solid var(--ec-border);
+  border-radius: var(--ec-r-md);
+  padding: var(--ec-s-4);
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+.ec-year-card:hover {
+  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.06);
+  border-color: rgba(37, 99, 235, 0.2);
+}
+.ec-year-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ec-s-2);
+  margin-bottom: var(--ec-s-2);
+}
+.ec-year-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ec-text);
+}
+.ec-year-status {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+.ec-year-meta {
+  font-size: 13px;
+  color: var(--ec-muted);
+  margin-bottom: var(--ec-s-2);
+}
+.ec-year-cooldown {
+  font-size: 12px;
+  color: var(--ec-warning);
+  margin-bottom: var(--ec-s-2);
+}
+.ec-year-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ec-s-2);
+  margin-top: var(--ec-s-3);
+}
+
+/* ========== 空态 ========== */
+.exam-center-empty {
+  text-align: center;
+  padding: var(--ec-s-6);
+  color: var(--ec-muted);
+  background: var(--ec-surface-2);
+  border: 1px dashed var(--ec-border);
+  border-radius: var(--ec-r-lg);
+}
+.exam-center-empty .icon-empty {
+  font-size: 32px;
+  opacity: 0.5;
+  margin-bottom: var(--ec-s-3);
+}
+
+/* ========== 响应式 ========== */
+@media (max-width: 767px) {
+  .exam-center-title { font-size: 22px; }
+  .ec-recommended-grid {
+    grid-template-columns: 1fr;
+  }
+  .ec-years-grid {
+    grid-template-columns: 1fr;
+  }
+}
