@@ -500,6 +500,18 @@ class DiagAttempt(db.Model):
     exam = db.relationship('DiagExam', backref=db.backref('attempts', lazy=True))
 
 
+class DiagnosticBenchmarkSample(db.Model):
+    """诊断系统参考样本分布（冷启动/真实样本）。仅 diagnostic 使用，不影响作业网站。"""
+    __tablename__ = 'diagnostic_benchmark_samples'
+    id = db.Column(db.Integer, primary_key=True)
+    contest_key = db.Column(db.String(64), nullable=False, index=True)
+    score = db.Column(db.Float, nullable=False)
+    max_score = db.Column(db.Float, nullable=False)
+    source_type = db.Column(db.String(20), nullable=False, default='seed')  # 'seed' | 'real'
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 class DiagAttemptAnswer(db.Model):
     __tablename__ = 'diag_attempt_answers'
     id = db.Column(db.Integer, primary_key=True)

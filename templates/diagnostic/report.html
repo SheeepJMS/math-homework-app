@@ -70,10 +70,10 @@
         </div>
       </div>
       <div class="mini-card">
-        <div class="icon-wrap info"><i data-lucide="hourglass"></i></div>
+        <div class="icon-wrap info"><i data-lucide="award"></i></div>
         <div>
-          <div class="metric-value">{{ avg_time_sec | default(0) | format_time_sec }}</div>
-          <div class="metric-label">均题耗时</div>
+          <div class="metric-value">{% if rank_top_percent is not none %}前 {{ rank_top_percent | round(1) }}%{% else %}—{% endif %}</div>
+          <div class="metric-label">总排名位置</div>
         </div>
       </div>
       <div class="mini-card">
@@ -173,6 +173,21 @@
         <p class="mb-0"><strong>下一步行动：</strong>{% if practice_summary and practice_summary.exists %}推荐练习包 {{ practice_summary.count | default(0) }} 题，预计 {{ practice_summary.est_minutes | default(5) }} 分钟。{% else %}暂无练习包。交卷后系统将根据错题自动生成。{% endif %}</p>
       </div>
     </div>
+
+    {# 参考样本位置（内部参考样本，非全国排名） #}
+    {% if benchmark_summary %}
+    <div class="card benchmark-card mb-4">
+      <div class="card-body">
+        <h6 class="fw-bold mb-3"><i data-lucide="bar-chart-2" class="me-2" style="color: var(--muted);"></i>参考样本位置</h6>
+        <ul class="benchmark-list mb-2">
+          <li>当前内部参考样本平均分：<strong>{{ benchmark_summary.mean_score }}</strong></li>
+          <li>当前内部参考样本中位数：<strong>{{ benchmark_summary.median_score }}</strong></li>
+          <li>你当前大致高于 <strong>{{ benchmark_summary.percentile_estimate | round(1) }}%</strong> 的内部参考样本。</li>
+        </ul>
+        <p class="benchmark-hint text-muted small mb-0">当前数据基于系统内部参考样本，会随真实样本增加持续更新。</p>
+      </div>
+    </div>
+    {% endif %}
 
     {# 专家诊断型模块（无数据则自动隐藏） #}
     {% include "diagnostic/_expert_diagnosis_modules.html" %}

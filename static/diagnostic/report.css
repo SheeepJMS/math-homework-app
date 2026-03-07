@@ -463,6 +463,25 @@
   margin-bottom: 0;
 }
 
+/* 参考样本位置（内部参考，非全国排名） */
+.benchmark-card .card-body {
+  padding: var(--s-5);
+}
+.benchmark-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: var(--base);
+  color: var(--text);
+}
+.benchmark-list li {
+  margin-bottom: var(--s-2);
+}
+.benchmark-hint {
+  font-size: var(--small);
+  line-height: 1.5;
+}
+
 /* AI个性化训练包（premium SaaS 布局） */
 .practice-pack-card {
   border: 1px solid rgba(15, 23, 42, 0.06);

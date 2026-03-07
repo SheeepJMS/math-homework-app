@@ -258,6 +258,7 @@ def _sample_report_mock():
         'total_time_sec': int(total_time_sec),
         'total_time_min': int(round(total_time_sec / 60, 0)),
         'avg_time_sec': int(avg_time),
+        'rank_top_percent': 25,
         'slow_wrong_qnums': [4, 9, 16],
         'practice_summary': {'exists': True, 'count': 10, 'est_minutes': 12},
         'answer_analysis': {
@@ -507,6 +508,10 @@ def sample_report():
         'detail_rows': detail_rows,
         'kp_radar': kp_radar,
     })
+    from diagnostic.benchmark import get_benchmark_summary
+    db = _get_db()
+    sample_benchmark_score = 39.0
+    benchmark_summary = get_benchmark_summary('gauss7', sample_benchmark_score, db)
     return render_template(
         'diagnostic/report.html',
         user=user,
@@ -526,6 +531,7 @@ def sample_report():
         accuracy_percent=s.get('accuracy_percent'),
         total_time_sec=total_time_sec,
         avg_time_sec=avg_time_sec,
+        rank_top_percent=s.get('rank_top_percent'),
         # 摘要/练习包
         kp_has_data=kp_has_data,
         kp_weak_top=kp_weak_top,
@@ -545,6 +551,7 @@ def sample_report():
         detail_rows=detail_rows,
         chart_bar_labels_slow_indices=[],
         expert_diag=expert_diag,
+        benchmark_summary=benchmark_summary,
     )
 
 
@@ -1942,6 +1949,22 @@ def _build_report_data(att, user, db):
     ps_count = len(practice_items)
     est_minutes = max(1, ps_count * 2)
     ps_kps = list(set(kp_stats.keys()))[:5]
+    # 总排名位置（百分比）：同试卷已完成尝试中，得分率超过多少比例的人 → 显示为「前 X%」
+    rank_top_percent = None
+    if len(finished_ids) > 1:
+        others = [aid for aid in finished_ids if aid != att.id]
+        n_better = 0
+        for oid in others:
+            o_att = db.session.get(DiagAttempt, oid)
+            if not o_att:
+                continue
+            st = _attempt_quick_stats(o_att, db)
+            o_score_max = st.get('score_max') or 1
+            o_sp = round(100 * st.get('score', 0) / o_score_max, 0)
+            if o_sp < score_percent:
+                n_better += 1
+        rank_top_percent = round(100 - 100 * n_better / len(others), 1)
+        rank_top_percent = max(0, min(100, rank_top_percent))
     return {
         'exam_title': exam_title,
         'competition_name': competition_name,
@@ -1955,6 +1978,7 @@ def _build_report_data(att, user, db):
         'score_percent': score_percent,
         'total_time_sec': total_time_sec,
         'avg_time_sec': avg_time_sec,
+        'rank_top_percent': rank_top_percent,
         'blank_count': blank_count,
         'skip_count': blank_count,
         'correct_count': correct_count,
@@ -1999,6 +2023,18 @@ def report(attempt_id):
     report_data['chart_radar_labels'] = [r['category'] for r in report_data['kp_radar']]
     report_data['chart_radar_values'] = [r['value_0to100'] for r in report_data['kp_radar']]
     report_data['expert_diag'] = _compute_expert_diagnosis(report_data)
+    # 参考样本位置（diagnostic benchmark）
+    from diagnostic.roadmap_config import infer_contest_key
+    from diagnostic.benchmark import get_benchmark_summary
+    exam = getattr(att, 'exam', None)
+    comp = getattr(exam, 'competition', None) if exam else None
+    comp_name = getattr(comp, 'name', None) if comp else None
+    exam_title = getattr(exam, 'title', None) or ''
+    contest_key = infer_contest_key(comp_name, exam_title)
+    if contest_key and report_data.get('score') is not None:
+        report_data['benchmark_summary'] = get_benchmark_summary(contest_key, float(report_data['score']), db)
+    else:
+        report_data['benchmark_summary'] = None
     return render_template('diagnostic/report.html', **report_data)
 
 
