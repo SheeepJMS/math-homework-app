@@ -13,33 +13,47 @@
 <div class="auth-page">
   <div class="auth-container">
     <div class="auth-hero">
-      <h1>数学竞赛诊断卷<br>+ 智能分析报告</h1>
-      <p class="auth-subtitle">智能分析报告：记录每题所耗时间、薄弱点分析，并自动生成针对性练习。</p>
+      <h1>数学竞赛诊断系统</h1>
+      <p class="auth-subtitle">Gauss · AMC · Pascal · Cayley · Fermat · Euclid</p>
+      <p class="auth-subtitle-hint">适用于 Grade 4 – 12 数学竞赛学生</p>
+      <div class="auth-competitions">
+        <span class="auth-competitions-label">支持竞赛</span>
+        <div class="auth-competitions-tags">
+          <span class="auth-tag">Gauss</span>
+          <span class="auth-tag">AMC8</span>
+          <span class="auth-tag">AMC10</span>
+          <span class="auth-tag">AMC12</span>
+          <span class="auth-tag">Pascal</span>
+          <span class="auth-tag">Cayley</span>
+          <span class="auth-tag">Fermat</span>
+          <span class="auth-tag">Euclid</span>
+        </div>
+      </div>
       <ul class="auth-highlights">
         <li>
           <span class="auth-icon"><i data-lucide="clock"></i></span>
           <div>
-            <strong>每题所耗时间</strong>
-            <span>精准计时，每题耗时与答题轨迹可视化</span>
+            <strong>每题耗时分析</strong>
+            <span>精准记录每题用时，识别慢题与快错题</span>
           </div>
         </li>
         <li>
           <span class="auth-icon"><i data-lucide="line-chart"></i></span>
           <div>
             <strong>薄弱点分析</strong>
-            <span>知识点画像，薄弱点 Top3 与进步趋势</span>
+            <span>自动识别 Top3 知识薄弱点，生成能力雷达图</span>
           </div>
         </li>
         <li>
           <span class="auth-icon"><i data-lucide="lightbulb"></i></span>
           <div>
-            <strong>针对性练习</strong>
-            <span>错题对应知识点随机 3 题巩固</span>
+            <strong>AI针对性训练</strong>
+            <span>系统自动生成训练包，强化竞赛关键知识点</span>
           </div>
         </li>
       </ul>
       <a href="{{ url_for('diagnostic.sample_report') }}" class="auth-sample-btn">
-        <i data-lucide="file-text"></i> 查看示例报告
+        <i data-lucide="file-text"></i> 查看真实学生报告
       </a>
     </div>
     <div class="auth-form-col">
