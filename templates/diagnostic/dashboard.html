@@ -54,79 +54,70 @@
   {# AI 个性化训练包（首屏高权重） #}
   {% include "diagnostic/_practice_pack_home.html" %}
 
-  {# 最近报告（首屏紧凑，最多 2 条） #}
-  <div class="dashboard-card dashboard-recent-reports mb-4 dashboard-module">
-    <div class="card-header card-header--flex">
-      <span class="card-header-title"><i data-lucide="history" class="me-2"></i>最近报告</span>
-      <a href="{{ url_for('diagnostic.reports') }}" class="btn btn-sm btn-outline-secondary btn-header-link">全部报告</a>
-    </div>
-    <div class="card-body card-body--report">
-      {% if recent_reports_first_2 and recent_reports_first_2|length > 0 %}
-      <div class="report-card-list">
-        {% for r in recent_reports_first_2 %}
-        <div class="report-card-row">
-          <div class="report-card-left">
-            <div class="report-card-tier1">{{ r.exam_title }}</div>
-            <div class="report-card-tier2">
-              <span class="report-card-stat">得分：<strong>{{ r.score }}/{{ r.score_max }}</strong></span>
-              <span class="report-card-stat">正确率：<strong>{{ r.accuracy_percent | format_percent1 }}</strong></span>
-              {% if r.benchmark_top_percent is defined %}
-              <span class="report-card-stat">内部参考位置：<strong>前 {{ r.benchmark_top_percent }}%</strong></span>
+  {# ========== 轻量摘要区：最近报告（左 50%）+ 六大板块能力分布（右 50%） ========== #}
+  <div class="dashboard-summary-row">
+    <div class="dashboard-card dashboard-recent-reports dashboard-module dashboard-module--half">
+      <div class="card-header card-header--flex">
+        <span class="card-header-title"><i data-lucide="history" class="me-2"></i>最近报告</span>
+        <a href="{{ url_for('diagnostic.reports') }}" class="btn btn-sm btn-outline-secondary btn-header-link">全部报告</a>
+      </div>
+      <div class="card-body card-body--report">
+        {% if recent_reports_first_2 and recent_reports_first_2|length > 0 %}
+        <div class="report-card-list">
+          {% for r in recent_reports_first_2 %}
+          <div class="report-card-row">
+            <div class="report-card-left">
+              <div class="report-card-tier1">{{ r.exam_title }}</div>
+              <div class="report-card-tier2">
+                <span class="report-card-stat">得分：<strong>{{ r.score }}/{{ r.score_max }}</strong></span>
+                <span class="report-card-stat">正确率：<strong>{{ r.accuracy_percent | format_percent1 }}</strong></span>
+                {% if r.benchmark_top_percent is defined %}
+                <span class="report-card-stat">前 <strong>{{ r.benchmark_top_percent }}%</strong></span>
+                {% endif %}
+              </div>
+              <div class="report-card-tier3">
+                <span>{{ r.submitted_at_str }}</span>
+                <span>{{ r.total_time_sec | format_time_sec }}</span>
+              </div>
+              {% if r.ability_label is defined %}
+              <span class="report-ability-badge report-ability-{{ r.ability_label }}">{{ r.ability_label }}</span>
               {% endif %}
             </div>
-            <div class="report-card-tier3">
-              <span>{{ r.submitted_at_str }}</span>
-              <span>{{ r.total_time_sec | format_time_sec }} 总耗时</span>
+            <div class="report-card-actions">
+              <div class="report-card-status-line">
+                <span class="report-badge report-badge--done">已完成</span>
+                {% if r.practice_set_id and r.practice_completed %}
+                <span class="report-badge report-badge--practice-done">训练已完成</span>
+                {% endif %}
+              </div>
+              <p class="report-card-hint">
+                {% if r.practice_set_id and r.practice_completed %}
+                可查看结果或再练一组
+                {% else %}
+                可查看报告或开始练习
+                {% endif %}
+              </p>
+              <a href="{{ url_for('diagnostic.report', attempt_id=r.attempt_id) }}" class="btn btn-primary btn-report-main">查看报告</a>
+              {% if r.practice_set_id %}
+                {% if r.practice_completed %}
+              <a href="{{ url_for('diagnostic.exams') }}" class="btn btn-outline-secondary btn-report-sub">再练一组</a>
+                {% else %}
+              <a href="{{ url_for('diagnostic.practice', practice_set_id=r.practice_set_id) }}" class="btn btn-outline-secondary btn-report-sub">开始练习</a>
+                {% endif %}
+              {% endif %}
             </div>
-            {% if r.ability_label is defined %}
-            <span class="report-ability-badge report-ability-{{ r.ability_label }}">{{ r.ability_label }}</span>
-            {% endif %}
           </div>
-          <div class="report-card-actions">
-            <div class="report-card-status-line">
-              <span class="report-badge report-badge--done">已完成</span>
-              {% if r.practice_set_id and r.practice_completed %}
-              <span class="report-badge report-badge--practice-done">训练已完成</span>
-              {% endif %}
-            </div>
-            <p class="report-card-hint">
-              {% if r.practice_set_id and r.practice_completed %}
-              可查看结果或再练一组
-              {% else %}
-              可查看报告或开始练习
-              {% endif %}
-            </p>
-            <a href="{{ url_for('diagnostic.report', attempt_id=r.attempt_id) }}" class="btn btn-primary btn-report-main">查看报告</a>
-            {% if r.practice_set_id %}
-              {% if r.practice_completed %}
-            <a href="{{ url_for('diagnostic.exams') }}" class="btn btn-outline-secondary btn-report-sub">再练一组</a>
-              {% else %}
-            <a href="{{ url_for('diagnostic.practice', practice_set_id=r.practice_set_id) }}" class="btn btn-outline-secondary btn-report-sub">开始练习</a>
-              {% endif %}
-            {% endif %}
-          </div>
+          {% endfor %}
         </div>
-        {% endfor %}
+        {% else %}
+        <div class="dashboard-empty small">
+          <div class="icon-empty"><i data-lucide="file-text"></i></div>
+          <p class="mb-0">暂无报告。完成试卷后即可在此查看。</p>
+        </div>
+        {% endif %}
       </div>
-      {% else %}
-      <div class="dashboard-empty small">
-        <div class="icon-empty"><i data-lucide="file-text"></i></div>
-        <p class="mb-0">暂无报告。完成试卷后即可在此查看。</p>
-      </div>
-      {% endif %}
     </div>
-  </div>
-
-  {% if not last_attempt and not trend %}
-  <div class="dashboard-empty mb-4">
-    <div class="icon-empty"><i data-lucide="pie-chart"></i></div>
-    <p class="mb-0">暂无数据。去<a href="{{ url_for('diagnostic.exams') }}">试卷中心</a>完成一次诊断即可看到你的表现与趋势。</p>
-  </div>
-  {% endif %}
-
-  {# ========== 第二屏：六大板块能力图谱 + 竞赛路线规划 ========== #}
-  <div class="dashboard-mid-grid">
-    <div class="dashboard-card dashboard-module dashboard-six-panel-module">
+    <div class="dashboard-card dashboard-module dashboard-six-panel-module dashboard-module--half">
       <div class="card-header card-header--flex">
         <span class="card-header-title"><i data-lucide="hexagon" class="me-2"></i>六大板块能力分布</span>
       </div>
@@ -143,7 +134,18 @@
         <p class="six-panel-summary">{{ six_panel_weak_summary or '各板块均有数据后将显示薄弱区域总结。' }}</p>
       </div>
     </div>
-    <div class="dashboard-card roadmap-card-wrap dashboard-module" id="roadmap-card" style="align-self: start;" data-exams-url="{{ url_for('diagnostic.exams') }}">
+  </div>
+
+  {% if not last_attempt and not trend %}
+  <div class="dashboard-empty mb-4">
+    <div class="icon-empty"><i data-lucide="pie-chart"></i></div>
+    <p class="mb-0">暂无数据。去<a href="{{ url_for('diagnostic.exams') }}">试卷中心</a>完成一次诊断即可看到你的表现与趋势。</p>
+  </div>
+  {% endif %}
+
+  {# ========== 重点指导区：竞赛路线规划（整行 100%） ========== #}
+  <div class="dashboard-roadmap-row">
+    <div class="dashboard-card roadmap-card-wrap dashboard-module" id="roadmap-card" data-exams-url="{{ url_for('diagnostic.exams') }}">
       <div class="card-body roadmap-card-body p-0" id="roadmap-body">
         <div class="roadmap-loading" id="roadmap-loading">
           <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
