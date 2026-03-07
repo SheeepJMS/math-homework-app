@@ -1330,6 +1330,8 @@ def _build_dashboard_data(user, db):
     _SIX_PANELS_DEFAULT = ['Number Theory', 'Algebra', 'Geometry', 'Counting', 'Word Problems', 'Sequences']
     six_panel_radar = [{'label': p, 'value_0to100': 0} for p in _SIX_PANELS_DEFAULT]
     six_panel_weak_summary = ''
+    six_panel_strong_labels = []
+    six_panel_weak_labels = []
     hero = {}
     chart_bar_labels = []
     chart_bar_time = []
@@ -1486,6 +1488,8 @@ def _build_dashboard_data(user, db):
             six_panel_radar.append({'label': p, 'value_0to100': value})
         weak_panels = sorted([r for r in six_panel_radar if r['value_0to100'] < 70], key=lambda x: x['value_0to100'])[:3]
         six_panel_weak_summary = '当前 %s 为主要薄弱区域。' % ('、'.join([w['label'] for w in weak_panels]) or '暂无数据') if weak_panels else '各板块均有数据后将显示薄弱区域总结。'
+        six_panel_strong_labels = [r['label'] for r in six_panel_radar if r['value_0to100'] >= 70]
+        six_panel_weak_labels = [r['label'] for r in six_panel_radar if r['value_0to100'] < 50]
 
         last = finished[0]
         order = db.session.query(DiagExamQuestion).filter_by(exam_id=last.exam_id).order_by(DiagExamQuestion.q_index).all()
@@ -1631,6 +1635,8 @@ def _build_dashboard_data(user, db):
         'practice_pack_home': practice_pack_home,
         'six_panel_radar': six_panel_radar,
         'six_panel_weak_summary': six_panel_weak_summary,
+        'six_panel_strong_labels': six_panel_strong_labels or [],
+        'six_panel_weak_labels': six_panel_weak_labels or [],
         'weekly_participation': weekly_participation,
         'exam_tree': exam_tree,
     }
