@@ -1252,7 +1252,7 @@ def _build_dashboard_data(user, db):
     from sqlalchemy import func
     from app import (
         DiagAttempt, DiagAttemptAnswer, DiagExam, DiagExamQuestion, DiagCompetition,
-        DiagQuestion, DiagQuestionKp, DiagKnowledgePoint, DiagPracticeSet,
+        DiagQuestion, DiagQuestionKp, DiagKnowledgePoint, DiagPracticeSet, DiagPracticeSetItem,
     )
     user_display_name = getattr(user, 'username', None) or 'N/A'
     cutoff_30d = datetime.utcnow() - timedelta(days=30)
@@ -1425,11 +1425,26 @@ def _build_dashboard_data(user, db):
     weak_kp_names = [w['kp_name'] for w in weak_kps]
     practice_minutes = 10
     if last_attempt and weak_kp_names:
-        hero_summary = '本次正确率 %.1f%%，薄弱集中在：%s。建议先做 %d 分钟纠错练习包。' % (last_attempt['accuracy_percent'], '、'.join(weak_kp_names[:3]), practice_minutes)
+        hero_summary = '本次正确率 %.1f%%，薄弱点集中在 %s。' % (last_attempt['accuracy_percent'], '、'.join(weak_kp_names[:3]))
     elif last_attempt:
         hero_summary = '本次正确率 %.1f%%。暂无知识点标签，完成试卷后可为题目标注知识点以获取薄弱点分析。' % last_attempt['accuracy_percent']
     else:
         hero_summary = '暂无测验记录，去完成一次诊断即可获得专属分析。'
+
+    # 首页 AI 训练包：取最近一次报告的 practice_set
+    practice_pack_home = {'exists': False, 'practice_set_id': None, 'count': 0, 'est_minutes': 0, 'weak_kp_names': weak_kp_names[:3]}
+    if recent_reports and recent_reports[0].get('practice_set_id'):
+        ps_id = recent_reports[0]['practice_set_id']
+        pack_count = db.session.query(DiagPracticeSetItem).filter_by(practice_set_id=ps_id).count()
+        practice_pack_home = {
+            'exists': True,
+            'practice_set_id': ps_id,
+            'count': pack_count,
+            'est_minutes': round(pack_count * 0.5, 1) if pack_count else 0,
+            'weak_kp_names': weak_kp_names[:3],
+        }
+
+    hero_action_line = '建议先完成一组 %d 分钟基础训练，再进入下一阶段竞赛练习。' % (practice_pack_home.get('est_minutes') or practice_minutes)
 
     recommended_exam = None
     for cat in exams_grouped:
@@ -1447,11 +1462,16 @@ def _build_dashboard_data(user, db):
         if recommended_exam and recommended_exam.get('type') == 'continue':
             break
 
+    cta_primary = '继续上次试卷' if in_progress_att else (
+        '开始针对性训练' if practice_pack_home.get('exists') and practice_pack_home.get('practice_set_id') else '开始推荐试卷'
+    )
     hero = {
         'summary_text': hero_summary,
+        'action_line': hero_action_line,
         'in_progress_attempt': {'attempt_id': in_progress_att.id, 'exam_title': getattr(in_progress_att.exam, 'title', None)} if in_progress_att else None,
         'recommended_exam': recommended_exam,
-        'cta_primary': '继续上次试卷' if in_progress_att else '开始推荐试卷',
+        'practice_pack_home': practice_pack_home,
+        'cta_primary': cta_primary,
         'cta_secondary': '查看最近报告',
     }
 
@@ -1478,6 +1498,7 @@ def _build_dashboard_data(user, db):
         'trend': trend,
         'weak_kps': weak_kps,
         'recent_reports': recent_reports,
+        'recent_reports_first_2': recent_reports[:2],
         'exams_grouped': exams_grouped,
         'chart_trend_labels': [t['label'] for t in trend],
         'chart_trend_values': [t['accuracy_percent'] for t in trend],
@@ -1485,6 +1506,7 @@ def _build_dashboard_data(user, db):
         'chart_bar_time': chart_bar_time,
         'chart_bar_slow_indices': chart_bar_slow_indices,
         'hero': hero,
+        'practice_pack_home': practice_pack_home,
         'weekly_participation': weekly_participation,
         'exam_tree': exam_tree,
     }

@@ -60,7 +60,8 @@
 .dashboard-hero .hero-score { font-size: 32px; font-weight: 800; }
 .dashboard-hero .hero-accuracy { font-size: 24px; font-weight: 600; opacity: 0.95; }
 .dashboard-hero .hero-label { font-size: var(--small); opacity: 0.85; margin-top: 4px; }
-.dashboard-hero .hero-summary { margin: 0 0 var(--s-4); font-size: var(--base); line-height: 1.5; opacity: 0.95; }
+.dashboard-hero .hero-summary { margin: 0 0 var(--s-2); font-size: var(--base); line-height: 1.5; opacity: 0.95; }
+.dashboard-hero .hero-action-line { margin: 0 0 var(--s-4); font-size: var(--base); line-height: 1.5; opacity: 0.9; }
 .dashboard-hero .hero-actions { display: flex; flex-wrap: wrap; gap: var(--s-2); }
 .btn-hero-primary {
   background: #fff;
@@ -190,6 +191,13 @@
   font-size: var(--small);
   color: var(--muted);
 }
+.participation-hint {
+  font-size: var(--small);
+}
+.gauge-wrap .gauge-value {
+  white-space: normal;
+  line-height: 1.3;
+}
 
 /* 右列保持顶部对齐 */
 .dashboard-right-col {
@@ -259,6 +267,11 @@
 .dashboard-weak-list .weak-count {
   font-size: var(--small);
   color: var(--muted);
+}
+.dashboard-weak-list .weak-right {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
 }
 
 /* 历史报告列表 */
@@ -391,3 +404,11 @@
 #roadmap-body .roadmap-next,
 #roadmap-body .roadmap-practice { font-size: var(--base); }
 #roadmap-body .roadmap-training li { padding-left: var(--s-2); }
+.roadmap-paths--compact .roadmap-path-title { font-size: 11px; color: var(--muted); }
+.dashboard-third-screen .dashboard-card .card-header { font-weight: 600; }
+
+/* 首页 AI 训练包卡片（复用 report 的 practice-pack-*） */
+.practice-pack-home-card .practice-pack-card-body { padding: var(--s-5); }
+.practice-pack-contents-grid--short { margin-bottom: 0; }
+.practice-pack-contents-grid--short li { padding-left: 1.35em; }
+.practice-pack-contents-grid--short li::before { content: "✓"; position: absolute; left: 0; color: var(--success); font-weight: 700; }

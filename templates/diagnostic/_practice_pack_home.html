@@ -1,0 +1,68 @@
+{# 首页 AI 个性化训练包模块（首屏，高权重） #}
+<div class="dashboard-card practice-pack-home-card">
+  <div class="card-body practice-pack-card-body">
+    <div class="practice-pack-grid">
+      <div class="practice-pack-left">
+        <div class="practice-pack-head">
+          <h2 class="practice-pack-title"><i data-lucide="sparkles" class="me-2"></i>AI个性化训练包</h2>
+          <span class="practice-pack-badge">AI生成</span>
+        </div>
+        <p class="practice-pack-desc">根据本次测试表现，系统自动生成针对性练习题，重点强化你的薄弱知识点。</p>
+        <div class="practice-pack-weak">
+          {% if practice_pack_home and practice_pack_home.weak_kp_names %}
+          <div class="practice-pack-weak-tags">
+            {% for name in practice_pack_home.weak_kp_names[:3] %}
+            <span class="chip chip-slate">{{ name }}</span>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="text-muted small">暂无知识点标签</div>
+          {% endif %}
+        </div>
+        <div class="practice-pack-contents">
+          <div class="practice-pack-contents-label">训练内容包含</div>
+          <ul class="practice-pack-contents-grid practice-pack-contents-grid--short">
+            <li>重点知识点强化</li>
+            <li>相似竞赛题型练习</li>
+            <li>每题详细解析</li>
+          </ul>
+        </div>
+      </div>
+      <div class="practice-pack-right">
+        <div class="practice-pack-cta-panel">
+          <div class="practice-pack-stats">
+            <div class="practice-pack-stat">
+              <i data-lucide="list-checks" class="practice-pack-stat-icon"></i>
+              <div class="practice-pack-stat-body">
+                <span class="practice-pack-stat-label">题目</span>
+                <span class="practice-pack-stat-value">{{ practice_pack_home.count | default(0) }}</span>
+              </div>
+            </div>
+            <div class="practice-pack-stat">
+              <i data-lucide="clock" class="practice-pack-stat-icon"></i>
+              <div class="practice-pack-stat-body">
+                <span class="practice-pack-stat-label">预计</span>
+                <span class="practice-pack-stat-value">{{ practice_pack_home.est_minutes | default(0) }} min</span>
+              </div>
+            </div>
+            <div class="practice-pack-stat">
+              <i data-lucide="layers" class="practice-pack-stat-icon"></i>
+              <div class="practice-pack-stat-body">
+                <span class="practice-pack-stat-label">类型</span>
+                <span class="practice-pack-stat-value">基础</span>
+              </div>
+            </div>
+          </div>
+          <div class="practice-pack-cta">
+            {% if practice_pack_home and practice_pack_home.exists and practice_pack_home.practice_set_id %}
+            <a class="btn btn-primary practice-pack-btn" href="{{ url_for('diagnostic.practice', practice_set_id=practice_pack_home.practice_set_id) }}">🚀 开始针对性训练</a>
+            {% else %}
+            <a class="btn btn-primary practice-pack-btn" href="{{ url_for('diagnostic.reports') }}">查看报告获取训练包</a>
+            {% endif %}
+            <p class="practice-pack-cta-hint">完成训练后系统将更新你的能力评估。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

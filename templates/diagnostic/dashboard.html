@@ -6,37 +6,10 @@
 {% endblock %}
 {% block content %}
 <div class="dashboard-page">
-  {# A) Hero 区 #}
-  <div class="dashboard-hero">
-    <div class="hero-left">
-      <div class="hero-metric">
-        {% if last_attempt %}
-        <span class="hero-score">{{ last_attempt.score }}/{{ last_attempt.score_max }}</span>
-        <span class="hero-accuracy">{{ last_attempt.accuracy_percent | format_percent1 }}</span>
-        {% else %}
-        <span class="hero-accuracy">--</span>
-        {% endif %}
-      </div>
-      <div class="hero-label">本次得分 / 正确率</div>
-    </div>
-    <div class="hero-right">
-      <p class="hero-summary">{{ hero.summary_text | default('暂无诊断总结') }}</p>
-      <div class="hero-actions">
-        {% if hero.in_progress_attempt %}
-        <a href="{{ url_for('diagnostic.attempt', attempt_id=hero.in_progress_attempt.attempt_id) }}" class="btn btn-hero-primary">{{ hero.cta_primary }}</a>
-        {% elif hero.recommended_exam and hero.recommended_exam.type == 'continue' %}
-        <a href="{{ url_for('diagnostic.attempt', attempt_id=hero.recommended_exam.attempt_id) }}" class="btn btn-hero-primary">{{ hero.cta_primary }}</a>
-        {% elif hero.recommended_exam and hero.recommended_exam.type in ('start', 'retry') %}
-        <a href="{{ url_for('diagnostic.start_exam', exam_id=hero.recommended_exam.exam_id) }}" class="btn btn-hero-primary">{{ hero.cta_primary }}</a>
-        {% else %}
-        <a href="{{ url_for('diagnostic.exams') }}" class="btn btn-hero-primary">{{ hero.cta_primary }}</a>
-        {% endif %}
-        <a href="{{ url_for('diagnostic.reports') }}" class="btn btn-hero-secondary">{{ hero.cta_secondary }}</a>
-      </div>
-    </div>
-  </div>
+  {# ========== 第一屏：Hero > 数据卡 > AI训练包 > 最近报告 ========== #}
+  {% include "diagnostic/_hero_summary.html" %}
 
-  {# B) 4 张指标卡 #}
+  {# 关键数据卡（4 张） #}
   <div class="dashboard-summary-grid">
     <div class="dashboard-mini-card">
       <div class="icon-wrap brand"><i data-lucide="line-chart"></i></div>
@@ -44,11 +17,9 @@
         <div class="metric-value">
           {% if last_attempt %}
           {{ last_attempt.score }}/{{ last_attempt.score_max }} · {{ last_attempt.accuracy_percent | format_percent1 }}
-          {% else %}
-          N/A
-          {% endif %}
+          {% else %}N/A{% endif %}
         </div>
-        <div class="metric-label">最近一次 得分/正确率</div>
+        <div class="metric-label">最近得分/正确率</div>
       </div>
     </div>
     <div class="dashboard-mini-card">
@@ -61,26 +32,58 @@
           {% endif %}
           {% else %}N/A{% endif %}
         </div>
-        <div class="metric-label">近 30 天平均正确率</div>
+        <div class="metric-label">近30天正确率</div>
       </div>
     </div>
     <div class="dashboard-mini-card">
       <div class="icon-wrap info"><i data-lucide="clock"></i></div>
       <div>
-        <div class="metric-value">
-          {% if stats_30d %}{{ stats_30d.avg_time_per_q_sec | format_time_sec }}{% else %}N/A{% endif %}
-        </div>
-        <div class="metric-label">近 30 天均题耗时</div>
+        <div class="metric-value">{% if stats_30d %}{{ stats_30d.avg_time_per_q_sec | format_time_sec }}{% else %}N/A{% endif %}</div>
+        <div class="metric-label">均题耗时</div>
       </div>
     </div>
     <div class="dashboard-mini-card">
       <div class="icon-wrap neutral"><i data-lucide="check-check"></i></div>
       <div>
-        <div class="metric-value">
-          {% if stats_30d %}{{ stats_30d.attempts_count }}{% else %}0{% endif %}
-        </div>
-        <div class="metric-label">近 30 天完成次数</div>
+        <div class="metric-value">{% if stats_30d %}{{ stats_30d.attempts_count }}{% else %}0{% endif %}</div>
+        <div class="metric-label">完成次数</div>
       </div>
+    </div>
+  </div>
+
+  {# AI 个性化训练包（首屏高权重） #}
+  {% include "diagnostic/_practice_pack_home.html" %}
+
+  {# 最近报告（首屏紧凑，最多 2 条） #}
+  <div class="dashboard-card dashboard-recent-reports mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span><i data-lucide="history" class="me-2"></i>最近报告</span>
+      <a href="{{ url_for('diagnostic.reports') }}" class="btn btn-sm btn-outline-primary">全部报告</a>
+    </div>
+    <div class="card-body">
+      {% if recent_reports_first_2 and recent_reports_first_2|length > 0 %}
+      <ul class="dashboard-report-list">
+        {% for r in recent_reports_first_2 %}
+        <li class="report-row">
+          <div class="report-main">
+            <span class="report-title">{{ r.exam_title }}</span>
+            <span class="report-meta">{{ r.submitted_at_str }} · {{ r.score }}/{{ r.score_max }} · {{ r.accuracy_percent | format_percent1 }} · {{ r.total_time_sec | format_time_sec }}</span>
+          </div>
+          <div class="report-actions">
+            <a href="{{ url_for('diagnostic.report', attempt_id=r.attempt_id) }}" class="btn btn-sm btn-primary">查看报告</a>
+            {% if r.practice_set_id %}
+            <a href="{{ url_for('diagnostic.practice', practice_set_id=r.practice_set_id) }}" class="btn btn-sm btn-outline-secondary">开始练习</a>
+            {% endif %}
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="dashboard-empty small">
+        <div class="icon-empty"><i data-lucide="file-text"></i></div>
+        <p class="mb-0">暂无报告。完成试卷后即可在此查看。</p>
+      </div>
+      {% endif %}
     </div>
   </div>
 
@@ -91,128 +94,108 @@
   </div>
   {% endif %}
 
-  {# C) 图表区：左列趋势+耗时，右列薄弱点+报告 #}
+  {# ========== 第二屏：薄弱知识点 + 竞赛路线规划 ========== #}
   <div class="dashboard-mid-grid">
-    <div>
-      <div class="dashboard-card mb-3">
-        <div class="card-header"><i data-lucide="line-chart" class="me-2"></i>最近 6 次正确率趋势</div>
-        <div class="card-body">
-          {% if trend and trend|length > 0 %}
-          <div class="dashboard-chart-wrap">
-            <canvas id="trendChart"></canvas>
-          </div>
-          {% else %}
-          <div class="dashboard-empty small">
-            <div class="icon-empty"><i data-lucide="line-chart"></i></div>
-            <p class="mb-0">暂无趋势数据</p>
-          </div>
-          {% endif %}
+    <div class="dashboard-card">
+      <div class="card-header"><i data-lucide="alert-triangle" class="me-2"></i>Top 3 薄弱知识点</div>
+      <div class="card-body">
+        {% if weak_kps and weak_kps|length > 0 %}
+        <div class="dashboard-chart-wrap" style="height: 120px;">
+          <canvas id="weakBarChart"></canvas>
         </div>
+        <ul class="dashboard-weak-list mt-2">
+          {% for w in weak_kps %}
+          <li>
+            <span>{{ w.kp_name }}</span>
+            <span class="weak-right">
+              <span class="weak-count">{{ w.wrong_count }}/{{ w.n_questions }} 题</span>
+              {% if practice_pack_home and practice_pack_home.practice_set_id %}
+              <a href="{{ url_for('diagnostic.practice', practice_set_id=practice_pack_home.practice_set_id) }}" class="btn btn-sm btn-outline-primary">练习</a>
+              {% else %}
+              <a href="{{ url_for('diagnostic.exams') }}?q={{ w.kp_name | urlencode }}" class="btn btn-sm btn-outline-primary">练习</a>
+              {% endif %}
+            </span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <div class="dashboard-empty small">
+          <div class="icon-empty"><i data-lucide="tags"></i></div>
+          <p class="mb-0">暂无知识点标签。请在后台为题目选择知识点后，即可生成薄弱点榜单。</p>
+        </div>
+        {% endif %}
       </div>
-      <div class="dashboard-card">
-        <div class="card-header"><i data-lucide="alert-triangle" class="me-2"></i>Top 3 薄弱知识点</div>
-        <div class="card-body">
-          {% if weak_kps and weak_kps|length > 0 %}
-          <div class="dashboard-chart-wrap" style="height: 120px;">
-            <canvas id="weakBarChart"></canvas>
-          </div>
-          <ul class="dashboard-weak-list mt-2">
-            {% for w in weak_kps %}
-            <li><span>{{ w.kp_name }}</span><span class="weak-count">{{ w.wrong_count }}/{{ w.n_questions }} 题</span></li>
-            {% endfor %}
-          </ul>
-          {% else %}
+    </div>
+    <div class="dashboard-card roadmap-card-wrap" id="roadmap-card" style="align-self: start;" data-exams-url="{{ url_for('diagnostic.exams') }}">
+      <div class="card-header"><i data-lucide="map" class="me-2"></i>竞赛路线规划</div>
+      <div class="card-body" id="roadmap-body">
+        <div class="roadmap-loading" id="roadmap-loading">
+          <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+          <span>加载中...</span>
+        </div>
+        <div class="roadmap-empty d-none" id="roadmap-empty">
           <div class="dashboard-empty small">
-            <div class="icon-empty"><i data-lucide="tags"></i></div>
-            <p class="mb-0">暂无知识点标签。请在后台为题目选择知识点后，即可生成薄弱点榜单。</p>
+            <div class="icon-empty"><i data-lucide="map"></i></div>
+            <p class="mb-0">暂无路线数据。完成试卷后可根据年级与赛历获得推荐。</p>
           </div>
-          {% endif %}
+        </div>
+        <div class="roadmap-content d-none" id="roadmap-content">
+          <div class="roadmap-grade mb-2 text-muted small" id="roadmap-grade"></div>
+          <div class="roadmap-current mb-2 small" id="roadmap-current"></div>
+          <div class="roadmap-next mb-2 small" id="roadmap-next"></div>
+          <div class="roadmap-paths mb-2 roadmap-paths--compact">
+            <div class="roadmap-path mb-2" id="roadmap-path-canada">
+              <div class="roadmap-path-title text-muted small mb-1">Canada 路径</div>
+              <div class="roadmap-stepper d-flex flex-wrap gap-1 align-items-center" id="roadmap-stepper-canada"></div>
+            </div>
+            <div class="roadmap-path">
+              <div class="roadmap-path-title text-muted small mb-1">AMC 路径</div>
+              <div class="roadmap-stepper d-flex flex-wrap gap-1 align-items-center" id="roadmap-stepper-amc"></div>
+            </div>
+          </div>
+          <div class="roadmap-practice mb-3" id="roadmap-practice"></div>
+          <ul class="roadmap-training list-unstyled small text-muted mb-3" id="roadmap-training"></ul>
+          <a href="{{ url_for('diagnostic.exams') }}" class="btn btn-primary">进入推荐试卷</a>
         </div>
       </div>
     </div>
-    <div class="dashboard-right-col">
-      <div class="dashboard-card mb-3">
-        <div class="card-header"><i data-lucide="calendar-check" class="me-2"></i>最近一周参与频率</div>
-        <div class="card-body d-flex align-items-center justify-content-center" style="min-height: 160px;">
+  </div>
+
+  {# ========== 第三屏：趋势 + 参与频率（降权） ========== #}
+  <div class="dashboard-mid-grid dashboard-third-screen">
+    <div class="dashboard-card">
+      <div class="card-header"><i data-lucide="line-chart" class="me-2"></i>最近 6 次正确率趋势</div>
+      <div class="card-body">
+        {% if trend and trend|length > 0 %}
+        <div class="dashboard-chart-wrap">
+          <canvas id="trendChart"></canvas>
+        </div>
+        {% else %}
+        <div class="dashboard-empty small">
+          <div class="icon-empty"><i data-lucide="line-chart"></i></div>
+          <p class="mb-0">暂无趋势数据</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    <div class="dashboard-card">
+      <div class="card-header"><i data-lucide="calendar-check" class="me-2"></i>最近一周参与频率</div>
+      <div class="card-body">
+        <p class="participation-hint text-muted small mb-3">建议每周完成 3 次训练，保持稳定进步。</p>
+        <div class="d-flex align-items-center justify-content-center" style="min-height: 140px;">
           <div class="gauge-wrap" data-days="{{ weekly_participation.days_active | default(0) }}">
             <canvas id="participationGauge"></canvas>
             <div class="gauge-label">
-              <span class="gauge-value">{{ weekly_participation.days_active | default(0) }}/7</span>
-              <span class="gauge-desc">有完成测验的天数</span>
+              <span class="gauge-value">当前完成 {{ weekly_participation.days_active | default(0) }} / 建议 3 次</span>
+              <span class="gauge-desc">本周有完成测验的天数</span>
             </div>
           </div>
         </div>
       </div>
-      <div class="dashboard-card" style="align-self: start;">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i data-lucide="history" class="me-2"></i>最近报告</span>
-          <a href="{{ url_for('diagnostic.reports') }}" class="btn btn-sm btn-outline-primary">全部报告</a>
-        </div>
-        <div class="card-body">
-          {% if recent_reports and recent_reports|length > 0 %}
-          <ul class="dashboard-report-list">
-            {% for r in recent_reports %}
-            <li class="report-row">
-              <div class="report-main">
-                <span class="report-title">{{ r.exam_title }}</span>
-                <span class="report-meta">{{ r.submitted_at_str }} · {{ r.score }}/{{ r.score_max }} · {{ r.accuracy_percent | format_percent1 }} · {{ r.total_time_sec | format_time_sec }}</span>
-              </div>
-              <div class="report-actions">
-                <a href="{{ url_for('diagnostic.report', attempt_id=r.attempt_id) }}" class="btn btn-sm btn-primary">查看报告</a>
-                {% if r.practice_set_id %}
-                <a href="{{ url_for('diagnostic.practice', practice_set_id=r.practice_set_id) }}" class="btn btn-sm btn-outline-secondary">开始练习</a>
-                {% endif %}
-              </div>
-            </li>
-            {% endfor %}
-          </ul>
-          {% else %}
-          <div class="dashboard-empty small">
-            <div class="icon-empty"><i data-lucide="file-text"></i></div>
-            <p class="mb-0">暂无报告。完成试卷后即可在此查看。</p>
-          </div>
-          {% endif %}
-        </div>
-      </div>
     </div>
   </div>
 
-  {# Competition Roadmap 竞赛路线规划 — 由 /diagnostic/api/roadmap 动态加载 #}
-  <div class="dashboard-card mb-4" id="roadmap-card" data-exams-url="{{ url_for('diagnostic.exams') }}">
-    <div class="card-header d-flex justify-content-between align-items-center">
-      <span><i data-lucide="map" class="me-2"></i>竞赛路线规划 <span class="text-muted small">(Competition Roadmap)</span></span>
-    </div>
-    <div class="card-body" id="roadmap-body">
-      <div class="roadmap-loading" id="roadmap-loading">
-        <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
-        <span>加载中...</span>
-      </div>
-      <div class="roadmap-empty d-none" id="roadmap-empty">
-        <div class="dashboard-empty small">
-          <div class="icon-empty"><i data-lucide="map"></i></div>
-          <p class="mb-0">暂无路线数据。完成试卷后可根据年级与赛历获得推荐。</p>
-        </div>
-      </div>
-      <div class="roadmap-content d-none" id="roadmap-content">
-        <div class="roadmap-grade mb-2 text-muted small" id="roadmap-grade"></div>
-        <div class="roadmap-paths mb-3">
-          <div class="roadmap-path mb-3" id="roadmap-path-canada">
-            <div class="roadmap-path-title fw-medium mb-1">Canada 路径</div>
-            <div class="roadmap-stepper d-flex flex-wrap gap-1 align-items-center" id="roadmap-stepper-canada"></div>
-          </div>
-          <div class="roadmap-path">
-            <div class="roadmap-path-title fw-medium mb-1">AMC 路径</div>
-            <div class="roadmap-stepper d-flex flex-wrap gap-1 align-items-center" id="roadmap-stepper-amc"></div>
-          </div>
-        </div>
-        <div class="roadmap-next mb-3" id="roadmap-next"></div>
-        <div class="roadmap-practice mb-3" id="roadmap-practice"></div>
-        <ul class="roadmap-training list-unstyled small text-muted mb-0" id="roadmap-training"></ul>
-      </div>
-    </div>
-  </div>
-
-  {# D) 底部：推荐/最近试卷（3–6 条） #}
+  {# D) 底部：开始新试卷 #}
   <div class="dashboard-exams-section">
     <h3><i data-lucide="pencil" class="me-2"></i>开始新试卷</h3>
     <p class="text-muted small mb-3">选择试卷开始答题，或前往 <a href="{{ url_for('diagnostic.exams') }}">试卷中心</a> 查看完整四级树结构。</p>
@@ -384,6 +367,14 @@
         });
       }
 
+      function renderCurrent(paths) {
+        var el = document.getElementById('roadmap-current');
+        if (!el) return;
+        var first = paths.CANADA || paths.AMC;
+        if (!first || !first.current_stage) { el.innerHTML = ''; return; }
+        var name = (first.sequence && first.sequence.find(function (s) { return s.contest_key === first.current_stage; })) ? first.sequence.find(function (s) { return s.contest_key === first.current_stage; }).display_name : first.current_stage;
+        el.innerHTML = '<span class="text-muted">当前阶段：</span><strong>' + (name || first.current_stage) + ' 基础准备</strong>';
+      }
       function renderNext(paths) {
         var el = document.getElementById('roadmap-next');
         if (!el) return;
@@ -391,14 +382,14 @@
         if (paths.CANADA && paths.CANADA.next_target) {
           var c = paths.CANADA;
           var name = (c.sequence.find(function (s) { return s.contest_key === c.next_target; }) || {}).display_name || c.next_target;
-          parts.push('Canada：下一目标 <strong>' + name + '</strong>' + (c.next_target_month_name ? '（预计 ' + c.next_target_month_name + '）' : ''));
+          parts.push('下一目标 <strong>' + name + '</strong>' + (c.next_target_month_name ? '（预计 ' + c.next_target_month_name + '）' : ''));
         }
         if (paths.AMC && paths.AMC.next_target) {
           var a = paths.AMC;
           var name = (a.sequence.find(function (s) { return s.contest_key === a.next_target; }) || {}).display_name || a.next_target;
-          parts.push('AMC：下一目标 <strong>' + name + '</strong>' + (a.next_target_month_name ? '（预计 ' + a.next_target_month_name + '）' : ''));
+          parts.push('下一目标 <strong>' + name + '</strong>' + (a.next_target_month_name ? '（预计 ' + a.next_target_month_name + '）' : ''));
         }
-        el.innerHTML = parts.length ? '<div class="small"><span class="text-muted">下一目标：</span>' + parts.join('；') + '。根据年级与赛历推荐。</div>' : '';
+        el.innerHTML = parts.length ? '<span class="text-muted">下一目标：</span>' + parts.join('；') + '。' : '';
       }
 
       function renderPractice(paths) {
@@ -447,6 +438,7 @@
           var gradeEl = document.getElementById('roadmap-grade');
           if (gradeEl) gradeEl.textContent = data.student_grade != null ? '当前年级参考：' + data.student_grade + ' 年级' : '未填写年级，显示通用推荐';
           var paths = data.paths || {};
+          renderCurrent(paths);
           renderStepper('roadmap-stepper-canada', paths.CANADA);
           renderStepper('roadmap-stepper-amc', paths.AMC);
           renderNext(paths);

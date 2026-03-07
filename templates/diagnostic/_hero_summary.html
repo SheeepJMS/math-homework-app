@@ -1,0 +1,32 @@
+{# 首页 Hero 总结卡：成绩 + 诊断结论 + 行动建议 + 主 CTA #}
+<div class="dashboard-hero">
+  <div class="hero-left">
+    <div class="hero-metric">
+      {% if last_attempt %}
+      <span class="hero-score">{{ last_attempt.score }}/{{ last_attempt.score_max }}</span>
+      <span class="hero-accuracy">{{ last_attempt.accuracy_percent | format_percent1 }}</span>
+      {% else %}
+      <span class="hero-accuracy">--</span>
+      {% endif %}
+    </div>
+    <div class="hero-label">本次得分 / 正确率</div>
+  </div>
+  <div class="hero-right">
+    <p class="hero-summary">{{ hero.summary_text | default('暂无诊断总结') }}</p>
+    <p class="hero-action-line">{{ hero.action_line | default('建议先完成一组 10 分钟基础训练，再进入下一阶段竞赛练习。') }}</p>
+    <div class="hero-actions">
+      {% if hero.cta_primary == '开始针对性训练' and hero.practice_pack_home and hero.practice_pack_home.practice_set_id %}
+      <a href="{{ url_for('diagnostic.practice', practice_set_id=hero.practice_pack_home.practice_set_id) }}" class="btn btn-hero-primary">{{ hero.cta_primary }}</a>
+      {% elif hero.in_progress_attempt %}
+      <a href="{{ url_for('diagnostic.attempt', attempt_id=hero.in_progress_attempt.attempt_id) }}" class="btn btn-hero-primary">{{ hero.cta_primary }}</a>
+      {% elif hero.recommended_exam and hero.recommended_exam.type == 'continue' %}
+      <a href="{{ url_for('diagnostic.attempt', attempt_id=hero.recommended_exam.attempt_id) }}" class="btn btn-hero-primary">{{ hero.cta_primary }}</a>
+      {% elif hero.recommended_exam and hero.recommended_exam.type in ('start', 'retry') %}
+      <a href="{{ url_for('diagnostic.start_exam', exam_id=hero.recommended_exam.exam_id) }}" class="btn btn-hero-primary">{{ hero.cta_primary }}</a>
+      {% else %}
+      <a href="{{ url_for('diagnostic.exams') }}" class="btn btn-hero-primary">{{ hero.cta_primary }}</a>
+      {% endif %}
+      <a href="{{ url_for('diagnostic.reports') }}" class="btn btn-hero-secondary">{{ hero.cta_secondary }}</a>
+    </div>
+  </div>
+</div>

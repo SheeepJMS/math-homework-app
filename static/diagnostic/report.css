@@ -491,7 +491,7 @@
   margin-bottom: 0;
 }
 
-/* 参考样本位置（内部参考，非全国排名） */
+/* 参考得分位置（含正态分布示意） */
 .benchmark-card .card-body {
   padding: var(--s-5);
 }
@@ -508,6 +508,55 @@
 .benchmark-hint {
   font-size: var(--small);
   line-height: 1.5;
+}
+
+.benchmark-distribution-wrap {
+  margin-top: var(--s-3);
+  padding: var(--s-3) 0;
+  border-top: 1px solid var(--border);
+}
+.benchmark-distribution-svg {
+  width: 100%;
+  height: 72px;
+  display: block;
+  margin-bottom: var(--s-2);
+}
+.benchmark-curve {
+  vector-effect: non-scaling-stroke;
+}
+.benchmark-marker {
+  vector-effect: non-scaling-stroke;
+}
+.benchmark-marker-dot {
+  vector-effect: non-scaling-stroke;
+}
+.benchmark-distribution-labels {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--small);
+  color: var(--muted);
+  padding: 0 2px;
+}
+.benchmark-distribution-wrap {
+  position: relative;
+}
+.benchmark-distribution-labels {
+  position: relative;
+  min-height: 1.8em;
+}
+.benchmark-distribution-labels .benchmark-marker-label {
+  position: absolute;
+  top: 0;
+  color: var(--danger);
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+}
+@media (max-width: 480px) {
+  .benchmark-distribution-labels .benchmark-marker-label {
+    font-size: 11px;
+  }
 }
 
 /* AI个性化训练包（premium SaaS 布局） */

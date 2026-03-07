@@ -171,16 +171,35 @@
       </div>
     </div>
 
-    {# 参考样本位置（内部参考样本，非全国排名） #}
+    {# 参考得分位置（含分布图） #}
     {% if benchmark_summary %}
+    {% set pct = benchmark_summary.percentile_estimate | round(1) %}
     <div class="card benchmark-card mb-4">
       <div class="card-body">
-        <h6 class="fw-bold mb-3"><i data-lucide="bar-chart-2" class="me-2" style="color: var(--muted);"></i>参考样本位置</h6>
-        <ul class="benchmark-list mb-2">
+        <h6 class="fw-bold mb-3"><i data-lucide="bar-chart-2" class="me-2" style="color: var(--muted);"></i>参考得分位置</h6>
+        <ul class="benchmark-list mb-3">
           <li>当前平均分：<strong>{{ benchmark_summary.mean_score }}</strong></li>
           <li>当前中位数：<strong>{{ benchmark_summary.median_score }}</strong></li>
-          <li>你当前大概高于 <strong>{{ benchmark_summary.percentile_estimate | round(1) }}%</strong> 的学生分数。</li>
+          <li>你当前大概高于 <strong>{{ pct }}%</strong> 的学生分数。</li>
         </ul>
+        <div class="benchmark-distribution-wrap">
+          <svg class="benchmark-distribution-svg" viewBox="0 0 100 36" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="benchmark-curve-fill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="var(--brand)" stop-opacity="0.25"/>
+                <stop offset="100%" stop-color="var(--brand)" stop-opacity="0.02"/>
+              </linearGradient>
+            </defs>
+            <path class="benchmark-curve" fill="url(#benchmark-curve-fill)" stroke="var(--brand)" stroke-width="0.8" d="M 0 32 C 20 32 30 8 50 4 C 70 8 80 32 100 32 L 100 32 L 0 32 Z"/>
+            <line class="benchmark-marker" x1="{{ pct }}" y1="0" x2="{{ pct }}" y2="32" stroke="var(--danger)" stroke-width="1.2" stroke-linecap="round"/>
+            <circle class="benchmark-marker-dot" cx="{{ pct }}" cy="28" r="2.5" fill="var(--danger)" stroke="#fff" stroke-width="0.6"/>
+          </svg>
+          <div class="benchmark-distribution-labels">
+            <span>低</span>
+            <span class="benchmark-marker-label" style="left: {{ pct }}%; transform: translateX(-50%);">你的位置 ({{ pct }}%)</span>
+            <span>高</span>
+          </div>
+        </div>
       </div>
     </div>
     {% endif %}
