@@ -1131,7 +1131,8 @@ def diag_users():
     for u in users:
         cnt = db.session.query(DiagAttempt).filter_by(user_id=u.id, status='finished').count()
         attempt_counts[u.id] = cnt
-    return render_template('admin/diagnostic/diag_users.html', users=users, attempt_counts=attempt_counts)
+    current_year = datetime.utcnow().year
+    return render_template('admin/diagnostic/diag_users.html', users=users, attempt_counts=attempt_counts, current_year=current_year)
 
 
 @diagnostic_admin_bp.route('/diag-users/<int:user_id>')

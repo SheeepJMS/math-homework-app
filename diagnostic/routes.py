@@ -512,6 +512,7 @@ def sample_report():
     db = _get_db()
     sample_benchmark_score = 39.0
     benchmark_summary = get_benchmark_summary('gauss7', sample_benchmark_score, db)
+    display_rank_top_percent = round(100 - benchmark_summary['percentile_estimate'], 1) if benchmark_summary else None
     return render_template(
         'diagnostic/report.html',
         user=user,
@@ -552,6 +553,7 @@ def sample_report():
         chart_bar_labels_slow_indices=[],
         expert_diag=expert_diag,
         benchmark_summary=benchmark_summary,
+        display_rank_top_percent=display_rank_top_percent,
     )
 
 
@@ -2035,6 +2037,11 @@ def report(attempt_id):
         report_data['benchmark_summary'] = get_benchmark_summary(contest_key, float(report_data['score']), db)
     else:
         report_data['benchmark_summary'] = None
+    # 总排名位置与参考样本位置统一：优先用参考样本百分位，避免两处数据不一致
+    if report_data.get('benchmark_summary'):
+        report_data['display_rank_top_percent'] = round(100 - report_data['benchmark_summary']['percentile_estimate'], 1)
+    else:
+        report_data['display_rank_top_percent'] = report_data.get('rank_top_percent')
     return render_template('diagnostic/report.html', **report_data)
 
 

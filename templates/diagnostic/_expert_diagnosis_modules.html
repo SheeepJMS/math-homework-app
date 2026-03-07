@@ -78,7 +78,7 @@
 
     {# 3) 错因分类统计（无数据时隐藏） #}
     {% set m3 = expert_diag.error_type_stats %}
-    {% if m3 and m3.items and (m3.total_tagged or 0) > 0 %}
+    {% if m3 and (m3.total_tagged or 0) > 0 %}
     <div class="card expert-card expert-card-wide">
       <div class="expert-head">
         <div class="expert-title"><i data-lucide="alert-triangle" class="me-2" style="color: var(--warning);"></i>错因分类统计</div>
@@ -86,7 +86,7 @@
       </div>
       <div class="expert-body">
         <div class="err-bars">
-          {% for it in m3.items %}
+          {% for it in (m3.get('items') or []) %}
           <div class="err-row">
             <div class="err-label">{{ it.label }}</div>
             <div class="err-bar-wrap" aria-label="{{ it.label }} {{ it.percent }}%">

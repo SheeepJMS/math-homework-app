@@ -72,7 +72,7 @@
       <div class="mini-card">
         <div class="icon-wrap info"><i data-lucide="award"></i></div>
         <div>
-          <div class="metric-value">{% if rank_top_percent is not none %}前 {{ rank_top_percent | round(1) }}%{% else %}—{% endif %}</div>
+          <div class="metric-value">{% if display_rank_top_percent is not none %}前 {{ display_rank_top_percent | round(1) }}%{% else %}—{% endif %}</div>
           <div class="metric-label">总排名位置</div>
         </div>
       </div>
@@ -180,11 +180,10 @@
       <div class="card-body">
         <h6 class="fw-bold mb-3"><i data-lucide="bar-chart-2" class="me-2" style="color: var(--muted);"></i>参考样本位置</h6>
         <ul class="benchmark-list mb-2">
-          <li>当前内部参考样本平均分：<strong>{{ benchmark_summary.mean_score }}</strong></li>
-          <li>当前内部参考样本中位数：<strong>{{ benchmark_summary.median_score }}</strong></li>
-          <li>你当前大致高于 <strong>{{ benchmark_summary.percentile_estimate | round(1) }}%</strong> 的内部参考样本。</li>
+          <li>当前平均分：<strong>{{ benchmark_summary.mean_score }}</strong></li>
+          <li>当前中位数：<strong>{{ benchmark_summary.median_score }}</strong></li>
+          <li>你当前大概高于 <strong>{{ benchmark_summary.percentile_estimate | round(1) }}%</strong> 的学生分数。</li>
         </ul>
-        <p class="benchmark-hint text-muted small mb-0">当前数据基于系统内部参考样本，会随真实样本增加持续更新。</p>
       </div>
     </div>
     {% endif %}
