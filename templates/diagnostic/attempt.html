@@ -65,6 +65,7 @@
             <div class="mb-3">
                 <label class="form-label">答案</label>
                 <div class="form-text text-muted">提示：输入根号请用 <code>v</code> 表示。例如 √3 写 <code>v3</code>。</div>
+                {% if question.type == 'choice' %}
                 <div class="options-vertical">
                     {% for opt in choices %}
                     {% set key_val = opt.get('key', opt) %}
@@ -79,6 +80,11 @@
                     </div>
                     {% endfor %}
                 </div>
+                {% elif question.type == 'proof' %}
+                <textarea class="form-control" name="answer" rows="4" placeholder="请写出你的解题思路或证明步骤（支持纯文本）">{% if answer_rec and answer_rec.answer %}{{ answer_rec.answer }}{% endif %}</textarea>
+                {% else %}
+                <input type="text" class="form-control" name="answer" value="{% if answer_rec and answer_rec.answer %}{{ answer_rec.answer }}{% endif %}" placeholder="请在此输入你的答案，例如 4/5 或 0.8">
+                {% endif %}
             </div>
             <div class="diag-action-btns">
                 <button type="submit" name="action" value="prev" class="btn btn-sm btn-outline-secondary" {% if q_index == 0 %}disabled{% endif %}>上一题</button>
@@ -111,38 +117,60 @@
         spentEl.value = elapsed * 1000;
     });
     var key = 'diag_attempt_{{ attempt.id }}';
+    var qType = "{{ question.type }}";
     try {
         var saved = localStorage.getItem(key);
         if (saved) {
             var data = JSON.parse(saved);
-            if (data.q{{ question.id }} !== undefined && !document.querySelector('input[name="answer"]:checked')) {
-                var r = document.querySelector('input[name="answer"][value="' + data.q{{ question.id }} + '"]');
-                if (r) r.checked = true;
+            if (data.q{{ question.id }} !== undefined) {
+                if (qType === 'choice') {
+                    if (!document.querySelector('input[name="answer"]:checked')) {
+                        var r = document.querySelector('input[name="answer"][value="' + data.q{{ question.id }} + '"]');
+                        if (r) r.checked = true;
+                    }
+                } else {
+                    var field = document.querySelector('[name="answer"]');
+                    if (field && !field.value) {
+                        field.value = data.q{{ question.id }};
+                    }
+                }
             }
         }
     } catch(e){}
     form.addEventListener('change', function(){
         try {
             var data = JSON.parse(localStorage.getItem(key) || '{}');
-            var ans = document.querySelector('input[name="answer"]:checked');
-            data.q{{ question.id }} = ans ? ans.value : '';
+            var stored = '';
+            if (qType === 'choice') {
+                var ans = document.querySelector('input[name="answer"]:checked');
+                stored = ans ? ans.value : '';
+            } else {
+                var field = document.querySelector('[name="answer"]');
+                stored = field ? field.value : '';
+            }
+            data.q{{ question.id }} = stored;
             localStorage.setItem(key, JSON.stringify(data));
         } catch(e){}
     });
 
-    // 与作业网一致：选中选项时显示小图标 A🍎 B🐝 C🐱 D🐕 E🐘
-    var choiceEmojis = { 'A': '🍎', 'B': '🐝', 'C': '🐱', 'D': '🐕', 'E': '🐘' };
-    var radios = form.querySelectorAll('.option-input[type="radio"]');
-    function updateChoiceEmojis() {
-        radios.forEach(function(option) {
-            var emojiSpan = option.nextElementSibling && option.nextElementSibling.querySelector('.choice-emoji');
-            if (emojiSpan) emojiSpan.textContent = option.checked ? (choiceEmojis[option.value] || '') : '';
+    if (qType === 'choice') {
+        // 与作业网一致：选中选项时显示小图标 A🍎 B🐝 C🐱 D🐕 E🐘
+        var choiceEmojis = { 'A': '🍎', 'B': '🐝', 'C': '🐱', 'D': '🐕', 'E': '🐘' };
+        var radios = form.querySelectorAll('.option-input[type="radio"]');
+        function updateChoiceEmojis() {
+            radios.forEach(function(option) {
+                var emojiSpan = option.nextElementSibling && option.nextElementSibling.querySelector('.choice-emoji');
+                if (emojiSpan) emojiSpan.textContent = option.checked ? (choiceEmojis[option.value] || '') : '';
+            });
+        }
+        radios.forEach(function(input) {
+            input.addEventListener('change', updateChoiceEmojis);
         });
+        updateChoiceEmojis();
+    } else {
+        var radios = [];
+        function updateChoiceEmojis() {}
     }
-    radios.forEach(function(input) {
-        input.addEventListener('change', updateChoiceEmojis);
-    });
-    updateChoiceEmojis();
 
     // 交卷确认弹窗：Confirm 后提交 form 并带上 action=submit
     var submitModal = document.getElementById('submitConfirmModal');
@@ -160,25 +188,27 @@
         });
     }
 
-    // 点击已选中的选项可取消选择（空选）
-    radios.forEach(function(radio) {
-        var label = form.querySelector('label[for="' + radio.id + '"]');
-        if (!label) return;
-        label.addEventListener('click', function(e) {
-            var wasChecked = radio.checked;
-            setTimeout(function() {
-                if (wasChecked && radio.checked) {
-                    radio.checked = false;
-                    updateChoiceEmojis();
-                    try {
-                        var data = JSON.parse(localStorage.getItem(key) || '{}');
-                        data.q{{ question.id }} = '';
-                        localStorage.setItem(key, JSON.stringify(data));
-                    } catch(x) {}
-                }
-            }, 0);
+    // 点击已选中的选项可取消选择（空选）——仅对选择题生效
+    if (qType === 'choice') {
+        radios.forEach(function(radio) {
+            var label = form.querySelector('label[for="' + radio.id + '"]');
+            if (!label) return;
+            label.addEventListener('click', function(e) {
+                var wasChecked = radio.checked;
+                setTimeout(function() {
+                    if (wasChecked && radio.checked) {
+                        radio.checked = false;
+                        updateChoiceEmojis();
+                        try {
+                            var data = JSON.parse(localStorage.getItem(key) || '{}');
+                            data.q{{ question.id }} = '';
+                            localStorage.setItem(key, JSON.stringify(data));
+                        } catch(x) {}
+                    }
+                }, 0);
+            });
         });
-    });
+    }
 })();
 </script>
 {% endblock %}
