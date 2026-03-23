@@ -62,6 +62,7 @@
                         <th>得分率</th>
                         <th>标准答案</th>
                         <th>状态</th>
+                        <th>操作</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -94,6 +95,17 @@
                             {% else %}
                                 <span class="badge bg-danger">需关注</span>
                             {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <button
+                                type="button"
+                                class="btn btn-sm btn-outline-primary"
+                                data-fix-question
+                                data-url="{{ url_for('admin_mark_all_question_correct', lesson_id=lesson.id, question_number=stat.question_number) }}"
+                                data-question-number="{{ stat.question_number }}"
+                            >
+                                一键设为全员正确
+                            </button>
                         </td>
                     </tr>
                     {% endfor %}
@@ -227,9 +239,13 @@
 }
 </style>
 
+<!-- 给 Chart.js 的数据用 JSON script 包裹，避免把 Jinja 片段直接塞进 JS 解析里导致 IDE 误报 -->
+<script type="application/json" id="chartLabelsData">{{ question_stats|map(attribute='question_number')|list|tojson }}</script>
+<script type="application/json" id="chartRatesData">{{ question_stats|map(attribute='success_rate')|list|tojson }}</script>
+
 <script>
-const chartLabels = {{ question_stats|map(attribute='question_number')|list|tojson }};
-const chartRates = {{ question_stats|map(attribute='success_rate')|list|tojson }};
+const chartLabels = JSON.parse(document.getElementById('chartLabelsData').textContent);
+const chartRates = JSON.parse(document.getElementById('chartRatesData').textContent);
 const chartData = {
     labels: chartLabels,
     datasets: [{
@@ -278,6 +294,33 @@ let successRateChart = new Chart(document.getElementById('successRateChart'), {
             }
         }
     }
+});
+
+// 一键将某题标为全员正确（用于纠正标准答案导入/比对错误）
+document.querySelectorAll('[data-fix-question]').forEach(function(btn){
+    btn.addEventListener('click', async function(){
+        const url = btn.getAttribute('data-url');
+        const qn = btn.getAttribute('data-question-number');
+        if (!url) return;
+        if (!confirm('确定要把第 ' + qn + ' 题设为全员正确吗？这会把该题所有学生答案标记为正确并同步更新总分。')) return;
+        try {
+            btn.disabled = true;
+            btn.textContent = '处理中...';
+            const resp = await fetch(url, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            const data = await resp.json().catch(()=>({}));
+            if (!resp.ok || (data && data.success === false)) {
+                alert((data && data.msg) ? data.msg : '操作失败，请稍后重试。');
+                btn.disabled = false;
+                btn.textContent = '一键设为全员正确';
+                return;
+            }
+            window.location.reload();
+        } catch(e) {
+            btn.disabled = false;
+            btn.textContent = '一键设为全员正确';
+            alert('操作失败，请稍后重试。');
+        }
+    });
 });
 </script>
 {% endblock %} 

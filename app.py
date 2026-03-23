@@ -3035,6 +3035,54 @@ def lesson_students(lesson_id):
 
     return render_template('admin/students.html', lesson=lesson, completed_scores=completed_scores, not_completed=not_completed, question_stats=question_stats)
 
+
+@app.route('/admin/lesson/<int:lesson_id>/question/<int:question_number>/mark_all_correct', methods=['POST'])
+@admin_required
+def admin_mark_all_question_correct(lesson_id, question_number):
+    """
+    将某道题在该 lesson 下的所有 UserAnswer 置为正确，
+    并同步重算每个受影响学生（QuizHistory）的 correct_answers，从而更新总分/正确率。
+    """
+    question = Question.query.filter_by(lesson_id=lesson_id, question_number=question_number).first()
+    if not question:
+        return jsonify({'success': False, 'msg': '未找到该题'}), 404
+
+    user_answers = UserAnswer.query.filter_by(
+        lesson_id=lesson_id,
+        question_id=question.id
+    ).all()
+
+    if not user_answers:
+        return jsonify({'success': False, 'msg': '该题暂无答题记录，无法纠正。'}), 404
+
+    affected_quiz_ids = set()
+    changed_count = 0
+    for ua in user_answers:
+        if not ua.is_correct:
+            ua.is_correct = True
+            changed_count += 1
+        affected_quiz_ids.add(ua.quiz_history_id)
+
+    # 重算每个受影响 QuizHistory 的 correct_answers
+    for qh_id in affected_quiz_ids:
+        qh = QuizHistory.query.get(qh_id)
+        if not qh:
+            continue
+        qh.correct_answers = UserAnswer.query.filter_by(
+            quiz_history_id=qh_id,
+            is_correct=True
+        ).count()
+
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'msg': '已将该题标记为全员正确',
+        'question_number': question_number,
+        'changed_answers': changed_count,
+        'affected_quiz_histories': len(affected_quiz_ids),
+    })
+
 # 诊断模块蓝图（独立路由与表，不影响现有业务）
 from diagnostic.routes import diagnostic_bp
 from diagnostic.admin_routes import diagnostic_admin_bp
