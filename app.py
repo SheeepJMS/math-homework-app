@@ -1632,7 +1632,13 @@ def view_history(lesson_id):
     ).order_by(QuizHistory.completed_at.desc()).all()
     if quiz_history:
         latest_quiz = quiz_history[0]
-        latest_answers = UserAnswer.query.filter_by(quiz_history_id=latest_quiz.id).all()
+        # 固定按题号顺序返回，避免管理员改对/改错后页面重新加载出现题目顺序抖动
+        latest_answers = (
+            UserAnswer.query.filter_by(quiz_history_id=latest_quiz.id)
+            .join(Question, Question.id == UserAnswer.question_id)
+            .order_by(Question.question_number.asc())
+            .all()
+        )
         latest_questions = [answer.question for answer in latest_answers]
         exam_files = ExamFile.query.filter_by(lesson_id=lesson_id).order_by(ExamFile.page_number).all()
         explanation_files = ExplanationFile.query.filter_by(lesson_id=lesson_id).order_by(ExplanationFile.page_number).all()

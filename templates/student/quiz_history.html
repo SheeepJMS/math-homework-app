@@ -323,6 +323,20 @@ document.addEventListener('DOMContentLoaded', function() {
         const percentage = circle.dataset.percentage;
         circle.style.setProperty('--percentage', percentage);
     });
+
+    // 管理员改对/改错后，页面会重新加载。把之前的滚动位置保存并恢复，避免跳回顶部。
+    const savedY = localStorage.getItem('quiz_history_scrollY');
+    if (savedY) {
+        const y = parseInt(savedY, 10);
+        if (!Number.isNaN(y)) window.scrollTo(0, y);
+        localStorage.removeItem('quiz_history_scrollY');
+    }
+
+    document.querySelectorAll('form[action*="mark_answer"]').forEach(function(form) {
+        form.addEventListener('submit', function() {
+            localStorage.setItem('quiz_history_scrollY', String(window.scrollY || 0));
+        });
+    });
 });
 </script>
 {% endblock %} 
