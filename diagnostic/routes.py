@@ -12,6 +12,25 @@ import statistics
 from werkzeug.security import generate_password_hash, check_password_hash
 
 
+def _strip_excel_formula_and_quotes(value):
+    """去除 Excel/CSV 常见答案格式（如 =\"13\"、='A'）的前导 = 与外层引号，便于展示与判分比较。"""
+    if value is None:
+        return ''
+    s = str(value).strip()
+    if not s:
+        return ''
+    if s.startswith('='):
+        s = s[1:].strip()
+    if len(s) >= 2 and ((s[0] == s[-1] == '"') or (s[0] == s[-1] == "'")):
+        s = s[1:-1].strip()
+    return s
+
+
+def _normalize_diag_answer_for_compare(raw):
+    """将标准答案与学生作答归一化后再比较（沿用原逻辑的大小写不敏感）。"""
+    return _strip_excel_formula_and_quotes(raw).upper()
+
+
 def _points_for_exam(score_scheme_json, num_questions):
     """根据竞赛分段分值计算每题得分。返回 (points_per_question, total_max)。题号 1-based。
     若试卷/竞赛未设置 score_scheme，默认一题一分，满分 = 题数。"""
@@ -1048,13 +1067,14 @@ def _grade_attempt(attempt_id):
         q = db.session.get(DiagQuestion, aa.question_id)
         q_index = qidx_map.get(aa.question_id)
         imp = imported.get(q_index) if q_index is not None else None
-        key = None
-        if imp and imp.correct_answer:
-            key = (imp.correct_answer or '').strip().upper()
-        elif q:
-            key = (q.answer_key or '').strip().upper()
-        ans = (aa.answer or '').strip().upper()
-        aa.is_correct = (key == ans) if key else None
+        key_src = ''
+        if imp and (imp.correct_answer or '').strip():
+            key_src = (imp.correct_answer or '').strip()
+        elif q and (q.answer_key or '').strip():
+            key_src = (q.answer_key or '').strip()
+        key_norm = _normalize_diag_answer_for_compare(key_src) if key_src else ''
+        ans_norm = _normalize_diag_answer_for_compare(aa.answer)
+        aa.is_correct = (key_norm == ans_norm) if key_src else None
 
 
 def _build_practice_set(attempt_id):
@@ -2198,7 +2218,8 @@ def _build_report_data(att, user, db):
             kp_stats[kp_id]['total_time_ms'] += my_ms
             if not is_blank and not is_correct:
                 kp_stats[kp_id]['wrong_count'] += 1
-        correct_ans = (imp_ans.correct_answer or '').strip() if imp_ans and imp_ans.correct_answer else ((q.answer_key or '').strip() if q else '')
+        raw_correct = (imp_ans.correct_answer or '').strip() if imp_ans and imp_ans.correct_answer else ((q.answer_key or '').strip() if q else '')
+        correct_ans = _strip_excel_formula_and_quotes(raw_correct) if raw_correct else ''
         solution_txt = (imp_ans.solution_explain or '') if imp_ans and imp_ans.solution_explain else (q.solution_text if q else '')
         pq = {
             'qnum': i + 1,
@@ -2463,7 +2484,10 @@ def practice(practice_set_id):
             it = qdata['item']
             correct = (qdata['correct_answer'] or '').strip()
             user_ans = (answers_map.get(str(it.id)) or '').strip()
-            is_correct = (correct and user_ans and correct.upper() == user_ans.upper())
+            is_correct = (
+                correct and user_ans
+                and _normalize_diag_answer_for_compare(correct) == _normalize_diag_answer_for_compare(user_ans)
+            )
             if is_correct:
                 score_earned += 1
             result_rows.append({
