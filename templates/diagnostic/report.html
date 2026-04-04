@@ -69,12 +69,12 @@
           <div class="metric-label">总耗时</div>
         </div>
       </div>
-          <div class="mini-card mini-card--rank">
+              <div class="mini-card mini-card--rank">
         <div class="icon-wrap info"><i data-lucide="award"></i></div>
         <div class="mini-card-rank-inner">
           <div class="metric-value metric-value--rank">
             {% if display_rank_top_percent is defined and display_rank_top_percent is not none %}
-              <span class="rank-prefix">前</span><span class="rank-percent">{{ display_rank_top_percent | default(0) | round(1) }}%</span>
+              <span class="rank-prefix">前</span><span class="rank-percent">{{ display_rank_top_percent | default(0, true) | round(1) }}%</span>
             {% else %}—{% endif %}
           </div>
           <div class="metric-label">总排名位置</div>
@@ -179,8 +179,8 @@
 
     {# 参考得分位置：左侧文字，右侧正态分布图 + 红点在曲线上 #}
     {% if benchmark_summary %}
-    {% set pct = benchmark_summary.percentile_estimate | round(1) %}
-    {% set y_curve = (4 + (28 * (pct - 50) * (pct - 50) / 2500)) | round(1) %}
+    {% set pct = (benchmark_summary.percentile_estimate | default(50, true)) | round(1) %}
+    {% set y_curve = (4 + (28 * (pct - 50) * (pct - 50) / 2500)) | default(0, true) | round(1) %}
     <div class="card benchmark-card mb-4">
       <div class="card-body benchmark-card-body--split">
         <div class="benchmark-text">

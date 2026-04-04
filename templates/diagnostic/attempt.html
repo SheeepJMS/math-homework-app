@@ -2,6 +2,13 @@
 {% block title %}答题 - 第 {{ q_index + 1 }} / {{ total }} 题{% endblock %}
 {% block extra_css %}
 <style>
+/* 若 Bootstrap 主 CSS 未完整加载，.modal 会失去 display:none，确认框会像普通段落铺在页顶 */
+#submitConfirmModal.modal:not(.show) {
+    display: none !important;
+}
+#submitConfirmModal.modal.show {
+    display: block !important;
+}
 .diag-nav-dot { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; margin: 2px; border-radius: 8px; }
 .diag-nav-dot.answered { background: #0d6efd; color: #fff; }
 .diag-nav-dot.current { border: 2px solid #0d6efd; font-weight: bold; }
@@ -29,20 +36,20 @@
         <span id="timer">总耗时: <span id="totalTimeMs">0</span> 秒</span>
         <span class="text-muted">第 {{ q_index + 1 }} / {{ total }} 题</span>
     </div>
-    <button type="button" class="btn btn-success btn-lg" data-bs-toggle="modal" data-bs-target="#submitConfirmModal" id="submitTriggerBtn">Submit</button>
+    <button type="button" class="btn btn-success btn-lg" id="submitTriggerBtn">交卷</button>
 </div>
-<!-- 交卷确认弹窗（英文） -->
+<!-- 交卷确认弹窗：由脚本打开，避免 data-bs-* 在 bootstrap.js 未加载时失效；无 Bootstrap 时降级为 confirm -->
 <div class="modal fade" id="submitConfirmModal" tabindex="-1" aria-labelledby="submitConfirmLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="submitConfirmLabel">Submit</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title" id="submitConfirmLabel">确认交卷</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
             </div>
-            <div class="modal-body">Are you sure you want to submit?</div>
+            <div class="modal-body">确定要交卷吗？交卷后将无法继续修改本题试卷。</div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success" id="submitConfirmBtn">Confirm</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-success" id="submitConfirmBtn">确认交卷</button>
             </div>
         </div>
     </div>
@@ -172,19 +179,53 @@
         function updateChoiceEmojis() {}
     }
 
-    // 交卷确认弹窗：Confirm 后提交 form 并带上 action=submit
     var submitModal = document.getElementById('submitConfirmModal');
+    var submitTriggerBtn = document.getElementById('submitTriggerBtn');
     var submitConfirmBtn = document.getElementById('submitConfirmBtn');
-    if (submitModal && submitConfirmBtn) {
+
+    function diagSubmitAttempt() {
+        var actionInput = document.createElement('input');
+        actionInput.type = 'hidden';
+        actionInput.name = 'action';
+        actionInput.value = 'submit';
+        form.appendChild(actionInput);
+        form.submit();
+    }
+    function diagHideSubmitModal() {
+        if (!submitModal) return;
+        try {
+            if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                var inst = bootstrap.Modal.getInstance(submitModal);
+                if (inst) inst.hide();
+            }
+        } catch (e) {}
+        submitModal.classList.remove('show');
+        submitModal.style.display = 'none';
+        submitModal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('modal-open');
+        document.querySelectorAll('.modal-backdrop').forEach(function(el) { el.remove(); });
+    }
+    if (submitTriggerBtn && submitModal && form) {
+        submitTriggerBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                try {
+                    var m = bootstrap.Modal.getOrCreateInstance(submitModal);
+                    m.show();
+                    return;
+                } catch (err) {}
+            }
+            if (window.confirm('确定要交卷吗？交卷后将无法继续修改本题试卷。')) {
+                diagSubmitAttempt();
+            }
+        });
+    }
+    if (submitModal && submitConfirmBtn && form) {
         submitConfirmBtn.addEventListener('click', function() {
-            var modal = bootstrap.Modal.getInstance(submitModal);
-            if (modal) modal.hide();
-            var actionInput = document.createElement('input');
-            actionInput.type = 'hidden';
-            actionInput.name = 'action';
-            actionInput.value = 'submit';
-            form.appendChild(actionInput);
-            form.submit();
+            try {
+                diagHideSubmitModal();
+            } catch (e) {}
+            diagSubmitAttempt();
         });
     }
 
