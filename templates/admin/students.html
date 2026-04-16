@@ -271,7 +271,8 @@ let successRateChart = new Chart(document.getElementById('successRateChart'), {
             tooltip: {
                 callbacks: {
                     label: function(context) {
-                        return `第${context.label}题: ${context.parsed.y}%`;
+                        const qn = context.chart.data.labels[context.dataIndex];
+                        return `第${qn}题: ${context.parsed.y}%`;
                     }
                 }
             }
@@ -287,6 +288,7 @@ let successRateChart = new Chart(document.getElementById('successRateChart'), {
                 }
             },
             x: {
+                type: 'category',
                 title: {
                     display: true,
                     text: '题号'
@@ -306,7 +308,13 @@ document.querySelectorAll('[data-fix-question]').forEach(function(btn){
         try {
             btn.disabled = true;
             btn.textContent = '处理中...';
-            const resp = await fetch(url, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                }
+            });
             const data = await resp.json().catch(()=>({}));
             if (!resp.ok || (data && data.success === false)) {
                 alert((data && data.msg) ? data.msg : '操作失败，请稍后重试。');
