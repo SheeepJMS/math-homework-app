@@ -3042,6 +3042,37 @@ def lesson_students(lesson_id):
     return render_template('admin/students.html', lesson=lesson, completed_scores=completed_scores, not_completed=not_completed, question_stats=question_stats)
 
 
+@app.route('/admin/lesson/<int:lesson_id>/student/<int:user_id>/reset', methods=['POST'])
+@admin_required
+def admin_reset_student_lesson_status(lesson_id, user_id):
+    """将指定学生在该 lesson 的完成状态重置为未完成。"""
+    lesson = Lesson.query.get_or_404(lesson_id)
+    user = User.query.get_or_404(user_id)
+
+    quiz_histories = QuizHistory.query.filter_by(
+        lesson_id=lesson_id,
+        user_id=user_id
+    ).all()
+
+    if not quiz_histories:
+        flash(f'{user.username} 当前没有该作业的完成记录。', 'info')
+        return redirect(url_for('lesson_students', lesson_id=lesson_id))
+
+    deleted_answers = 0
+    deleted_quizzes = 0
+    for qh in quiz_histories:
+        deleted_answers += UserAnswer.query.filter_by(quiz_history_id=qh.id).delete()
+        db.session.delete(qh)
+        deleted_quizzes += 1
+
+    db.session.commit()
+    flash(
+        f'已重置 {user.username} 在《{lesson.title}》的作业状态（删除 {deleted_quizzes} 条作业记录，{deleted_answers} 条答题记录）。',
+        'success'
+    )
+    return redirect(url_for('lesson_students', lesson_id=lesson_id))
+
+
 @app.route('/admin/lesson/<int:lesson_id>/question/<int:question_number>/mark_all_correct', methods=['POST'])
 @admin_required
 def admin_mark_all_question_correct(lesson_id, question_number):

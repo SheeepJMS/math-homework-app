@@ -18,9 +18,18 @@
                         </span>
                         <a href="{{ url_for('student_dashboard_admin', user_id=item.student.id) }}" class="student-name">{{ item.student.username }}</a>
                     </div>
-                    <span class="score-badge {% if item.score >= 90 %}score-high{% elif item.score >= 60 %}score-mid{% else %}score-low{% endif %}">
-                        {{ item.score }}%
-                    </span>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="score-badge {% if item.score >= 90 %}score-high{% elif item.score >= 60 %}score-mid{% else %}score-low{% endif %}">
+                            {{ item.score }}%
+                        </span>
+                        <form method="POST" action="{{ url_for('admin_reset_student_lesson_status', lesson_id=lesson.id, user_id=item.student.id) }}" class="m-0">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger reset-btn"
+                                onclick="return confirm('确定重置 {{ item.student.username }} 的这个作业吗？重置后将变为未完成状态。');">
+                                reset
+                            </button>
+                        </form>
+                    </div>
                 </div>
                 {% else %}
                 <div class="list-group-item">暂无学生完成</div>
@@ -232,6 +241,9 @@
 .score-low {
     background: #f8d7da;
     color: #721c24;
+}
+.reset-btn {
+    text-transform: lowercase;
 }
 .unhappy-face {
     font-size: 1.5rem;
