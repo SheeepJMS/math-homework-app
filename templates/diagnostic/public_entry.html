@@ -1,0 +1,30 @@
+{% extends "diagnostic/base_auth.html" %}
+{% block title %}数学竞赛测评诊断{% endblock %}
+{% block auth_form %}
+<div class="auth-card">
+    <h2 class="auth-card-title">数学竞赛测评诊断</h2>
+    <p class="text-muted small mb-3">完成一套分级诊断卷后，系统将生成学习报告，包括正确率、耗时、知识薄弱点、参考位置与针对性训练建议。</p>
+    <form method="post" action="{{ url_for('diagnostic.guest_start') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="auth-field">
+            <label for="student_name" class="auth-label">学生姓名 / Student Name <span class="text-danger">*</span></label>
+            <input type="text" class="auth-input" id="student_name" name="student_name" required maxlength="120" placeholder="请输入姓名">
+        </div>
+        <div class="auth-field">
+            <label for="grade" class="auth-label">年级 / Grade <span class="text-danger">*</span></label>
+            <select class="auth-input" id="grade" name="grade" required>
+                <option value="" disabled selected>请选择年级</option>
+                {% for g in placement_grades %}
+                <option value="{{ g }}">{{ g }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="auth-btn">开始诊断测试</button>
+    </form>
+    <p class="auth-privacy mt-3 mb-1">测评数据仅用于生成诊断报告，不接入作业网账号系统。</p>
+    <p class="auth-switch small mb-0">
+        <a href="{{ url_for('diagnostic.legacy_login') }}">学员账号登录</a>
+        <span class="text-muted">（原注册诊断学员）</span>
+    </p>
+</div>
+{% endblock %}

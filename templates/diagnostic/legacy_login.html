@@ -1,0 +1,23 @@
+{% extends "diagnostic/base_auth.html" %}
+{% block title %}学员账号登录 - 诊断{% endblock %}
+{% block auth_form %}
+<div class="auth-card">
+    <h2 class="auth-card-title">学员账号登录</h2>
+    <p class="text-muted small">原诊断系统注册账号。公开测评请返回<a href="{{ url_for('diagnostic.login') }}">数学竞赛测评诊断</a>入口。</p>
+    <form method="post" action="{{ url_for('diagnostic.legacy_login') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="auth-field">
+            <label for="username" class="auth-label">用户名</label>
+            <input type="text" class="auth-input" id="username" name="username" required>
+        </div>
+        <div class="auth-field">
+            <label for="password" class="auth-label">密码</label>
+            <input type="password" class="auth-input" id="password" name="password" required>
+        </div>
+        <button type="submit" class="auth-btn">登录</button>
+    </form>
+    <p class="auth-switch">
+        没有账号？<a href="{{ url_for('diagnostic.register') }}">注册</a>
+    </p>
+</div>
+{% endblock %}

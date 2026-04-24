@@ -1,0 +1,63 @@
+{% extends "admin/base.html" %}
+{% block admin_content %}
+<div class="container">
+    <link rel="stylesheet" href="{{ url_for('static', filename='diagnostic/tokens.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='diagnostic/diagnostic_ui.css') }}">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i data-lucide="user-plus" class="me-2"></i>公开测评访客：{{ guest.name }}</h2>
+        <a href="{{ url_for('diagnostic_admin.diag_users') }}" class="btn btn-outline-secondary">返回列表</a>
+    </div>
+    <div class="card mb-4">
+        <div class="card-header">基本信息</div>
+        <div class="card-body">
+            <p><strong>姓名：</strong>{{ guest.name }}</p>
+            <p><strong>年级：</strong>{{ guest.grade }}</p>
+            <p><strong>首次进入时间：</strong>{{ guest.created_at.strftime('%Y-%m-%d %H:%M') if guest.created_at else 'N/A' }}</p>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header">诊断记录（共 {{ report_items|length }} 份已完成报告）</div>
+        <div class="card-body">
+            {% if report_items %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>试卷</th>
+                            <th>竞赛</th>
+                            <th>完成时间</th>
+                            <th>得分</th>
+                            <th>正确率</th>
+                            <th>耗时</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in report_items %}
+                        <tr>
+                            <td>{{ r.exam_title }}</td>
+                            <td>{{ r.competition_name }}</td>
+                            <td>{{ r.submitted_at_str }}</td>
+                            <td>{{ r.score }}/{{ r.score_max }}</td>
+                            <td>{{ r.accuracy_percent }}%</td>
+                            <td>{{ r.total_time_sec }}s</td>
+                            <td>
+                                <a href="{{ url_for('diagnostic_admin.admin_report_view', attempt_id=r.attempt_id) }}" class="btn btn-sm btn-outline-primary" target="_blank">查看报告</a>
+                                {% if r.share_token %}
+                                <a href="{{ url_for('diagnostic.report_shared', token=r.share_token) }}" class="btn btn-sm btn-outline-secondary" target="_blank">公开链接</a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted mb-0">暂无已完成报告。进行中记录：{{ attempts|length }} 条。</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>try{ lucide.createIcons(); }catch(e){}</script>
+{% endblock %}

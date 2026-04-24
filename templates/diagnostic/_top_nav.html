@@ -6,7 +6,7 @@
       <img class="diag-nav__logo" src="{{ url_for('static', filename='diagnostic/brand/logo.png') }}" alt="Burning Math Academy" onerror="this.style.display='none'">
       <div class="diag-nav__brand-text">
         <span class="diag-nav__brand-name">Burning Math Academy</span>
-        <span class="diag-nav__brand-sub">数学竞赛诊断平台</span>
+        <span class="diag-nav__brand-sub">数学竞赛测评诊断</span>
       </div>
     </a>
     <button class="diag-nav__toggler" type="button" data-bs-toggle="collapse" data-bs-target="#diagNav" aria-controls="diagNav" aria-expanded="false" aria-label="展开菜单">
@@ -17,7 +17,7 @@
         <li class="diag-nav__item">
           <a class="diag-nav__link {% if request.endpoint == 'diagnostic.index' %}diag-nav__link--active{% endif %}" href="{{ url_for('diagnostic.index') }}">首页</a>
         </li>
-        {% if user or request.cookies.get('diag_session') %}
+        {% if user or guest_student %}
         <li class="diag-nav__item">
           <a class="diag-nav__link {% if request.endpoint == 'diagnostic.exams' %}diag-nav__link--active{% endif %}" href="{{ url_for('diagnostic.exams') }}">试卷中心</a>
         </li>
@@ -33,9 +33,12 @@
         {% if user %}
         <li class="diag-nav__item"><span class="diag-nav__user">{{ user.username }}</span></li>
         <li class="diag-nav__item"><a class="diag-nav__link" href="{{ url_for('diagnostic.logout') }}">退出</a></li>
+        {% elif guest_student %}
+        <li class="diag-nav__item"><span class="diag-nav__user">{{ guest_student.name }}（{{ guest_student.grade }}）</span></li>
+        <li class="diag-nav__item"><a class="diag-nav__link" href="{{ url_for('diagnostic.logout') }}">退出</a></li>
         {% else %}
-        <li class="diag-nav__item"><a class="diag-nav__link {% if request.endpoint == 'diagnostic.login' %}diag-nav__link--active{% endif %}" href="{{ url_for('diagnostic.login') }}">登录</a></li>
-        <li class="diag-nav__item"><a class="diag-nav__link {% if request.endpoint == 'diagnostic.register' %}diag-nav__link--active{% endif %}" href="{{ url_for('diagnostic.register') }}">注册</a></li>
+        <li class="diag-nav__item"><a class="diag-nav__link {% if request.endpoint == 'diagnostic.login' %}diag-nav__link--active{% endif %}" href="{{ url_for('diagnostic.login') }}">测评入口</a></li>
+        <li class="diag-nav__item"><a class="diag-nav__link text-muted small" href="{{ url_for('diagnostic.legacy_login') }}">学员登录</a></li>
         {% endif %}
       </ul>
     </div>

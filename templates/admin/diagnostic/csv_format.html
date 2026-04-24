@@ -21,7 +21,8 @@
                     <tr><td><code>stem_text</code></td><td><strong>题干文本</strong>，批量模式（无题目时）必填以创建题目；逐个模式不采用</td></tr>
                     <tr><td><code>correct_answer</code></td><td>正确答案（A/B/C/D/E 或数值/文本）</td></tr>
                     <tr><td><code>solution_explain</code></td><td>解析文本</td></tr>
-                    <tr><td><code>answer_format</code></td><td>可选：mcq / numeric / text</td></tr>
+                    <tr><td><code>answer_format</code></td><td>可选，<strong>可留空</strong>：留空时系统自动推断——正确答案为单个 A–E 或题干含 <code>(A)…(B)…</code> 视为选择题，否则为填空。<code>mcq</code>/<code>choice</code>=选择；<code>text</code>/<code>numeric</code>/<code>fill</code>=填空；<code>proof</code>=证明简答。</td></tr>
+                    <tr><td><code>choices_json</code></td><td>可选：本题选项 JSON（对象如 <code>{"A":"10","B":"12"}</code>）。不填且题干为 Gauss 式 <code>(A)…(B)…</code> 时，导入会自动写入 <code>choices_json</code>。</td></tr>
                     <tr><td><code>kp_primary</code></td><td>一级知识点</td></tr>
                     <tr><td><code>kp_secondary</code></td><td>二级知识点（逗号或分号分隔）</td></tr>
                     <tr><td><code>needs_image</code></td><td><strong>有图/无图标记</strong>：<code>1</code>/<code>yes</code>/<code>有</code>/<code>有图</code>=该题需补充题干图或解析图，题目详情页会提示；<code>0</code>/<code>无</code>/空=无图可跳过</td></tr>

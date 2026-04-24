@@ -3,12 +3,58 @@
 <div class="container">
     <link rel="stylesheet" href="{{ url_for('static', filename='diagnostic/tokens.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='diagnostic/diagnostic_ui.css') }}">
-    <div class="card">
+    <div class="card mb-4">
         <div class="card-header">
-            <h2 class="mb-0"><i data-lucide="users" class="me-2"></i>测评用户管理</h2>
+            <h2 class="mb-0"><i data-lucide="users" class="me-2"></i>公开测评记录</h2>
         </div>
         <div class="card-body">
-            <p class="text-muted">所有在诊断系统注册的学员。点击用户名可查看其试卷、报告等数据。<strong>共 {{ users|length }} 人</strong></p>
+            <p class="text-muted">通过「数学竞赛测评诊断」入口提交的访客（无作业网账号）。<strong>共 {{ guest_rows|length }} 人</strong></p>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>学生姓名</th>
+                            <th>年级</th>
+                            <th>诊断 Level</th>
+                            <th>完成时间</th>
+                            <th>诊断试卷</th>
+                            <th>分数</th>
+                            <th>正确率</th>
+                            <th>报告数</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in guest_rows %}
+                        {% set g = row.guest %}
+                        <tr>
+                            <td><a href="{{ url_for('diagnostic_admin.diag_guest_detail', guest_id=g.id) }}">{{ g.name }}</a></td>
+                            <td>{{ g.grade }}</td>
+                            <td>{% if row.placement_level %}Level {{ row.placement_level }}{% else %}—{% endif %}</td>
+                            <td>{{ row.last_finished_at.strftime('%Y-%m-%d %H:%M') if row.last_finished_at else '—' }}</td>
+                            <td>{{ row.last_exam_title or '—' }}</td>
+                            <td>{% if row.last_score is not none %}{{ row.last_score }}{% else %}—{% endif %}</td>
+                            <td>{% if row.last_accuracy is not none %}{{ row.last_accuracy }}%{% else %}—{% endif %}</td>
+                            <td>{{ row.finished_count }}</td>
+                            <td>
+                                <a href="{{ url_for('diagnostic_admin.diag_guest_detail', guest_id=g.id) }}" class="btn btn-sm btn-primary">记录</a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="9" class="text-muted text-center">暂无公开测评记录</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2 class="mb-0"><i data-lucide="user-check" class="me-2"></i>注册诊断学员</h2>
+        </div>
+        <div class="card-body">
+            <p class="text-muted">原诊断系统账号。<strong>共 {{ users|length }} 人</strong></p>
             <div class="table-responsive">
                 <table class="table table-hover">
                     <thead>

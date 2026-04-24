@@ -110,6 +110,11 @@ def _exam_upload_progress(db):
 def exams():
     db = _db()
     DiagCompetition, DiagExam, *_ = _models()
+    placement_by_level = {1: None, 2: None, 3: None}
+    for lvl, _ in placement_by_level.items():
+        placement_by_level[lvl] = db.session.query(DiagExam).filter_by(
+            diag_placement_level=lvl
+        ).order_by(DiagExam.created_at.desc()).first()
     comps = db.session.query(DiagCompetition).order_by(
         DiagCompetition.subject, DiagCompetition.category, DiagCompetition.name
     ).all()
@@ -140,6 +145,7 @@ def exams():
         exam_upload_progress=exam_upload_progress,
         total_exams=total_exams,
         published_exams=published_exams,
+        placement_by_level=placement_by_level,
     )
 
 
@@ -216,9 +222,42 @@ def exam_detail(id):
             'homework_assignment_id': hw_id,
             'homework_title': lesson_titles.get(hw_id, '') if hw_id else '',
         }
-    return render_template('admin/diagnostic/exam_detail.html',
+    return render_template(
+        'admin/diagnostic/exam_detail.html',
         exam=exam, order=order, questions=questions,
-        imported_answers=imported_answers, kp_list=kp_list, lessons=lessons, q_tags=q_tags, q_config=q_config)
+        imported_answers=imported_answers, kp_list=kp_list, lessons=lessons, q_tags=q_tags, q_config=q_config,
+        placement_levels=[(1, 'G1–G6'), (2, 'G7–G9'), (3, 'G10–G12')],
+    )
+
+
+@diagnostic_admin_bp.route('/exams/<int:id>/placement_level', methods=['POST'])
+@admin_required
+def exam_set_placement_level(id):
+    """设置该试卷为某分级诊断卷（1=G1–G6，2=G7–G9，3=G10–G12）；同一 level 仅保留一份。"""
+    db = _db()
+    _, DiagExam, *_ = _models()
+    exam = db.session.get(DiagExam, id)
+    if exam is None:
+        abort(404)
+    raw = (request.form.get('diag_placement_level') or '').strip()
+    if raw == '' or str(raw).lower() == 'none':
+        exam.diag_placement_level = None
+    else:
+        try:
+            lvl = int(raw)
+            if lvl not in (1, 2, 3):
+                raise ValueError('bad level')
+            db.session.query(DiagExam).filter(
+                DiagExam.diag_placement_level == lvl,
+                DiagExam.id != exam.id,
+            ).update({'diag_placement_level': None}, synchronize_session=False)
+            exam.diag_placement_level = lvl
+        except Exception:
+            flash('分级须为 1、2、3 或留空', 'error')
+            return redirect(url_for('diagnostic_admin.exam_detail', id=id))
+    db.session.commit()
+    flash('分级诊断卷设置已保存', 'success')
+    return redirect(url_for('diagnostic_admin.exam_detail', id=id))
 
 
 @diagnostic_admin_bp.route('/exams/<int:id>/publish', methods=['POST'])
@@ -681,7 +720,9 @@ def _parse_enhanced_csv(raw):
                 'stem_text': stem_text_val,
                 'correct_answer': _col(row, 'correct_answer'),
                 'solution_explain': _col(row, 'solution_explain'),
-                'answer_format': _col(row, 'answer_format') or 'mcq',
+                # 可空：空则按正确答案是否为 A–E、题干是否含 (A)(B)… 等自动推断选择/填空
+                'answer_format': _col(row, 'answer_format'),
+                'choices_json': _col(row, 'choices_json', 'options_json'),
                 'kp_primary': _col(row, 'kp_primary'),
                 'kp_secondary': _col(row, 'kp_secondary'),
                 'needs_image': needs_image,
@@ -719,6 +760,7 @@ def _decode_csv_bytes(data: bytes):
 def _write_csv_rows(db, rows, M, force_exam_id=None):
     """将解析后的 CSV 行写入数据库，返回成功更新的题数。不提交，由调用方 commit。
     force_exam_id: 若提供（如从试卷详情页上传），则所有行强制使用该试卷，忽略 CSV 的 competition_name/exam_title。"""
+    from diagnostic.diag_question_format import parse_mcq_options_from_stem
     DiagCompetition, DiagExam, DiagQuestion, DiagExamQuestion = M[0], M[1], M[2], M[3]
     DiagQuestionAnswer, DiagQuestionKp, DiagQuestionPracticeItem, DiagExamQuestionPracticeConfig = M[10], M[11], M[12], M[13]
     updated = 0
@@ -782,6 +824,13 @@ def _write_csv_rows(db, rows, M, force_exam_id=None):
                     q.answer_key = (r.get('correct_answer') or '').strip()
                 if (r.get('solution_explain') or '').strip():
                     q.solution_text = (r.get('solution_explain') or '').strip()
+                cj_in = (r.get('choices_json') or '').strip()
+                if cj_in:
+                    q.choices_json = cj_in
+                elif not (q.choices_json or '').strip():
+                    parsed_opts = parse_mcq_options_from_stem(q.stem_text or '')
+                    if parsed_opts:
+                        q.choices_json = json.dumps(parsed_opts, ensure_ascii=False)
         except Exception:
             # 不影响主流程：答案/知识点等仍可更新
             pass
@@ -795,14 +844,14 @@ def _write_csv_rows(db, rows, M, force_exam_id=None):
         if ans_row:
             ans_row.correct_answer = r['correct_answer'] or None
             ans_row.solution_explain = r['solution_explain'] or None
-            ans_row.answer_format = r['answer_format'] or None
+            ans_row.answer_format = (r.get('answer_format') or None)
             ans_row.reserved_1, ans_row.reserved_2, ans_row.reserved_3 = res1, res2, res3
         else:
             db.session.add(DiagQuestionAnswer(
                 exam_id=exam.id, q_index=q_index,
                 correct_answer=r['correct_answer'] or None,
                 solution_explain=r['solution_explain'] or None,
-                answer_format=r['answer_format'] or None,
+                answer_format=(r.get('answer_format') or None),
                 reserved_1=res1, reserved_2=res2, reserved_3=res3,
             ))
         kp_row = db.session.query(DiagQuestionKp).filter_by(
@@ -1123,16 +1172,58 @@ def _diag_attempt_quick_stats(att, db):
 @diagnostic_admin_bp.route('/diag-users')
 @admin_required
 def diag_users():
-    """测评用户列表。"""
+    """测评用户列表（注册学员 + 公开测评访客）。"""
     db = _db()
-    from app import DiagUser, DiagAttempt
+    from app import DiagUser, DiagAttempt, DiagGuestStudent, DiagExam
     users = db.session.query(DiagUser).order_by(DiagUser.created_at.desc()).all()
     attempt_counts = {}
     for u in users:
         cnt = db.session.query(DiagAttempt).filter_by(user_id=u.id, status='finished').count()
         attempt_counts[u.id] = cnt
+    guests = db.session.query(DiagGuestStudent).order_by(DiagGuestStudent.created_at.desc()).all()
+    guest_rows = []
+    for g in guests:
+        atts = db.session.query(DiagAttempt).filter_by(guest_student_id=g.id).all()
+        fin = [a for a in atts if a.status == 'finished']
+        last_fin = None
+        for a in fin:
+            if a.finished_at and (last_fin is None or a.finished_at > last_fin):
+                last_fin = a.finished_at
+        last_exam_title = None
+        last_level = None
+        last_score = None
+        last_acc = None
+        if fin:
+            last_att = max(fin, key=lambda x: (x.finished_at or x.started_at or datetime.min))
+            last_level = last_att.placement_level
+            ex = db.session.get(DiagExam, last_att.exam_id)
+            last_exam_title = ex.title if ex else 'N/A'
+            st = _diag_attempt_quick_stats(last_att, db)
+            last_score = st['score']
+            last_acc = st['accuracy_percent']
+        elif atts:
+            last_att = max(atts, key=lambda x: (x.started_at or datetime.min))
+            last_level = last_att.placement_level
+            ex = db.session.get(DiagExam, last_att.exam_id)
+            last_exam_title = (ex.title if ex else 'N/A') + ' (进行中)'
+        guest_rows.append({
+            'guest': g,
+            'finished_count': len(fin),
+            'total_attempts': len(atts),
+            'last_finished_at': last_fin,
+            'last_exam_title': last_exam_title,
+            'placement_level': last_level,
+            'last_score': last_score,
+            'last_accuracy': last_acc,
+        })
     current_year = datetime.utcnow().year
-    return render_template('admin/diagnostic/diag_users.html', users=users, attempt_counts=attempt_counts, current_year=current_year)
+    return render_template(
+        'admin/diagnostic/diag_users.html',
+        users=users,
+        attempt_counts=attempt_counts,
+        guest_rows=guest_rows,
+        current_year=current_year,
+    )
 
 
 @diagnostic_admin_bp.route('/diag-users/<int:user_id>')
@@ -1167,6 +1258,41 @@ def diag_user_detail(user_id):
         user=user, attempts=attempts, report_items=report_items)
 
 
+@diagnostic_admin_bp.route('/diag-guests/<int:guest_id>')
+@admin_required
+def diag_guest_detail(guest_id):
+    """公开测评访客详情：答题与报告。"""
+    db = _db()
+    from app import DiagGuestStudent, DiagAttempt, DiagExam
+    guest = db.session.get(DiagGuestStudent, guest_id)
+    if not guest:
+        abort(404)
+    attempts = db.session.query(DiagAttempt).filter_by(guest_student_id=guest_id).order_by(
+        DiagAttempt.finished_at.desc().nullslast(), DiagAttempt.started_at.desc()
+    ).all()
+    report_items = []
+    for att in attempts:
+        if att.status == 'finished':
+            st = _diag_attempt_quick_stats(att, db)
+            exam = att.exam
+            comp = getattr(exam, 'competition', None) if exam else None
+            comp_name = (getattr(comp, 'name_cn', None) or getattr(comp, 'category', None) or comp.name if comp else None) or 'N/A'
+            sub = getattr(att, 'finished_at', None) or getattr(att, 'started_at', None)
+            report_items.append({
+                'attempt_id': att.id,
+                'exam_title': getattr(exam, 'title', None) or 'N/A',
+                'competition_name': comp_name,
+                'submitted_at_str': sub.strftime('%Y-%m-%d %H:%M') if sub and hasattr(sub, 'strftime') else 'N/A',
+                'score': st['score'], 'score_max': st['score_max'], 'accuracy_percent': st['accuracy_percent'],
+                'total_time_sec': st['total_time_sec'],
+                'share_token': getattr(att, 'share_token', None),
+            })
+    return render_template(
+        'admin/diagnostic/diag_guest_detail.html',
+        guest=guest, attempts=attempts, report_items=report_items,
+    )
+
+
 @diagnostic_admin_bp.route('/diag-users/<int:user_id>/toggle-active', methods=['POST'])
 @admin_required
 def diag_user_toggle_active(user_id):
@@ -1188,12 +1314,12 @@ def admin_report_view(attempt_id):
     """管理员查看任意学员的报告。"""
     db = _db()
     from app import DiagAttempt
-    from diagnostic.routes import _build_report_data
+    from diagnostic.routes import _build_report_data, _report_user_proxy
     att = db.session.get(DiagAttempt, attempt_id)
     if not att:
         abort(404)
-    user = att.user
-    report_data = _build_report_data(att, user, db)
+    report_user = _report_user_proxy(att, db)
+    report_data = _build_report_data(att, report_user, db, guest_student=att.guest_student)
     report_data['attempt'] = att
     report_data['chart_radar_labels'] = [r['category'] for r in report_data['kp_radar']]
     report_data['chart_radar_values'] = [r['value_0to100'] for r in report_data['kp_radar']]

@@ -23,6 +23,13 @@
         </div>
       </div>
     </div>
+    {% if share_report_url | default('') %}
+    <div class="container mb-2">
+      <div class="alert alert-light border small mb-0">
+        <strong>公开查看链接</strong>（无需登录）：<a href="{{ share_report_url }}">{{ share_report_url }}</a>
+      </div>
+    </div>
+    {% endif %}
 
     {# C) 顶部指标卡：1 大卡(2列) + 4 小卡 #}
     <div class="metrics-grid">

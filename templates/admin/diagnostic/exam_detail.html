@@ -15,6 +15,28 @@
         </div>
     </div>
 
+    <div class="card mb-3 border-info">
+        <div class="card-header bg-info text-white">分级诊断卷（公开测评入口）</div>
+        <div class="card-body">
+            <p class="text-muted small mb-2">将本试卷设为某一 Level 后，选择对应年级的访客将自动进入该卷。每个 Level 同时仅保留一份绑定（保存时会自动取消其他试卷的同级设置）。</p>
+            <form method="post" action="{{ url_for('diagnostic_admin.exam_set_placement_level', id=exam.id) }}" class="row g-2 align-items-end">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="col-md-4">
+                    <label class="form-label">诊断 Level</label>
+                    <select class="form-select" name="diag_placement_level">
+                        <option value="" {% if not exam.diag_placement_level %}selected{% endif %}>不设（普通竞赛卷）</option>
+                        {% for lvl, label in placement_levels %}
+                        <option value="{{ lvl }}" {% if exam.diag_placement_level == lvl %}selected{% endif %}>Level {{ lvl }}：{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary">保存分级设置</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- 上传模式选择 -->
     <div class="card mb-3">
         <div class="card-body py-2">

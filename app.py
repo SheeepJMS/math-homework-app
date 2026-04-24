@@ -442,6 +442,26 @@ class DiagSession(db.Model):
     user = db.relationship('DiagUser', backref=db.backref('sessions', lazy=True))
 
 
+class DiagGuestStudent(db.Model):
+    """公开测评入口：无注册账号的测评学员（仅 diagnostic 表）。"""
+    __tablename__ = 'diag_guest_students'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    grade = db.Column(db.String(8), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class DiagGuestSession(db.Model):
+    """访客会话：cookie token 绑定 diag_guest_students。"""
+    __tablename__ = 'diag_guest_sessions'
+    id = db.Column(db.Integer, primary_key=True)
+    guest_student_id = db.Column(db.Integer, db.ForeignKey('diag_guest_students.id', ondelete='CASCADE'), nullable=False)
+    token = db.Column(db.String(64), unique=True, nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    guest_student = db.relationship('DiagGuestStudent', backref=db.backref('sessions', lazy=True))
+
+
 class DiagCompetition(db.Model):
     __tablename__ = 'diag_competitions'
     id = db.Column(db.Integer, primary_key=True)
@@ -462,6 +482,8 @@ class DiagExam(db.Model):
     time_limit_sec = db.Column(db.Integer, nullable=True)
     is_published = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # 1=G1–G6, 2=G7–G9, 3=G10–G12 分级诊断卷；空表示普通竞赛卷
+    diag_placement_level = db.Column(db.Integer, nullable=True)
     competition = db.relationship('DiagCompetition', backref=db.backref('exams', lazy=True))
 
 
@@ -491,13 +513,18 @@ class DiagExamQuestion(db.Model):
 class DiagAttempt(db.Model):
     __tablename__ = 'diag_attempts'
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('diag_users.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('diag_users.id'), nullable=True)
+    guest_student_id = db.Column(db.Integer, db.ForeignKey('diag_guest_students.id', ondelete='SET NULL'), nullable=True)
     exam_id = db.Column(db.Integer, db.ForeignKey('diag_exams.id'), nullable=False)
     status = db.Column(db.String(20), default='in_progress')
     started_at = db.Column(db.DateTime, default=datetime.utcnow)
     finished_at = db.Column(db.DateTime, nullable=True)
     total_time_ms = db.Column(db.BigInteger, default=0)
+    placement_level = db.Column(db.Integer, nullable=True)
+    guest_grade = db.Column(db.String(16), nullable=True)
+    share_token = db.Column(db.String(64), unique=True, nullable=True)
     user = db.relationship('DiagUser', backref=db.backref('attempts', lazy=True))
+    guest_student = db.relationship('DiagGuestStudent', backref=db.backref('attempts', lazy=True))
     exam = db.relationship('DiagExam', backref=db.backref('attempts', lazy=True))
 
 
@@ -650,10 +677,12 @@ class DiagQuestionPracticeConfig(db.Model):
 class DiagPracticeSet(db.Model):
     __tablename__ = 'diag_practice_sets'
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('diag_users.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('diag_users.id'), nullable=True)
+    guest_student_id = db.Column(db.Integer, db.ForeignKey('diag_guest_students.id', ondelete='SET NULL'), nullable=True)
     attempt_id = db.Column(db.Integer, db.ForeignKey('diag_attempts.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     user = db.relationship('DiagUser', backref=db.backref('practice_sets', lazy=True))
+    guest_student = db.relationship('DiagGuestStudent', backref=db.backref('practice_sets', lazy=True))
     attempt = db.relationship('DiagAttempt', backref=db.backref('practice_sets', lazy=True))
 
 
@@ -672,11 +701,13 @@ class DiagPracticeAttempt(db.Model):
     __tablename__ = 'diag_practice_attempts'
     id = db.Column(db.Integer, primary_key=True)
     practice_set_id = db.Column(db.Integer, db.ForeignKey('diag_practice_sets.id'), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('diag_users.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('diag_users.id'), nullable=True)
+    guest_student_id = db.Column(db.Integer, db.ForeignKey('diag_guest_students.id', ondelete='SET NULL'), nullable=True)
     answers_json = db.Column(db.Text, nullable=True)  # {"item_id": "A", ...}
     submitted_at = db.Column(db.DateTime, default=datetime.utcnow)
     practice_set = db.relationship('DiagPracticeSet', backref=db.backref('attempts', lazy=True))
     user = db.relationship('DiagUser', backref=db.backref('practice_attempts', lazy=True))
+    guest_student = db.relationship('DiagGuestStudent', backref=db.backref('practice_attempts', lazy=True))
 
 
 def admin_required(f):

@@ -72,7 +72,7 @@
             <div class="mb-3">
                 <label class="form-label">答案</label>
                 <div class="form-text text-muted">提示：输入根号请用 <code>v</code> 表示。例如 √3 写 <code>v3</code>。</div>
-                {% if question.type == 'choice' %}
+                {% if question_type == 'choice' %}
                 <div class="options-vertical">
                     {% for opt in choices %}
                     {% set key_val = opt.get('key', opt) %}
@@ -87,7 +87,7 @@
                     </div>
                     {% endfor %}
                 </div>
-                {% elif question.type == 'proof' %}
+                {% elif question_type == 'proof' %}
                 <textarea class="form-control" name="answer" rows="4" placeholder="请写出你的解题思路或证明步骤（支持纯文本）">{% if answer_rec and answer_rec.answer %}{{ answer_rec.answer }}{% endif %}</textarea>
                 {% else %}
                 <input type="text" class="form-control" name="answer" value="{% if answer_rec and answer_rec.answer %}{{ answer_rec.answer }}{% endif %}" placeholder="请在此输入你的答案，例如 4/5 或 0.8">
@@ -124,7 +124,7 @@
         spentEl.value = elapsed * 1000;
     });
     var key = 'diag_attempt_{{ attempt.id }}';
-    var qType = "{{ question.type }}";
+    var qType = "{{ question_type }}";
     try {
         var saved = localStorage.getItem(key);
         if (saved) {

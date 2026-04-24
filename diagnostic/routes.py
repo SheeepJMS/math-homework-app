@@ -10,25 +10,15 @@ import random
 import math
 import statistics
 from werkzeug.security import generate_password_hash, check_password_hash
+from types import SimpleNamespace
 
-
-def _strip_excel_formula_and_quotes(value):
-    """去除 Excel/CSV 常见答案格式（如 =\"13\"、='A'）的前导 = 与外层引号，便于展示与判分比较。"""
-    if value is None:
-        return ''
-    s = str(value).strip()
-    if not s:
-        return ''
-    if s.startswith('='):
-        s = s[1:].strip()
-    if len(s) >= 2 and ((s[0] == s[-1] == '"') or (s[0] == s[-1] == "'")):
-        s = s[1:-1].strip()
-    return s
-
-
-def _normalize_diag_answer_for_compare(raw):
-    """将标准答案与学生作答归一化后再比较（沿用原逻辑的大小写不敏感）。"""
-    return _strip_excel_formula_and_quotes(raw).upper()
+from diagnostic.diag_question_format import (
+    strip_excel_formula_and_quotes as _strip_excel_formula_and_quotes,
+    normalize_for_compare as _normalize_diag_answer_for_compare,
+    diag_question_ui_type,
+    mcq_answers_equivalent,
+    parse_mcq_options_from_stem,
+)
 
 
 def _points_for_exam(score_scheme_json, num_questions):
@@ -92,18 +82,67 @@ def _get_db_and_models():
     from flask import current_app
     db = current_app.extensions['sqlalchemy']
     from app import (
-        DiagUser, DiagSession, DiagCompetition, DiagExam, DiagQuestion, DiagExamQuestion,
+        DiagUser, DiagSession, DiagGuestStudent, DiagGuestSession, DiagCompetition, DiagExam, DiagQuestion, DiagExamQuestion,
         DiagAttempt, DiagAttemptAnswer, DiagKnowledgePoint, DiagQuestionTag,
         DiagBankQuestion, DiagBankQuestionTag, DiagQuestionBankLink, DiagQuestionPracticeConfig,
         DiagPracticeSet, DiagPracticeSetItem,
     )
-    return (db, DiagUser, DiagSession, DiagCompetition, DiagExam, DiagQuestion, DiagExamQuestion,
+    return (db, DiagUser, DiagSession, DiagGuestStudent, DiagGuestSession, DiagCompetition, DiagExam, DiagQuestion, DiagExamQuestion,
             DiagAttempt, DiagAttemptAnswer, DiagKnowledgePoint, DiagQuestionTag,
             DiagBankQuestion, DiagBankQuestionTag, DiagQuestionBankLink, DiagQuestionPracticeConfig,
             DiagPracticeSet, DiagPracticeSetItem)
 
 DIAG_COOKIE_NAME = os.environ.get('DIAG_COOKIE_NAME', 'diag_session')
+DIAG_GUEST_COOKIE_NAME = os.environ.get('DIAG_GUEST_COOKIE_NAME', 'diag_guest_session')
 DIAG_SESSION_DAYS = int(os.environ.get('DIAG_SESSION_DAYS', '7'))
+DIAG_GUEST_SESSION_DAYS = int(os.environ.get('DIAG_GUEST_SESSION_DAYS', '7'))
+PLACEMENT_GRADES = (
+    (1, ('G1', 'G2', 'G3', 'G4', 'G5', 'G6')),
+    (2, ('G7', 'G8', 'G9')),
+    (3, ('G10', 'G11', 'G12')),
+)
+
+
+def grade_to_placement_level(grade_raw):
+    g = (grade_raw or '').strip().upper()
+    for level, grades in PLACEMENT_GRADES:
+        if g in grades:
+            return level
+    return None
+
+
+def _placement_exam_for_level(db, level):
+    """该分级下已发布的主诊断卷（取最新创建）。"""
+    from app import DiagExam
+    return db.session.query(DiagExam).filter_by(
+        diag_placement_level=level, is_published=True
+    ).order_by(DiagExam.created_at.desc()).first()
+
+
+def _is_placement_exam(exam):
+    return exam is not None and getattr(exam, 'diag_placement_level', None) in (1, 2, 3)
+
+
+def _attempt_owned_by(att, user, guest):
+    if user and att.user_id == user.id:
+        return True
+    if guest and att.guest_student_id == guest.id:
+        return True
+    return False
+
+
+def _report_user_proxy(att, db):
+    """供报告模板使用的「用户展示对象」：注册学员或访客姓名。"""
+    from app import DiagUser, DiagGuestStudent
+    if att.user_id:
+        u = db.session.get(DiagUser, att.user_id)
+        if u:
+            return u
+    if att.guest_student_id:
+        gs = db.session.get(DiagGuestStudent, att.guest_student_id)
+        if gs:
+            return SimpleNamespace(username=gs.name, id=None, is_guest=True, grade=getattr(gs, 'grade', None))
+    return SimpleNamespace(username='N/A', id=None, is_guest=True)
 RETRY_COOLDOWN_DAYS = 120  # 4 个月，同一试卷两次完成需间隔
 
 diagnostic_bp = Blueprint('diagnostic', __name__, template_folder='../templates/diagnostic')
@@ -311,10 +350,12 @@ def _sample_report_mock():
 def inject_diag_user():
     try:
         user = get_diag_user_from_cookie()
+        guest_student = get_guest_student_from_cookie()
         static_v = os.environ.get('RENDER_GIT_COMMIT') or os.environ.get('GIT_COMMIT') or ''
         static_v = (static_v or '')[:12] or datetime.utcnow().strftime('%Y%m%d%H%M')
         return {
             'user': user,
+            'guest_student': guest_student,
             'diag_static_v': static_v,
             'diag_require_plan': lambda required_plan='pro', feature_name=None: require_plan(required_plan, feature_name, user),
         }
@@ -323,6 +364,7 @@ def inject_diag_user():
         static_v = (static_v or '')[:12] or datetime.utcnow().strftime('%Y%m%d%H%M')
         return {
             'user': None,
+            'guest_student': None,
             'diag_static_v': static_v,
             'diag_require_plan': lambda required_plan='pro', feature_name=None: require_plan(required_plan, feature_name, None),
         }
@@ -340,6 +382,18 @@ def get_diag_user_from_cookie():
     return db.session.get(DiagUser, sess.user_id)
 
 
+def get_guest_student_from_cookie():
+    """从 cookie 解析访客测评学员（diag_guest_session）。"""
+    token = request.cookies.get(DIAG_GUEST_COOKIE_NAME)
+    if not token:
+        return None
+    db, _diag_user, _diag_sess, DiagGuestStudent, DiagGuestSession, *_ = _get_db_and_models()
+    sess = db.session.query(DiagGuestSession).filter_by(token=token).first()
+    if not sess or sess.expires_at < datetime.utcnow():
+        return None
+    return db.session.get(DiagGuestStudent, sess.guest_student_id)
+
+
 def require_diag_login(f):
     """要求已登录诊断用户，否则重定向到诊断登录页。"""
     @wraps(f)
@@ -352,6 +406,17 @@ def require_diag_login(f):
     return wrapped
 
 
+def require_diag_access(f):
+    """已登录注册学员，或公开测评访客（cookie），二者其一即可。"""
+    @wraps(f)
+    def wrapped(*args, **kwargs):
+        if get_diag_user_from_cookie() or get_guest_student_from_cookie():
+            return f(*args, **kwargs)
+        flash('请先填写姓名与年级开始测评', 'warning')
+        return redirect(url_for('diagnostic.login'))
+    return wrapped
+
+
 @diagnostic_bp.route('/')
 def index():
     user = get_diag_user_from_cookie()
@@ -359,7 +424,9 @@ def index():
         db = _get_db()
         dashboard = _build_dashboard_data(user, db)
         return render_template('diagnostic/dashboard.html', user=user, **dashboard)
-    return render_template('diagnostic/index.html')
+    if get_guest_student_from_cookie():
+        return redirect(url_for('diagnostic.reports'))
+    return redirect(url_for('diagnostic.login'))
 
 
 @diagnostic_bp.route('/api/roadmap', methods=['GET'])
@@ -414,13 +481,76 @@ def register():
         )
         db.session.add(user)
         db.session.commit()
-        flash('注册成功，请登录', 'success')
-        return redirect(url_for('diagnostic.login'))
+        flash('注册成功，请使用学员账号登录', 'success')
+        return redirect(url_for('diagnostic.legacy_login'))
     return render_template('diagnostic/register.html', sample_report=_sample_report_mock())
 
 
-@diagnostic_bp.route('/login', methods=['GET', 'POST'])
+@diagnostic_bp.route('/login', methods=['GET'])
 def login():
+    """公开测评入口：姓名 + 年级（无账号登录）。"""
+    if get_diag_user_from_cookie():
+        return redirect(url_for('diagnostic.index'))
+    return render_template(
+        'diagnostic/public_entry.html',
+        sample_report=_sample_report_mock(),
+        placement_grades=[g for _, grades in PLACEMENT_GRADES for g in grades],
+    )
+
+
+@diagnostic_bp.route('/guest/start', methods=['POST'])
+def guest_start():
+    """创建访客学员 + 会话 cookie，并进入对应分级诊断卷。"""
+    if get_diag_user_from_cookie():
+        return redirect(url_for('diagnostic.index'))
+    db = _get_db()
+    from app import DiagGuestStudent, DiagGuestSession, DiagExam, DiagExamQuestion, DiagAttempt, DiagAttemptAnswer
+    name = (request.form.get('student_name') or '').strip()
+    grade = (request.form.get('grade') or '').strip().upper()
+    if not name or not grade:
+        flash('请填写学生姓名并选择年级', 'error')
+        return redirect(url_for('diagnostic.login'))
+    level = grade_to_placement_level(grade)
+    if not level:
+        flash('年级无效，请从列表中选择 G1–G12', 'error')
+        return redirect(url_for('diagnostic.login'))
+    exam = _placement_exam_for_level(db, level)
+    if not exam:
+        flash('当前年级诊断卷尚未开放，请联系老师。', 'warning')
+        return redirect(url_for('diagnostic.login'))
+    guest = DiagGuestStudent(name=name[:120], grade=grade[:8])
+    db.session.add(guest)
+    db.session.flush()
+    token = secrets.token_urlsafe(32)
+    expires = datetime.utcnow() + timedelta(days=DIAG_GUEST_SESSION_DAYS)
+    gsess = DiagGuestSession(guest_student_id=guest.id, token=token, expires_at=expires)
+    db.session.add(gsess)
+    order = db.session.query(DiagExamQuestion).filter_by(exam_id=exam.id).order_by(DiagExamQuestion.q_index).all()
+    if not order:
+        db.session.rollback()
+        flash('该诊断卷尚未配置题目，请联系老师。', 'warning')
+        return redirect(url_for('diagnostic.login'))
+    attempt = DiagAttempt(
+        user_id=None,
+        guest_student_id=guest.id,
+        exam_id=exam.id,
+        status='in_progress',
+        placement_level=level,
+        guest_grade=grade,
+    )
+    db.session.add(attempt)
+    db.session.flush()
+    for eq in order:
+        db.session.add(DiagAttemptAnswer(attempt_id=attempt.id, question_id=eq.question_id))
+    db.session.commit()
+    resp = make_response(redirect(url_for('diagnostic.attempt', attempt_id=attempt.id, q=0)))
+    resp.set_cookie(DIAG_GUEST_COOKIE_NAME, token, max_age=DIAG_GUEST_SESSION_DAYS * 86400, httponly=True, samesite='Lax')
+    return resp
+
+
+@diagnostic_bp.route('/legacy-login', methods=['GET', 'POST'])
+def legacy_login():
+    """保留：原诊断学员账号密码登录（非主要入口）。"""
     db = _get_db()
     from app import DiagUser, DiagSession
     if request.method == 'POST':
@@ -429,10 +559,10 @@ def login():
         user = db.session.query(DiagUser).filter_by(username=username).first()
         if not user or not check_password_hash(user.password_hash, password):
             flash('用户名或密码错误', 'error')
-            return render_template('diagnostic/login.html', sample_report=_sample_report_mock())
+            return render_template('diagnostic/legacy_login.html', sample_report=_sample_report_mock())
         if not getattr(user, 'is_active', True):
             flash('该账号已被停用，请联系管理员', 'error')
-            return render_template('diagnostic/login.html', sample_report=_sample_report_mock())
+            return render_template('diagnostic/legacy_login.html', sample_report=_sample_report_mock())
         token = secrets.token_urlsafe(32)
         expires = datetime.utcnow() + timedelta(days=DIAG_SESSION_DAYS)
         sess = DiagSession(user_id=user.id, token=token, expires_at=expires)
@@ -442,7 +572,7 @@ def login():
         resp.set_cookie(DIAG_COOKIE_NAME, token, max_age=DIAG_SESSION_DAYS * 86400, httponly=True, samesite='Lax')
         flash('登录成功', 'success')
         return resp
-    return render_template('diagnostic/login.html', sample_report=_sample_report_mock())
+    return render_template('diagnostic/legacy_login.html', sample_report=_sample_report_mock())
 
 
 @diagnostic_bp.route('/sample-report')
@@ -614,9 +744,10 @@ def support_placeholder():
 
 @diagnostic_bp.route('/logout')
 def logout():
-    resp = make_response(redirect(url_for('diagnostic.index')))
+    resp = make_response(redirect(url_for('diagnostic.login')))
     resp.set_cookie(DIAG_COOKIE_NAME, '', max_age=0)
-    flash('已退出登录', 'info')
+    resp.set_cookie(DIAG_GUEST_COOKIE_NAME, '', max_age=0)
+    flash('已退出', 'info')
     return resp
 
 
@@ -696,11 +827,14 @@ def _build_recommended_exams(dashboard):
 
 
 @diagnostic_bp.route('/exams')
-@require_diag_login
+@require_diag_access
 def exams():
     """试卷中心：展示四级树结构 + 推荐试卷 + 待考试卷列表。"""
     db = _get_db()
     user = get_diag_user_from_cookie()
+    if not user:
+        flash('公开测评请从首页开始；试卷中心仅对注册诊断学员开放。', 'info')
+        return redirect(url_for('diagnostic.reports'))
     dashboard = _build_dashboard_data(user, db)
     recommended_exams = _build_recommended_exams(dashboard)
     return render_template('diagnostic/exam_center.html', user=user,
@@ -710,19 +844,20 @@ def exams():
 
 
 @diagnostic_bp.route('/history')
-@require_diag_login
+@require_diag_access
 def history():
     """重定向到报告中心。"""
     return redirect(url_for('diagnostic.reports'))
 
 
 @diagnostic_bp.route('/reports')
-@require_diag_login
+@require_diag_access
 def reports():
     """报告中心：搜索、过滤、分页、delta 对比、同卷历史。"""
     db = _get_db()
     from app import DiagAttempt, DiagExam, DiagCompetition, DiagPracticeSet, DiagPracticeAttempt
     user = get_diag_user_from_cookie()
+    guest = get_guest_student_from_cookie()
 
     q = (request.args.get('q') or '').strip()
     competition_id = request.args.get('competition', type=int)
@@ -733,7 +868,10 @@ def reports():
     page = max(1, request.args.get('page', 1, type=int))
     page_size = min(50, max(10, request.args.get('page_size', 15, type=int)))
 
-    base = db.session.query(DiagAttempt).filter(DiagAttempt.user_id == user.id)
+    if user:
+        base = db.session.query(DiagAttempt).filter(DiagAttempt.user_id == user.id)
+    else:
+        base = db.session.query(DiagAttempt).filter(DiagAttempt.guest_student_id == guest.id)
     if not include_in_progress:
         base = base.filter(DiagAttempt.status == 'finished')
     else:
@@ -785,25 +923,30 @@ def reports():
     exam_ids = set(a.exam_id for a in attempts)
     prev_by_exam = {}
     exam_history_by_exam = {}
-    for att in db.session.query(DiagAttempt).filter(
-        DiagAttempt.user_id == user.id,
-        DiagAttempt.status == 'finished',
-        DiagAttempt.exam_id.in_(exam_ids)
-    ).order_by(DiagAttempt.finished_at.desc()).all():
-        if att.exam_id not in prev_by_exam:
-            prev_by_exam[att.exam_id] = []
-        prev_by_exam[att.exam_id].append(att)
-        if att.exam_id not in exam_history_by_exam:
-            exam_history_by_exam[att.exam_id] = []
-        if len(exam_history_by_exam[att.exam_id]) < 10:
-            st_h = _attempt_quick_stats(att, db)
-            sub_h = getattr(att, 'finished_at', None)
-            exam_history_by_exam[att.exam_id].append({
-                'attempt_id': att.id,
-                'submitted_at_str': sub_h.strftime('%Y-%m-%d %H:%M') if sub_h and hasattr(sub_h, 'strftime') else 'N/A',
-                'accuracy_percent': st_h['accuracy_percent'],
-                'total_time_sec': round((att.total_time_ms or 0) / 1000, 0),
-            })
+    if exam_ids:
+        hist_q = db.session.query(DiagAttempt).filter(
+            DiagAttempt.status == 'finished',
+            DiagAttempt.exam_id.in_(exam_ids),
+        )
+        if user:
+            hist_q = hist_q.filter(DiagAttempt.user_id == user.id)
+        else:
+            hist_q = hist_q.filter(DiagAttempt.guest_student_id == guest.id)
+        for att in hist_q.order_by(DiagAttempt.finished_at.desc()).all():
+            if att.exam_id not in prev_by_exam:
+                prev_by_exam[att.exam_id] = []
+            prev_by_exam[att.exam_id].append(att)
+            if att.exam_id not in exam_history_by_exam:
+                exam_history_by_exam[att.exam_id] = []
+            if len(exam_history_by_exam[att.exam_id]) < 10:
+                st_h = _attempt_quick_stats(att, db)
+                sub_h = getattr(att, 'finished_at', None)
+                exam_history_by_exam[att.exam_id].append({
+                    'attempt_id': att.id,
+                    'submitted_at_str': sub_h.strftime('%Y-%m-%d %H:%M') if sub_h and hasattr(sub_h, 'strftime') else 'N/A',
+                    'accuracy_percent': st_h['accuracy_percent'],
+                    'total_time_sec': round((att.total_time_ms or 0) / 1000, 0),
+                })
 
     items = []
     for att in attempts:
@@ -826,9 +969,13 @@ def reports():
 
         ps = att.practice_sets[-1] if att.practice_sets else None
         practice_completed = False
-        if ps and user.id:
+        if ps and user:
             practice_completed = db.session.query(DiagPracticeAttempt).filter_by(
                 practice_set_id=ps.id, user_id=user.id
+            ).first() is not None
+        elif ps and guest:
+            practice_completed = db.session.query(DiagPracticeAttempt).filter_by(
+                practice_set_id=ps.id, guest_student_id=guest.id
             ).first() is not None
         practice_info = {'exists': ps is not None, 'practice_set_id': ps.id if ps else None, 'completed': practice_completed}
 
@@ -918,11 +1065,12 @@ def reports():
         'competitions': competitions,
         'exams_by_comp': exams_by_comp,
     }
-    return render_template('diagnostic/report_center.html', reports_view=reports_view, user=user)
+    display_user = user if user else SimpleNamespace(username=guest.name, id=guest.id, is_guest=True)
+    return render_template('diagnostic/report_center.html', reports_view=reports_view, user=display_user)
 
 
 @diagnostic_bp.route('/exams/<int:exam_id>/start', methods=['GET', 'POST'])
-@require_diag_login
+@require_diag_access
 def start_exam(exam_id):
     db = _get_db()
     from app import DiagExam, DiagExamQuestion, DiagAttempt, DiagAttemptAnswer
@@ -933,6 +1081,9 @@ def start_exam(exam_id):
         flash('该试卷未发布', 'error')
         return redirect(url_for('diagnostic.exams'))
     user = get_diag_user_from_cookie()
+    if not user:
+        flash('公开测评请使用首页入口；注册学员可从试卷中心开始答题。', 'info')
+        return redirect(url_for('diagnostic.reports'))
 
     in_progress = db.session.query(DiagAttempt).filter_by(
         user_id=user.id, exam_id=exam_id, status='in_progress'
@@ -944,7 +1095,7 @@ def start_exam(exam_id):
         user_id=user.id, exam_id=exam_id, status='finished'
     ).order_by(DiagAttempt.finished_at.desc()).first()
     retry_policy = _compute_retry_policy(last_finished.finished_at if last_finished else None)
-    if not retry_policy['can_retry'] and last_finished:
+    if not _is_placement_exam(exam) and (not retry_policy['can_retry'] and last_finished):
         next_str = retry_policy['next_retry_at'].strftime('%Y-%m-%d') if retry_policy.get('next_retry_at') and hasattr(retry_policy['next_retry_at'], 'strftime') else 'N/A'
         flash('距离上次完成不足 4 个月，可在 %s 后重做。每份试卷每 4 个月可重做一次。' % next_str, 'warning')
         return redirect(url_for('diagnostic.report', attempt_id=last_finished.id))
@@ -955,7 +1106,13 @@ def start_exam(exam_id):
         if not order:
             flash('该试卷暂无题目', 'error')
             return redirect(url_for('diagnostic.exams'))
-        attempt = DiagAttempt(user_id=user.id, exam_id=exam_id, status='in_progress')
+        attempt = DiagAttempt(
+            user_id=user.id,
+            guest_student_id=None,
+            exam_id=exam_id,
+            status='in_progress',
+            placement_level=getattr(exam, 'diag_placement_level', None),
+        )
         db.session.add(attempt)
         db.session.flush()
         for eq in order:
@@ -967,17 +1124,18 @@ def start_exam(exam_id):
 
 
 @diagnostic_bp.route('/attempt/<int:attempt_id>', methods=['GET', 'POST'])
-@require_diag_login
+@require_diag_access
 def attempt(attempt_id):
     db = _get_db()
-    from app import DiagAttempt, DiagAttemptAnswer, DiagExam, DiagExamQuestion, DiagQuestion
+    from app import DiagAttempt, DiagAttemptAnswer, DiagExam, DiagExamQuestion, DiagQuestion, DiagQuestionAnswer
     att = db.session.get(DiagAttempt, attempt_id)
     if not att:
         abort(404)
     user = get_diag_user_from_cookie()
-    if att.user_id != user.id:
+    guest = get_guest_student_from_cookie()
+    if not _attempt_owned_by(att, user, guest):
         flash('无权访问该答题记录', 'error')
-        return redirect(url_for('diagnostic.exams'))
+        return redirect(url_for('diagnostic.exams') if user else url_for('diagnostic.reports'))
     if att.status != 'in_progress':
         return redirect(url_for('diagnostic.report', attempt_id=attempt_id))
 
@@ -1010,6 +1168,8 @@ def attempt(attempt_id):
         if action == 'submit':
             att.status = 'finished'
             att.finished_at = datetime.utcnow()
+            if not getattr(att, 'share_token', None):
+                att.share_token = secrets.token_urlsafe(32)[:64]
             _grade_attempt(attempt_id)
             _build_practice_set(attempt_id)
             db.session.commit()
@@ -1021,6 +1181,11 @@ def attempt(attempt_id):
             prev_i = max(q_index - 1, 0)
             return redirect(url_for('diagnostic.attempt', attempt_id=attempt_id, q=prev_i))
 
+    imp_row = db.session.query(DiagQuestionAnswer).filter_by(
+        exam_id=att.exam_id, q_index=current_eq.q_index
+    ).first()
+    question_type = diag_question_ui_type(imp_row, question)
+
     choices = []
     if question.choices_json:
         try:
@@ -1031,6 +1196,11 @@ def attempt(attempt_id):
                 choices = raw
         except Exception:
             pass
+    if not choices and question_type == 'choice':
+        parsed = parse_mcq_options_from_stem(question.stem_text)
+        if parsed:
+            order = ['A', 'B', 'C', 'D', 'E']
+            choices = [{'key': k, 'text': parsed[k]} for k in order if k in parsed]
     if not choices:
         choices = [{'key': c, 'text': c} for c in ('A', 'B', 'C', 'D', 'E')]
 
@@ -1044,6 +1214,7 @@ def attempt(attempt_id):
         exam=att.exam,
         order=order,
         question=question,
+        question_type=question_type,
         q_index=q_index,
         total=len(order),
         answer_rec=answer_rec,
@@ -1072,9 +1243,20 @@ def _grade_attempt(attempt_id):
             key_src = (imp.correct_answer or '').strip()
         elif q and (q.answer_key or '').strip():
             key_src = (q.answer_key or '').strip()
-        key_norm = _normalize_diag_answer_for_compare(key_src) if key_src else ''
-        ans_norm = _normalize_diag_answer_for_compare(aa.answer)
-        aa.is_correct = (key_norm == ans_norm) if key_src else None
+        ui_type = diag_question_ui_type(imp, q)
+        if ui_type == 'choice' and key_src:
+            ok = mcq_answers_equivalent(
+                aa.answer, key_src,
+                q.choices_json if q else None,
+                q.stem_text if q else None,
+            )
+            aa.is_correct = ok
+        elif key_src:
+            key_norm = _normalize_diag_answer_for_compare(key_src)
+            ans_norm = _normalize_diag_answer_for_compare(aa.answer)
+            aa.is_correct = (key_norm == ans_norm)
+        else:
+            aa.is_correct = None
 
 
 def _build_practice_set(attempt_id):
@@ -1093,7 +1275,11 @@ def _build_practice_set(attempt_id):
     ]
     if not wrong_question_ids:
         return
-    ps = DiagPracticeSet(user_id=att.user_id, attempt_id=att.id)
+    ps = DiagPracticeSet(
+        user_id=att.user_id,
+        guest_student_id=att.guest_student_id,
+        attempt_id=att.id,
+    )
     db.session.add(ps)
     db.session.flush()
     seen = set()
@@ -2125,7 +2311,7 @@ def _compute_expert_diagnosis(ctx):
     }
 
 
-def _build_report_data(att, user, db):
+def _build_report_data(att, user, db, guest_student=None):
     """组装报告数据结构，缺失字段安全降级为 N/A 或空。优先使用 CSV 导入的答案/解析/知识点。"""
     from sqlalchemy import func
     from app import (DiagAttempt, DiagAttemptAnswer, DiagExamQuestion, DiagQuestion,
@@ -2263,9 +2449,13 @@ def _build_report_data(att, user, db):
     est_minutes = max(1, ps_count * 2)
     ps_kps = list(set(kp_stats.keys()))[:5]
     practice_completed = False
-    if practice_set and user and user.id:
+    if practice_set and user and getattr(user, 'id', None):
         practice_completed = db.session.query(DiagPracticeAttempt).filter_by(
             practice_set_id=practice_set.id, user_id=user.id
+        ).first() is not None
+    elif practice_set and guest_student and getattr(guest_student, 'id', None):
+        practice_completed = db.session.query(DiagPracticeAttempt).filter_by(
+            practice_set_id=practice_set.id, guest_student_id=guest_student.id
         ).first() is not None
     # 总排名位置（百分比）：同试卷已完成尝试中，得分率超过多少比例的人 → 显示为「前 X%」
     rank_top_percent = None
@@ -2326,7 +2516,7 @@ def _build_report_data(att, user, db):
 
 
 @diagnostic_bp.route('/report/<int:attempt_id>')
-@require_diag_login
+@require_diag_access
 def report(attempt_id):
     db = _get_db()
     from app import DiagAttempt
@@ -2334,10 +2524,12 @@ def report(attempt_id):
     if not att:
         abort(404)
     user = get_diag_user_from_cookie()
-    if att.user_id != user.id:
+    guest = get_guest_student_from_cookie()
+    if not _attempt_owned_by(att, user, guest):
         flash('无权访问', 'error')
-        return redirect(url_for('diagnostic.exams'))
-    report_data = _build_report_data(att, user, db)
+        return redirect(url_for('diagnostic.exams') if user else url_for('diagnostic.reports'))
+    report_user = _report_user_proxy(att, db)
+    report_data = _build_report_data(att, report_user, db, guest_student=guest)
     report_data['attempt'] = att
     report_data['chart_radar_labels'] = [r['category'] for r in report_data['kp_radar']]
     report_data['chart_radar_values'] = [r['value_0to100'] for r in report_data['kp_radar']]
@@ -2359,6 +2551,45 @@ def report(attempt_id):
         report_data['display_rank_top_percent'] = round(100 - report_data['benchmark_summary']['percentile_estimate'], 1)
     else:
         report_data['display_rank_top_percent'] = report_data.get('rank_top_percent')
+    if getattr(att, 'share_token', None):
+        report_data['share_report_url'] = url_for('diagnostic.report_shared', token=att.share_token, _external=True)
+    else:
+        report_data['share_report_url'] = None
+    return render_template('diagnostic/report.html', **report_data)
+
+
+@diagnostic_bp.route('/report/shared/<token>')
+def report_shared(token):
+    """无需登录：凭交卷后生成的 share_token 查看报告。"""
+    db = _get_db()
+    from app import DiagAttempt
+    att = db.session.query(DiagAttempt).filter_by(share_token=token, status='finished').first()
+    if not att:
+        abort(404)
+    report_user = _report_user_proxy(att, db)
+    report_data = _build_report_data(att, report_user, db, guest_student=None)
+    report_data['attempt'] = att
+    report_data['chart_radar_labels'] = [r['category'] for r in report_data['kp_radar']]
+    report_data['chart_radar_values'] = [r['value_0to100'] for r in report_data['kp_radar']]
+    report_data['expert_diag'] = _compute_expert_diagnosis(report_data)
+    from diagnostic.roadmap_config import infer_contest_key
+    from diagnostic.benchmark import get_benchmark_summary
+    exam = getattr(att, 'exam', None)
+    comp = getattr(exam, 'competition', None) if exam else None
+    comp_name = getattr(comp, 'name', None) if comp else None
+    exam_title = getattr(exam, 'title', None) or ''
+    contest_key = infer_contest_key(comp_name, exam_title)
+    if contest_key and report_data.get('score') is not None:
+        report_data['benchmark_summary'] = get_benchmark_summary(contest_key, float(report_data['score']), db)
+    else:
+        report_data['benchmark_summary'] = None
+    if report_data.get('benchmark_summary'):
+        report_data['display_rank_top_percent'] = round(100 - report_data['benchmark_summary']['percentile_estimate'], 1)
+    else:
+        report_data['display_rank_top_percent'] = report_data.get('rank_top_percent')
+    report_data['user'] = None
+    report_data['admin_view'] = False
+    report_data['shared_view'] = True
     return render_template('diagnostic/report.html', **report_data)
 
 
@@ -2452,7 +2683,7 @@ def _practice_questions_from_items(db, items):
 
 
 @diagnostic_bp.route('/practice/<int:practice_set_id>')
-@require_diag_login
+@require_diag_access
 def practice(practice_set_id):
     db = _get_db()
     from app import DiagPracticeSet, DiagPracticeSetItem, DiagBankQuestion, DiagPracticeAttempt
@@ -2461,14 +2692,26 @@ def practice(practice_set_id):
     if not ps:
         abort(404)
     user = get_diag_user_from_cookie()
-    if ps.user_id != user.id:
+    guest = get_guest_student_from_cookie()
+    if user and ps.user_id != user.id:
         flash('无权访问', 'error')
         return redirect(url_for('diagnostic.exams'))
+    if guest and ps.guest_student_id != guest.id:
+        flash('无权访问', 'error')
+        return redirect(url_for('diagnostic.reports'))
+    if not user and not guest:
+        flash('无权访问', 'error')
+        return redirect(url_for('diagnostic.login'))
     items = db.session.query(DiagPracticeSetItem).filter_by(practice_set_id=practice_set_id).order_by(DiagPracticeSetItem.q_index).all()
     # 是否已提交过：每人每练习包只能提交一次
-    attempt = db.session.query(DiagPracticeAttempt).filter_by(
-        practice_set_id=practice_set_id, user_id=user.id
-    ).first()
+    if user:
+        attempt = db.session.query(DiagPracticeAttempt).filter_by(
+            practice_set_id=practice_set_id, user_id=user.id
+        ).first()
+    else:
+        attempt = db.session.query(DiagPracticeAttempt).filter_by(
+            practice_set_id=practice_set_id, guest_student_id=guest.id
+        ).first()
     if attempt:
         # 已完成：直接显示得分与每题对错、答案、解析
         answers_map = {}
@@ -2520,7 +2763,7 @@ def practice(practice_set_id):
 
 
 @diagnostic_bp.route('/practice/<int:practice_set_id>/submit', methods=['POST'])
-@require_diag_login
+@require_diag_access
 def practice_submit(practice_set_id):
     """练习包提交：保存答案，每人每包只能提交一次。"""
     db = _get_db()
@@ -2529,12 +2772,21 @@ def practice_submit(practice_set_id):
     if not ps:
         abort(404)
     user = get_diag_user_from_cookie()
-    if ps.user_id != user.id:
+    guest = get_guest_student_from_cookie()
+    if user and ps.user_id != user.id:
         flash('无权访问', 'error')
         return redirect(url_for('diagnostic.exams'))
-    existing = db.session.query(DiagPracticeAttempt).filter_by(
-        practice_set_id=practice_set_id, user_id=user.id
-    ).first()
+    if guest and ps.guest_student_id != guest.id:
+        flash('无权访问', 'error')
+        return redirect(url_for('diagnostic.reports'))
+    if user:
+        existing = db.session.query(DiagPracticeAttempt).filter_by(
+            practice_set_id=practice_set_id, user_id=user.id
+        ).first()
+    else:
+        existing = db.session.query(DiagPracticeAttempt).filter_by(
+            practice_set_id=practice_set_id, guest_student_id=guest.id
+        ).first()
     if existing:
         flash('该练习包已提交过，不可重复提交。', 'info')
         return redirect(url_for('diagnostic.practice', practice_set_id=practice_set_id))
@@ -2546,7 +2798,8 @@ def practice_submit(practice_set_id):
             answers[str(it.id)] = str(val).strip()
     attempt = DiagPracticeAttempt(
         practice_set_id=practice_set_id,
-        user_id=user.id,
+        user_id=user.id if user else None,
+        guest_student_id=guest.id if guest else None,
         answers_json=json.dumps(answers, ensure_ascii=False),
     )
     db.session.add(attempt)
