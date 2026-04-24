@@ -32,10 +32,14 @@
         </li>
         {% if user %}
         <li class="diag-nav__item"><span class="diag-nav__user">{{ user.username }}</span></li>
-        <li class="diag-nav__item"><a class="diag-nav__link" href="{{ url_for('diagnostic.logout') }}">退出</a></li>
+        <li class="diag-nav__item">
+          <a class="btn btn-sm btn-outline-danger" href="{{ url_for('diagnostic.logout') }}">logout</a>
+        </li>
         {% elif guest_student %}
         <li class="diag-nav__item"><span class="diag-nav__user">{{ guest_student.name }}（{{ guest_student.grade }}）</span></li>
-        <li class="diag-nav__item"><a class="diag-nav__link" href="{{ url_for('diagnostic.logout') }}">退出</a></li>
+        <li class="diag-nav__item">
+          <a class="btn btn-sm btn-outline-danger" href="{{ url_for('diagnostic.logout') }}">logout</a>
+        </li>
         {% else %}
         <li class="diag-nav__item"><a class="diag-nav__link {% if request.endpoint == 'diagnostic.login' %}diag-nav__link--active{% endif %}" href="{{ url_for('diagnostic.login') }}">测评入口</a></li>
         <li class="diag-nav__item"><a class="diag-nav__link text-muted small" href="{{ url_for('diagnostic.legacy_login') }}">学员登录</a></li>
