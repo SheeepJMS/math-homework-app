@@ -64,6 +64,14 @@
                                             <a href="{{ url_for('lesson_students', lesson_id=lesson.id) }}" class="btn btn-info">
                                                 <i class="fas fa-users"></i> 学生
                                             </a>
+                                            <button type="button"
+                                                    class="btn {% if lesson.kp_notes_image_url %}btn-success{% else %}btn-outline-secondary{% endif %}"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#kpNotesModal{{ lesson.id }}"
+                                                    title="上传一张知识点笔记图片，学生端将显示「知识点」按钮">
+                                                <i class="fas fa-book"></i> 知识点笔记
+                                                {% if lesson.kp_notes_image_url %}<span class="badge bg-light text-success ms-1">已上传</span>{% endif %}
+                                            </button>
                                         </div>
                                         <div class="btn-group btn-group-sm" role="group">
                                             {% if lesson.video_url %}
@@ -101,6 +109,35 @@
                                             </button>
                                         </div>
                                     </div>
+                                </div>
+                                <!-- 知识点笔记模态框 -->
+                                <div class="modal fade" id="kpNotesModal{{ lesson.id }}" tabindex="-1">
+                                  <div class="modal-dialog">
+                                    <div class="modal-content">
+                                      <div class="modal-header">
+                                        <h5 class="modal-title">知识点笔记 — {{ lesson.title }}</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                      </div>
+                                      <div class="modal-body">
+                                        {% if lesson.kp_notes_image_url %}
+                                        <p class="text-muted small mb-2">当前已上传预览：</p>
+                                        <div class="mb-3 border rounded p-2 text-center bg-light">
+                                          <img src="{{ lesson.kp_notes_image_url }}" alt="知识点笔记" class="img-fluid" style="max-height:220px;">
+                                        </div>
+                                        <form action="{{ url_for('clear_lesson_kp_notes', lesson_id=lesson.id) }}" method="post" class="mb-3" onsubmit="return confirm('确定清除知识点笔记？清除后学生端将不再显示「知识点」按钮。');">
+                                          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                          <button type="submit" class="btn btn-outline-danger btn-sm">清除图片</button>
+                                        </form>
+                                        {% endif %}
+                                        <p class="small text-muted mb-2">上传一张图片（ png / jpg / jpeg / gif ），将覆盖已有图片。</p>
+                                        <form action="{{ url_for('upload_lesson_kp_notes', lesson_id=lesson.id) }}" method="post" enctype="multipart/form-data">
+                                          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                          <input type="file" name="kp_notes_image" accept=".png,.jpg,.jpeg,.gif,image/png,image/jpeg,image/gif" class="form-control mb-3" required>
+                                          <button type="submit" class="btn btn-primary">上传并保存</button>
+                                        </form>
+                                      </div>
+                                    </div>
+                                  </div>
                                 </div>
                                 <!-- 上传课件模态框 -->
                                 <div class="modal fade" id="uploadCoursewareModal{{ lesson.id }}" tabindex="-1">
@@ -362,7 +399,7 @@
 
 /* 操作列：宽一点，固定2行按钮，统一行高 */
 .col-actions, .td-actions {
-    min-width: 520px;
+    min-width: 600px;
     vertical-align: middle;
 }
 .td-actions {

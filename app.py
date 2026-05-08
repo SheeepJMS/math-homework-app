@@ -203,6 +203,8 @@ class Lesson(db.Model):
     description = db.Column(db.String(200))  # 课程描述
     is_active = db.Column(db.Boolean, default=False)  # 是否当前显示
     video_url = db.Column(db.String(500))  # 视频回放链接
+    # 管理员上传的知识点笔记（单图 URL）；空则学生端不显示「知识点」按钮
+    kp_notes_image_url = db.Column(db.String(512), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     questions = db.relationship('Question', backref='lesson', lazy=True)
 
@@ -1267,6 +1269,57 @@ def student_dashboard():
                          history_data=history_data,
                          trend_data=json.dumps(trend_data),
                          lessons=available_lessons)
+
+@app.route('/admin/lesson/<int:lesson_id>/kp_notes', methods=['POST'])
+@admin_required
+def upload_lesson_kp_notes(lesson_id):
+    """上传单个课程的知识点笔记图片（写入 Cloudinary URL）。"""
+    lesson = Lesson.query.get_or_404(lesson_id)
+    file = request.files.get('kp_notes_image')
+    if not file or not file.filename:
+        flash('请选择图片文件', 'error')
+        return redirect(url_for('admin_lessons'))
+    ext_ok = allowed_file(file.filename, ALLOWED_IMAGE_EXTENSIONS)
+    if not ext_ok:
+        flash('仅支持 png / jpg / jpeg / gif 图片', 'error')
+        return redirect(url_for('admin_lessons'))
+    url = upload_to_cloudinary(file, resource_type='image')
+    if not url:
+        flash('上传失败，请稍后重试', 'error')
+        return redirect(url_for('admin_lessons'))
+    lesson.kp_notes_image_url = url
+    db.session.commit()
+    flash('知识点笔记已保存', 'success')
+    return redirect(url_for('admin_lessons'))
+
+@app.route('/admin/lesson/<int:lesson_id>/kp_notes/clear', methods=['POST'])
+@admin_required
+def clear_lesson_kp_notes(lesson_id):
+    lesson = Lesson.query.get_or_404(lesson_id)
+    lesson.kp_notes_image_url = None
+    db.session.commit()
+    flash('已清除知识点笔记', 'info')
+    return redirect(url_for('admin_lessons'))
+
+@app.route('/student/lesson/<int:lesson_id>/kp_notes')
+@login_required
+def student_lesson_kp_notes(lesson_id):
+    """学生查看知识点笔记图（须属于该生班级关联课程）；管理员可随时预览。"""
+    lesson = Lesson.query.get_or_404(lesson_id)
+    if not (lesson.kp_notes_image_url or '').strip():
+        flash('暂无知识点笔记', 'warning')
+        return redirect(url_for('student_dashboard'))
+    if getattr(current_user, 'is_admin', False):
+        return render_template('student/kp_notes_image.html',
+                               lesson_title=lesson.title,
+                               image_url=lesson.kp_notes_image_url.strip())
+    user_class = Class.query.get(current_user.class_id)
+    if not user_class or user_class not in lesson.classes:
+        flash('无权查看该内容', 'error')
+        return redirect(url_for('student_dashboard'))
+    return render_template('student/kp_notes_image.html',
+                           lesson_title=lesson.title,
+                           image_url=lesson.kp_notes_image_url.strip())
 
 @app.route('/admin/lesson/<int:lesson_id>/edit', methods=['POST'])
 @admin_required

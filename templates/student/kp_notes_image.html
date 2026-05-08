@@ -1,0 +1,16 @@
+{% extends "student/base.html" %}
+{% block title %}知识点 · {{ lesson_title }}{% endblock %}
+{% block content %}
+<div class="container py-4">
+    <div class="mb-3">
+        <a href="javascript:history.back()" class="btn btn-outline-secondary btn-sm">返回</a>
+    </div>
+    <h4 class="mb-3">{{ lesson_title }} — 知识点笔记</h4>
+    <div class="kp-notes-frame border rounded overflow-hidden bg-white shadow-sm">
+        <img src="{{ image_url }}" alt="知识点笔记" class="img-fluid w-100 d-block" loading="lazy">
+    </div>
+</div>
+<style>
+.kp-notes-frame { max-width: 100%; }
+</style>
+{% endblock %}
