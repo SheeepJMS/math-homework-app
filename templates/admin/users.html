@@ -98,7 +98,11 @@
                                                 </button>
                                             </form>
                                             <!-- 编辑用户名按钮 -->
-                                            <button type="button" class="btn btn-warning btn-sm ms-2" onclick="openEditUserModal('{{ user.id }}', '{{ user.username }}', '{{ user.class_id }}')">
+                                            <button type="button" class="btn btn-warning btn-sm ms-2 edit-user-btn"
+                                                    data-user-id="{{ user.id }}"
+                                                    data-username="{{ user.username }}"
+                                                    data-class-id="{{ user.class_id }}"
+                                                    data-report-link="{{ user.report_link or '' }}">
                                                 <i class="fas fa-edit"></i> 编辑
                                             </button>
                                             {% endif %}
@@ -190,6 +194,10 @@
                             <option value="{{ c.id }}">{{ c.name }}</option>
                             {% endfor %}
                         </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editReportLink" class="form-label">报告链接</label>
+                        <input type="text" class="form-control" id="editReportLink" name="report_link" placeholder="https://">
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -289,13 +297,19 @@ document.addEventListener('DOMContentLoaded', function() {
     
     roleSelect.addEventListener('change', toggleClassSelection);
     toggleClassSelection();
+
+    document.querySelectorAll('.edit-user-btn').forEach(btn => {
+        btn.addEventListener('click', () => openEditUserModal(btn));
+    });
 });
 
-function openEditUserModal(userId, username, classId) {
+function openEditUserModal(btn) {
     const form = document.getElementById('editUserForm');
+    const userId = btn.dataset.userId;
     form.action = `/admin/user/${userId}/edit`;
-    document.getElementById('editUsername').value = username;
-    document.getElementById('editClass').value = classId;
+    document.getElementById('editUsername').value = btn.dataset.username;
+    document.getElementById('editClass').value = btn.dataset.classId;
+    document.getElementById('editReportLink').value = btn.dataset.reportLink || '';
     new bootstrap.Modal(document.getElementById('editUserModal')).show();
 }
 
@@ -386,6 +400,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     const usernameCell = document.querySelector(`tr[data-user-id="${userId}"] td:first-child`);
                     if (usernameCell) {
                         usernameCell.textContent = formData.get('username');
+                    }
+
+                    const editBtn = document.querySelector(`.edit-user-btn[data-user-id="${userId}"]`);
+                    if (editBtn) {
+                        editBtn.dataset.username = formData.get('username');
+                        editBtn.dataset.classId = formData.get('class_id');
+                        editBtn.dataset.reportLink = formData.get('report_link') || '';
                     }
                     
                     // 恢复页面位置

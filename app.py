@@ -255,6 +255,7 @@ class User(UserMixin, db.Model):
     class_id = db.Column(db.Integer, db.ForeignKey('class.id'))
     achievement_count = db.Column(db.Integer, default=0)  # 达标次数（80%以上正确率）
     badge_level = db.Column(db.Integer, default=0)  # 徽章等级，默认为0（无徽章）
+    report_link = db.Column(db.String(500), nullable=True)  # 课堂智能报告链接
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
@@ -3042,6 +3043,7 @@ def edit_user(user_id):
 
     username = request.form.get('username')
     class_id = request.form.get('class_id')
+    report_link = (request.form.get('report_link') or '').strip() or None
 
     if not username or not class_id:
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -3059,6 +3061,7 @@ def edit_user(user_id):
 
     user.username = username
     user.class_id = class_id
+    user.report_link = report_link
     
     try:
         db.session.commit()

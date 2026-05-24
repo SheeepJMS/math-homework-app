@@ -77,7 +77,14 @@
 
     <!-- 趋势图 -->
     <div class="card trend-card">
-        <h2>正确率趋势</h2>
+        <div class="trend-card-header">
+            <h2>正确率趋势</h2>
+            {% if current_user.report_link %}
+            <button type="button" class="btn btn-primary btn-lg class-report-btn" data-report-url="{{ current_user.report_link }}">
+                <i class="fas fa-chart-line"></i> 课堂智能报告
+            </button>
+            {% endif %}
+        </div>
         <div class="chart-container">
             <canvas id="trendChart"></canvas>
         </div>
@@ -369,6 +376,25 @@
     padding: 20px;
     margin-bottom: 20px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.trend-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 10px;
+}
+
+.trend-card-header h2 {
+    margin: 0;
+}
+
+.class-report-btn {
+    white-space: nowrap;
+    font-weight: 600;
+    padding: 10px 24px;
+    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.25);
 }
 
 .chart-container {
@@ -666,6 +692,16 @@
 
     document.addEventListener('DOMContentLoaded', function() {
         renderTrendChart();
+
+        const reportBtn = document.querySelector('.class-report-btn');
+        if (reportBtn) {
+            reportBtn.addEventListener('click', function() {
+                const url = this.dataset.reportUrl;
+                if (url) {
+                    window.open(url, '_blank', 'noopener,noreferrer,width=1200,height=800');
+                }
+            });
+        }
     });
 </script>
 {% endblock %} 
