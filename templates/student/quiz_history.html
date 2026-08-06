@@ -98,18 +98,26 @@
                             {% else %}填空题{% endif %}
                         </span>
                     </div>
-                    <div class="result-badge {% if answer.is_correct %}correct{% else %}incorrect{% endif %}">
-                        <i class="fas {% if answer.is_correct %}fa-check{% else %}fa-times{% endif %}"></i>
-                        {{ '正确' if answer.is_correct else '错误' }}
-                        {% if is_admin_view %}
-                        <form action="{{ url_for('mark_answer', user_answer_id=answer.id) }}" method="post" style="display:inline; margin-left:10px;">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="is_correct" value="{{ not answer.is_correct }}">
-                            <button type="submit" class="btn btn-sm {% if answer.is_correct %}btn-danger{% else %}btn-success{% endif %}">
-                                {% if answer.is_correct %}改为错{% else %}改为对{% endif %}
-                            </button>
-                        </form>
-                        {% endif %}
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button"
+                                class="btn btn-sm btn-outline-info ai-tutor-btn"
+                                data-answer-id="{{ answer.id }}"
+                                data-qnum="{{ answer.question.question_number }}">
+                            <i class="fas fa-chalkboard-teacher"></i> AI 答疑
+                        </button>
+                        <div class="result-badge {% if answer.is_correct %}correct{% else %}incorrect{% endif %}">
+                            <i class="fas {% if answer.is_correct %}fa-check{% else %}fa-times{% endif %}"></i>
+                            {{ '正确' if answer.is_correct else '错误' }}
+                            {% if is_admin_view %}
+                            <form action="{{ url_for('mark_answer', user_answer_id=answer.id) }}" method="post" style="display:inline; margin-left:10px;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="is_correct" value="{{ not answer.is_correct }}">
+                                <button type="submit" class="btn btn-sm {% if answer.is_correct %}btn-danger{% else %}btn-success{% endif %}">
+                                    {% if answer.is_correct %}改为错{% else %}改为对{% endif %}
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
                 <div class="card-body">
@@ -179,12 +187,85 @@
     </div>
 </div>
 
+<!-- AI 导学弹窗 -->
+<div class="modal fade" id="aiTutorModal" tabindex="-1" aria-labelledby="aiTutorModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="aiTutorModalLabel">AI 答疑</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted small">AI 会结合题目与解析一步步提问引导你。</span>
+                    <span class="badge bg-secondary" id="aiTutorTurns">0/10</span>
+                </div>
+                <div id="aiTutorChat" class="ai-tutor-chat"></div>
+                <div id="aiTutorFallback" class="alert alert-warning d-none mb-0 mt-3" role="alert">
+                    该题需要询问老师答疑
+                </div>
+            </div>
+            <div class="modal-footer flex-column align-items-stretch">
+                <div class="input-group">
+                    <input type="text" class="form-control" id="aiTutorInput" placeholder="写下你的想法或疑问…" maxlength="2000" autocomplete="off">
+                    <button class="btn btn-primary" type="button" id="aiTutorSend">发送</button>
+                </div>
+                <div class="form-text" id="aiTutorStatus"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <style>
 .section-title {
     color: #495057;
     margin-bottom: 1rem;
     padding-bottom: 0.5rem;
     border-bottom: 2px solid #e9ecef;
+}
+
+.ai-tutor-chat {
+    min-height: 280px;
+    max-height: 50vh;
+    overflow-y: auto;
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.ai-tutor-bubble {
+    max-width: 88%;
+    margin-bottom: 10px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 0.95rem;
+    line-height: 1.45;
+}
+
+.ai-tutor-bubble.assistant {
+    background: #fff;
+    border: 1px solid #e9ecef;
+    margin-right: auto;
+}
+
+.ai-tutor-bubble.user {
+    background: #0d6efd;
+    color: #fff;
+    margin-left: auto;
+}
+
+.ai-tutor-bubble.system {
+    background: #fff3cd;
+    border: 1px solid #ffecb5;
+    margin: 0 auto 10px;
+    max-width: 100%;
+    text-align: center;
+}
+
+.ai-tutor-btn {
+    white-space: nowrap;
 }
 
 .question-image-container,
@@ -346,6 +427,179 @@ document.addEventListener('DOMContentLoaded', function() {
             localStorage.setItem('quiz_history_scrollY', String(window.scrollY || 0));
         });
     });
+
+    // —— AI 导学 ——
+    const CSRF = '{{ csrf_token() }}';
+    const TEACHER_MSG = '该题需要询问老师答疑';
+    const modalEl = document.getElementById('aiTutorModal');
+    if (!modalEl) return;
+
+    const modal = new bootstrap.Modal(modalEl);
+    const chatEl = document.getElementById('aiTutorChat');
+    const inputEl = document.getElementById('aiTutorInput');
+    const sendBtn = document.getElementById('aiTutorSend');
+    const turnsEl = document.getElementById('aiTutorTurns');
+    const statusEl = document.getElementById('aiTutorStatus');
+    const fallbackEl = document.getElementById('aiTutorFallback');
+    const titleEl = document.getElementById('aiTutorModalLabel');
+
+    let state = {
+        answerId: null,
+        messages: [],
+        turnsUsed: 0,
+        turnsMax: 10,
+        locked: false,
+        busy: false
+    };
+
+    function setTurns(used, max) {
+        state.turnsUsed = used;
+        state.turnsMax = max || 10;
+        turnsEl.textContent = used + '/' + state.turnsMax;
+    }
+
+    function setLocked(locked, reason) {
+        state.locked = locked;
+        inputEl.disabled = locked || state.busy;
+        sendBtn.disabled = locked || state.busy;
+        if (reason) statusEl.textContent = reason;
+    }
+
+    function setBusy(busy) {
+        state.busy = busy;
+        inputEl.disabled = busy || state.locked;
+        sendBtn.disabled = busy || state.locked;
+        statusEl.textContent = busy ? 'AI 思考中…' : (state.locked ? statusEl.textContent : '');
+    }
+
+    function appendBubble(role, text) {
+        const div = document.createElement('div');
+        div.className = 'ai-tutor-bubble ' + role;
+        div.textContent = text;
+        chatEl.appendChild(div);
+        chatEl.scrollTop = chatEl.scrollHeight;
+    }
+
+    function showTeacherFallback() {
+        fallbackEl.classList.remove('d-none');
+        appendBubble('system', TEACHER_MSG);
+        setLocked(true, '答疑已结束');
+    }
+
+    function resetUi(qnum) {
+        state.messages = [];
+        state.locked = false;
+        state.busy = false;
+        chatEl.innerHTML = '';
+        fallbackEl.classList.add('d-none');
+        inputEl.value = '';
+        titleEl.textContent = '第' + qnum + '题 · AI 答疑';
+        setTurns(0, 10);
+        setLocked(false, '');
+        statusEl.textContent = '';
+    }
+
+    async function apiPost(url, body) {
+        const resp = await fetch(url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': CSRF
+            },
+            body: JSON.stringify(body)
+        });
+        let data = null;
+        try {
+            data = await resp.json();
+        } catch (e) {
+            data = null;
+        }
+        if (!resp.ok && (!data || !data.reply)) {
+            throw new Error('http_' + resp.status);
+        }
+        return data || { ok: false, can_teach: false, reply: TEACHER_MSG, done: true };
+    }
+
+    async function startSession(answerId, qnum) {
+        resetUi(qnum);
+        state.answerId = answerId;
+        modal.show();
+        setBusy(true);
+        try {
+            const data = await apiPost('{{ url_for("ai_tutor_start") }}', { user_answer_id: answerId });
+            setTurns(data.turns_used || 0, data.turns_max || 10);
+            if (!data.can_teach) {
+                showTeacherFallback();
+                return;
+            }
+            appendBubble('assistant', data.reply || '');
+            state.messages.push({ role: 'assistant', content: data.reply || '' });
+            if (data.done) setLocked(true, '本课答疑已结束');
+        } catch (e) {
+            showTeacherFallback();
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    async function sendMessage() {
+        if (state.locked || state.busy || !state.answerId) return;
+        const text = (inputEl.value || '').trim();
+        if (!text) return;
+        if (state.turnsUsed >= state.turnsMax) {
+            setLocked(true, '回合已用完');
+            showTeacherFallback();
+            return;
+        }
+
+        inputEl.value = '';
+        appendBubble('user', text);
+        setBusy(true);
+        try {
+            const data = await apiPost('{{ url_for("ai_tutor_chat") }}', {
+                user_answer_id: state.answerId,
+                messages: state.messages,
+                student_message: text
+            });
+            state.messages.push({ role: 'user', content: text });
+            setTurns(data.turns_used || state.turnsUsed + 1, data.turns_max || state.turnsMax);
+
+            if (!data.can_teach) {
+                showTeacherFallback();
+                return;
+            }
+            appendBubble('assistant', data.reply || '');
+            state.messages.push({ role: 'assistant', content: data.reply || '' });
+
+            if (data.done || state.turnsUsed >= state.turnsMax) {
+                setLocked(true, state.turnsUsed >= state.turnsMax ? '已达 10 回合上限' : '本课答疑已结束');
+            }
+        } catch (e) {
+            showTeacherFallback();
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    document.querySelectorAll('.ai-tutor-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const id = parseInt(btn.getAttribute('data-answer-id'), 10);
+            const qnum = btn.getAttribute('data-qnum') || '';
+            if (!id) return;
+            startSession(id, qnum);
+        });
+    });
+
+    sendBtn.addEventListener('click', sendMessage);
+    inputEl.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
 });
 </script>
-{% endblock %} 
+{% endblock %}
+
+ 

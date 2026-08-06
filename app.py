@@ -3088,6 +3088,164 @@ def ai_regrade_quiz(quiz_history_id):
         'view_history', lesson_id=quiz_history.lesson_id, user_id=quiz_history.user_id
     ))
 
+
+def _can_access_user_answer(user_answer):
+    """本人或管理员可访问该答题记录。"""
+    if not current_user.is_authenticated:
+        return False
+    if getattr(current_user, 'is_admin', False):
+        return True
+    return user_answer.user_id == current_user.id
+
+
+def _tutor_context_for_answer(user_answer):
+    """组装导学上下文；无权或不存在返回 (None, error_response)。"""
+    q = user_answer.question
+    if not q:
+        return None, (jsonify({'ok': False, 'reply': '该题需要询问老师答疑', 'can_teach': False, 'done': True}), 404)
+    exam_by_page, expl_by_page = _homework_image_maps(user_answer.lesson_id)
+    qnum = q.question_number
+    image_urls = [u for u in (exam_by_page.get(qnum), expl_by_page.get(qnum)) if u]
+    ctx = {
+        'question_type': q.type or 'fill',
+        'stem': q.content or '',
+        'correct_answer': q.answer or '',
+        'student_answer': user_answer.answer or '',
+        'was_correct': bool(user_answer.is_correct) if user_answer.is_correct is not None else None,
+        'image_urls': image_urls,
+        'qnum': qnum,
+    }
+    return ctx, None
+
+
+@app.route('/student/ai_tutor/start', methods=['POST'])
+@login_required
+def ai_tutor_start():
+    from ai_tutor import tutor_available, start_tutor, MAX_STUDENT_TURNS, TEACHER_FALLBACK
+
+    data = request.get_json(silent=True) or {}
+    answer_id = data.get('user_answer_id') or request.form.get('user_answer_id', type=int)
+    try:
+        answer_id = int(answer_id)
+    except (TypeError, ValueError):
+        return jsonify({'ok': False, 'reply': TEACHER_FALLBACK, 'can_teach': False, 'done': True}), 400
+
+    ua = UserAnswer.query.get_or_404(answer_id)
+    if not _can_access_user_answer(ua):
+        return jsonify({'ok': False, 'reply': '无权访问', 'can_teach': False, 'done': True}), 403
+
+    if not tutor_available():
+        return jsonify({
+            'ok': False,
+            'reply': TEACHER_FALLBACK,
+            'can_teach': False,
+            'done': True,
+            'turns_used': 0,
+            'turns_max': MAX_STUDENT_TURNS,
+        })
+
+    ctx, err = _tutor_context_for_answer(ua)
+    if err:
+        return err
+
+    result = start_tutor(
+        question_type=ctx['question_type'],
+        stem=ctx['stem'],
+        correct_answer=ctx['correct_answer'],
+        student_answer=ctx['student_answer'],
+        was_correct=ctx['was_correct'],
+        image_urls=ctx['image_urls'],
+    )
+    return jsonify({
+        'ok': result.get('ok', False),
+        'reply': result.get('reply') or TEACHER_FALLBACK,
+        'can_teach': bool(result.get('can_teach')),
+        'done': bool(result.get('done')),
+        'turns_used': 0,
+        'turns_max': MAX_STUDENT_TURNS,
+        'qnum': ctx['qnum'],
+    })
+
+
+@app.route('/student/ai_tutor/chat', methods=['POST'])
+@login_required
+def ai_tutor_chat():
+    from ai_tutor import tutor_available, continue_tutor, MAX_STUDENT_TURNS, TEACHER_FALLBACK
+
+    data = request.get_json(silent=True) or {}
+    answer_id = data.get('user_answer_id')
+    try:
+        answer_id = int(answer_id)
+    except (TypeError, ValueError):
+        return jsonify({'ok': False, 'reply': TEACHER_FALLBACK, 'can_teach': False, 'done': True}), 400
+
+    student_message = (data.get('student_message') or '').strip()
+    history = data.get('messages') or []
+    if not isinstance(history, list):
+        history = []
+
+    ua = UserAnswer.query.get_or_404(answer_id)
+    if not _can_access_user_answer(ua):
+        return jsonify({'ok': False, 'reply': '无权访问', 'can_teach': False, 'done': True}), 403
+
+    # 学生发言次数 = history 中 user 条数 + 本条
+    prior_user = sum(1 for h in history if isinstance(h, dict) and h.get('role') == 'user')
+    turns_used = prior_user + 1
+    if turns_used > MAX_STUDENT_TURNS:
+        return jsonify({
+            'ok': False,
+            'reply': '本课导学回合已用完。' + TEACHER_FALLBACK,
+            'can_teach': False,
+            'done': True,
+            'turns_used': MAX_STUDENT_TURNS,
+            'turns_max': MAX_STUDENT_TURNS,
+        })
+
+    if not tutor_available():
+        return jsonify({
+            'ok': False,
+            'reply': TEACHER_FALLBACK,
+            'can_teach': False,
+            'done': True,
+            'turns_used': turns_used,
+            'turns_max': MAX_STUDENT_TURNS,
+        })
+
+    ctx, err = _tutor_context_for_answer(ua)
+    if err:
+        return err
+
+    clean_history = []
+    for h in history:
+        if not isinstance(h, dict):
+            continue
+        role = h.get('role')
+        content = (h.get('content') or '').strip()
+        if role in ('assistant', 'user') and content:
+            clean_history.append({'role': role, 'content': content})
+
+    result = continue_tutor(
+        question_type=ctx['question_type'],
+        stem=ctx['stem'],
+        correct_answer=ctx['correct_answer'],
+        student_answer=ctx['student_answer'],
+        was_correct=ctx['was_correct'],
+        image_urls=ctx['image_urls'],
+        history=clean_history,
+        student_message=student_message,
+        student_turns_used=turns_used,
+    )
+    return jsonify({
+        'ok': result.get('ok', False),
+        'reply': result.get('reply') or TEACHER_FALLBACK,
+        'can_teach': bool(result.get('can_teach')),
+        'done': bool(result.get('done')),
+        'turns_used': turns_used,
+        'turns_max': MAX_STUDENT_TURNS,
+        'qnum': ctx['qnum'],
+    })
+
+
 class CoursewareFile(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     lesson_id = db.Column(db.Integer, db.ForeignKey('lesson.id'), nullable=False)
