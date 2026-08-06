@@ -27,16 +27,26 @@
                     <a class="nav-link {% if request.endpoint == 'admin_users' %}active{% endif %}" 
                        href="{{ url_for('admin_users') }}">用户管理</a>
                 </li>
-                <li class="nav-item">
-                    <a class="nav-link {% if request.endpoint and request.endpoint.startswith('diagnostic_admin') and 'diag_user' not in (request.endpoint or '') %}active{% endif %}" 
-                       href="{{ url_for('diagnostic_admin.exams') }}">诊断管理</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link {% if request.endpoint and (request.endpoint == 'diagnostic_admin.diag_users' or (request.endpoint or '').startswith('diagnostic_admin.diag_user')) %}active{% endif %}" 
-                       href="{{ url_for('diagnostic_admin.diag_users') }}">测评用户管理</a>
+            </ul>
+            <ul class="navbar-nav align-items-center">
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle {% if request.endpoint and request.endpoint.startswith('diagnostic_admin') %}active{% endif %}"
+                       href="#" id="adminMoreMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        更多
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="adminMoreMenu">
+                        <li>
+                            <a class="dropdown-item {% if request.endpoint and request.endpoint.startswith('diagnostic_admin') and 'diag_user' not in (request.endpoint or '') %}active{% endif %}"
+                               href="{{ url_for('diagnostic_admin.exams') }}">诊断管理</a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item {% if request.endpoint and (request.endpoint == 'diagnostic_admin.diag_users' or (request.endpoint or '').startswith('diagnostic_admin.diag_user')) %}active{% endif %}"
+                               href="{{ url_for('diagnostic_admin.diag_users') }}">测评用户管理</a>
+                        </li>
+                    </ul>
                 </li>
             </ul>
-            <div class="d-flex align-items-center">
+            <div class="d-flex align-items-center ms-2">
                 <span class="text-light me-3">{{ current_user.username }}</span>
                 <a href="{{ url_for('logout') }}" class="btn btn-outline-light btn-sm">退出</a>
             </div>

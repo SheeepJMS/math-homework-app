@@ -19,6 +19,15 @@
                 <a href="{{ url_for('lesson_students', lesson_id=lesson.id) }}" class="btn btn-outline-secondary ms-2">
                     <i class="fas fa-list"></i> 返回作业名单
                 </a>
+                {% if quiz_history %}
+                <form action="{{ url_for('ai_regrade_quiz', quiz_history_id=quiz_history[0].id) }}" method="post" class="d-inline ms-2"
+                      onsubmit="return confirm('对判错题与解答题调用 GPT 重新判定？可能产生 API 费用。');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-outline-primary">
+                        <i class="fas fa-robot"></i> AI 重判本卷
+                    </button>
+                </form>
+                {% endif %}
             </div>
             {% endif %}
 

@@ -1,5 +1,10 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_from_directory, send_file, abort
 import os
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    pass
 import pandas as pd
 from werkzeug.utils import secure_filename
 from flask_sqlalchemy import SQLAlchemy
@@ -1424,6 +1429,75 @@ def start_quiz(lesson_id):
                          explanation_files=explanation_files,
                          form=form)
 
+def _homework_image_maps(lesson_id):
+    """按题号取试题图、解析图 URL。"""
+    exam_by_page = {
+        f.page_number: f.path
+        for f in ExamFile.query.filter_by(lesson_id=lesson_id).all()
+        if f.path
+    }
+    expl_by_page = {
+        f.page_number: f.path
+        for f in ExplanationFile.query.filter_by(lesson_id=lesson_id).all()
+        if f.path
+    }
+    return exam_by_page, expl_by_page
+
+
+def _grade_homework_question(question, user_answer, exam_by_page=None, expl_by_page=None):
+    """
+    作业单题判分：先规则，规则判错或解答题时用 GPT（对照标准答案 + 试题/解析图）。
+    空答/IDK 返回 False。
+    """
+    from ai_grading import maybe_upgrade_with_ai, ai_grading_available
+
+    ans = (user_answer or '').strip()
+    if not ans or ans.upper() == 'IDK':
+        return False
+
+    exam_by_page = exam_by_page or {}
+    expl_by_page = expl_by_page or {}
+    qnum = question.question_number
+    image_urls = [u for u in (exam_by_page.get(qnum), expl_by_page.get(qnum)) if u]
+    solution_text = getattr(question, 'explanation', None) or ''
+    stem = question.content or ''
+    key = question.answer or ''
+
+    if question.type == 'proof':
+        if ai_grading_available():
+            ok = maybe_upgrade_with_ai(
+                None,
+                student_answer=ans,
+                correct_answer=key,
+                solution=solution_text,
+                stem=stem,
+                question_type='proof',
+                image_urls=image_urls,
+                force=True,
+            )
+            return True if ok is None else bool(ok)
+        return True
+
+    if question.type == 'choice':
+        is_correct = ans.upper() == key.upper()
+    else:
+        is_correct = ans.lower() == key.strip().lower()
+
+    if is_correct:
+        return True
+
+    upgraded = maybe_upgrade_with_ai(
+        False,
+        student_answer=ans,
+        correct_answer=key,
+        solution=solution_text,
+        stem=stem,
+        question_type=question.type or 'fill',
+        image_urls=image_urls,
+    )
+    return bool(upgraded) if upgraded is not None else False
+
+
 @app.route('/student/lesson/<int:lesson_id>/submit_quiz', methods=['POST'])
 @login_required
 def submit_quiz(lesson_id):
@@ -1460,6 +1534,8 @@ def submit_quiz(lesson_id):
         db.session.flush()  # 获取quiz_history.id
 
         correct_count = 0
+        exam_by_page, expl_by_page = _homework_image_maps(lesson_id)
+
         # 处理每个题目的答案
         for question in questions:
             # 检查是否选择了"不会做"
@@ -1479,14 +1555,9 @@ def submit_quiz(lesson_id):
                 db.session.add(answer_record)
                 continue
 
-            # 根据题目类型判断答案正确性
-            is_correct = False
-            if question.type == 'proof':  # 解答题
-                is_correct = True  # 解答题默认判定为正确
-            elif question.type == 'choice':  # 选择题
-                is_correct = user_answer.upper() == question.answer.upper()
-            else:  # 填空题
-                is_correct = user_answer.strip().lower() == question.answer.strip().lower()
+            is_correct = _grade_homework_question(
+                question, user_answer, exam_by_page, expl_by_page
+            )
 
             # 创建用户答案记录
             answer_record = UserAnswer(
@@ -1775,20 +1846,14 @@ def quiz_detail(history_id):
         lesson_id=quiz_history.lesson_id
     ).order_by(ExplanationFile.page_number).all()
     
-    # 创建问题和答案的映射
+    # 创建问题和答案的映射（使用提交时写入的判分结果，含 GPT 判分）
     question_answers = {}
     for answer in user_answers:
         question = Question.query.get(answer.question_id)
         if question:
-            if question.type == 'proof':
-                is_correct = True
-            elif question.type == 'choice':
-                is_correct = (answer.answer or '').upper() == (question.answer or '').upper()
-            else:
-                is_correct = (answer.answer or '').strip().lower() == (question.answer or '').strip().lower()
             question_answers[question] = {
                 'selected_answer': answer.answer,
-                'is_correct': is_correct
+                'is_correct': answer.is_correct
             }
     
     return render_template('student/detail.html',
@@ -2975,6 +3040,53 @@ def mark_answer(user_answer_id):
     db.session.commit()
     flash('判定已修改', 'success')
     return redirect(request.referrer or url_for('admin_dashboard'))
+
+
+@app.route('/admin/quiz_history/<int:quiz_history_id>/ai_regrade', methods=['POST'])
+@admin_required
+def ai_regrade_quiz(quiz_history_id):
+    """管理员对已提交作业用 GPT 重判（主要用于写法不同被误判为错的题）。"""
+    from ai_grading import ai_grading_available
+
+    if not ai_grading_available():
+        flash('未配置 OPENAI_API_KEY，无法使用 AI 重判', 'error')
+        return redirect(request.referrer or url_for('admin_dashboard'))
+
+    quiz_history = QuizHistory.query.get_or_404(quiz_history_id)
+    answers = (
+        UserAnswer.query.filter_by(quiz_history_id=quiz_history.id)
+        .join(Question, Question.id == UserAnswer.question_id)
+        .order_by(Question.question_number.asc())
+        .all()
+    )
+    exam_by_page, expl_by_page = _homework_image_maps(quiz_history.lesson_id)
+    changed = 0
+    for ua in answers:
+        q = ua.question
+        if not q:
+            continue
+        raw = (ua.answer or '').strip()
+        if not raw or raw.upper() == 'IDK':
+            if ua.is_correct:
+                ua.is_correct = False
+                changed += 1
+            continue
+        # 已判对的选择题/填空题跳过（省费用）；解答题与判错题重判
+        if ua.is_correct and q.type != 'proof':
+            continue
+        new_ok = _grade_homework_question(q, raw, exam_by_page, expl_by_page)
+        if bool(ua.is_correct) != bool(new_ok):
+            ua.is_correct = new_ok
+            changed += 1
+
+    quiz_history.correct_answers = UserAnswer.query.filter_by(
+        quiz_history_id=quiz_history.id, is_correct=True
+    ).count()
+    db.session.commit()
+    flash(f'AI 重判完成，更新了 {changed} 题判定', 'success')
+    return redirect(request.referrer or url_for(
+        'view_history', lesson_id=quiz_history.lesson_id, user_id=quiz_history.user_id
+    ))
 
 class CoursewareFile(db.Model):
     id = db.Column(db.Integer, primary_key=True)
