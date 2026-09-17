@@ -126,7 +126,7 @@
                         <i class="fas fa-pencil-alt"></i> 开始答题
                     </a>
                     {% if lesson.video_url %}
-                    <a href="{{ lesson.video_url }}" target="_blank" class="btn btn-info">
+                    <a href="{{ url_for('lesson_replay', lesson_id=lesson.id) }}" target="_blank" rel="noopener noreferrer" class="btn btn-info">
                         <i class="fas fa-video"></i> 查看回放
                     </a>
                     {% else %}
@@ -174,7 +174,7 @@
                             <td>
                                 <div class="btn-group" role="group">
                                     {% if lesson.video_url %}
-                                    <a href="{{ lesson.video_url }}" target="_blank" class="btn btn-info btn-sm">
+                                    <a href="{{ url_for('lesson_replay', lesson_id=lesson.id) }}" target="_blank" rel="noopener noreferrer" class="btn btn-info btn-sm">
                                         <i class="fas fa-video"></i> 查看回放
                                     </a>
                                     {% else %}

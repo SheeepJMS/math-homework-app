@@ -75,14 +75,19 @@
                                         </div>
                                         <div class="btn-group btn-group-sm" role="group">
                                             {% if lesson.video_url %}
-                                            <a href="{{ lesson.video_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-info">
+                                            <a href="{{ url_for('lesson_replay', lesson_id=lesson.id) }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-info" title="打开本课程已绑定的回放">
                                                 <i class="fas fa-eye"></i> 查看回放
                                             </a>
-                                            <button type="button" class="btn btn-info" onclick="uploadVideo('{{ lesson.id }}')">
+                                            <button type="button" class="btn btn-info"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#uploadVideoModal{{ lesson.id }}">
                                                 <i class="fas fa-video"></i> 更改回放
+                                                <span class="badge bg-light text-success ms-1">已绑定</span>
                                             </button>
                                             {% else %}
-                                            <button type="button" class="btn btn-secondary" onclick="uploadVideo('{{ lesson.id }}')">
+                                            <button type="button" class="btn btn-secondary"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#uploadVideoModal{{ lesson.id }}">
                                                 <i class="fas fa-video"></i> 上传回放
                                             </button>
                                             {% endif %}
@@ -159,6 +164,60 @@
                                     </div>
                                   </div>
                                 </div>
+                                <!-- 上传/更改回放：每课独立表单，action 写死 lesson_id，避免共用弹窗写错课程 -->
+                                <div class="modal fade" id="uploadVideoModal{{ lesson.id }}" tabindex="-1">
+                                  <div class="modal-dialog">
+                                    <div class="modal-content">
+                                      <div class="modal-header">
+                                        <h5 class="modal-title">{{ '更改' if lesson.video_url else '上传' }}课程回放</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                      </div>
+                                      <form action="{{ url_for('upload_video', lesson_id=lesson.id) }}" method="post">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <input type="hidden" name="action" value="save">
+                                        <div class="modal-body">
+                                          <p class="mb-2">
+                                            绑定到课程：
+                                            <strong>{{ lesson.title }}</strong>
+                                            <span class="text-muted small">（ID {{ lesson.id }}）</span>
+                                          </p>
+                                          {% if lesson.video_url %}
+                                          <p class="small text-muted mb-2 text-break">当前链接：{{ lesson.video_url }}</p>
+                                          {% endif %}
+                                          <div class="mb-3">
+                                            <label for="videoUrl{{ lesson.id }}" class="form-label">视频链接</label>
+                                            <input type="url" class="form-control" id="videoUrl{{ lesson.id }}" name="video_url"
+                                                   value="{{ lesson.video_url or '' }}" required
+                                                   placeholder="请输入完整 https:// 视频链接（YouTube、Zoom、Bilibili 等）">
+                                            <div class="form-text">请粘贴该课专属回放链接；保存后管理端与学生端将打开同一链接。</div>
+                                          </div>
+                                        </div>
+                                        <div class="modal-footer justify-content-between">
+                                          <div>
+                                            {% if lesson.video_url %}
+                                            {# 独立表单，避免 Enter 误触清除 #}
+                                            <button type="submit" class="btn btn-outline-danger"
+                                                    form="clearVideoForm{{ lesson.id }}"
+                                                    onclick="return confirm('确定清除「{{ lesson.title }}」的回放链接？');">
+                                              清除回放
+                                            </button>
+                                            {% endif %}
+                                          </div>
+                                          <div>
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                                            <button type="submit" class="btn btn-primary">保存到本课</button>
+                                          </div>
+                                        </div>
+                                      </form>
+                                      {% if lesson.video_url %}
+                                      <form id="clearVideoForm{{ lesson.id }}" action="{{ url_for('upload_video', lesson_id=lesson.id) }}" method="post" class="d-none">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <input type="hidden" name="action" value="clear">
+                                      </form>
+                                      {% endif %}
+                                    </div>
+                                  </div>
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}
@@ -231,33 +290,6 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
                     <button type="submit" class="btn btn-primary">添加</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- 上传回放模态框 -->
-<div class="modal fade" id="uploadVideoModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">上传课程回放</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <form id="uploadVideoForm" method="post">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="videoUrl" class="form-label">视频链接</label>
-                        <input type="url" class="form-control" id="videoUrl" name="video_url" required 
-                               placeholder="请输入视频链接（支持 YouTube、Bilibili 等平台）">
-                        <div class="form-text">请确保链接可以正常访问</div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                    <button type="submit" class="btn btn-primary">保存</button>
                 </div>
             </form>
         </div>
@@ -455,15 +487,9 @@
 </style>
 
 <script>
-function uploadVideo(lessonId) {
-    document.getElementById('uploadVideoForm').action = `/admin/lesson/${lessonId}/upload_video`;
-    new bootstrap.Modal(document.getElementById('uploadVideoModal')).show();
-}
-
 function toggleLessonStatus(lessonId, button) {
-    // 保存当前页面位置
     const scrollPosition = window.scrollY;
-    
+
     fetch(`/admin/lesson/${lessonId}/toggle`, {
         method: 'POST',
         headers: {
@@ -474,7 +500,6 @@ function toggleLessonStatus(lessonId, button) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // 更新按钮状态
             if (data.is_active) {
                 button.classList.remove('btn-success');
                 button.classList.add('btn-warning');
@@ -484,8 +509,6 @@ function toggleLessonStatus(lessonId, button) {
                 button.classList.add('btn-success');
                 button.innerHTML = '<i class="fas fa-play"></i> 激活';
             }
-            
-            // 恢复页面位置
             window.scrollTo(0, scrollPosition);
         } else {
             console.error('操作失败：' + (data.message || '未知错误'));
@@ -496,13 +519,11 @@ function toggleLessonStatus(lessonId, button) {
     });
 }
 
-// 已激活课件模态框内的停用按钮
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('#activeLessonsModal .toggle-status-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             var lessonId = this.dataset.lessonId;
             var listItem = this.closest('.list-group-item');
-            var self = this;
             fetch('/admin/lesson/' + lessonId + '/toggle', {
                 method: 'POST',
                 headers: {
@@ -533,38 +554,21 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     });
-
-    // 初始化所有模态框
-    var modals = document.querySelectorAll('.modal');
-    modals.forEach(function(modal) {
-        new bootstrap.Modal(modal);
-    });
-    
-    // 确保添加课程按钮正常工作
-    var addButton = document.querySelector('[data-bs-target="#addLessonModal"]');
-    if (addButton) {
-        addButton.addEventListener('click', function(e) {
-            e.preventDefault();
-            var modal = new bootstrap.Modal(document.getElementById('addLessonModal'));
-            modal.show();
-        });
-    }
 });
 
 function deleteLesson(id) {
     const form = document.createElement('form');
     form.method = 'POST';
     form.action = `/admin/lesson/${id}/delete`;
-    
-    // 添加CSRF令牌
+
     const csrfInput = document.createElement('input');
     csrfInput.type = 'hidden';
     csrfInput.name = 'csrf_token';
     csrfInput.value = '{{ csrf_token() }}';
     form.appendChild(csrfInput);
-    
+
     document.body.appendChild(form);
     form.submit();
 }
 </script>
-{% endblock %} 
+{% endblock %}
