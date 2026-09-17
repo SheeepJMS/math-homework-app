@@ -25,25 +25,25 @@ from collections import namedtuple
 from sqlalchemy.exc import IntegrityError
 import cloudinary
 import cloudinary.uploader
-from cloudinary_config import *  # σ»╝σàÑ Cloudinary Θàìτ╜«
+from cloudinary_config import *  # 导入 Cloudinary 配置
 from collections import defaultdict
 import requests
 from io import BytesIO
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key'  # τö¿Σ║Ä flash µ╢êµü»σÆî session
+app.secret_key = 'your_secret_key'  # 用于 flash 消息和 session
 
-# Θàìτ╜« CSRF Σ┐¥µèñ
+# 配置 CSRF 保护
 csrf = CSRFProtect(app)
-app.config['WTF_CSRF_TIME_LIMIT'] = 10800  # CSRF Σ╗ñτëîµ£ëµòêµ£ƒΦ«╛τ╜«Σ╕║3σ░Åµù╢
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=3)  # Σ╝ÜΦ»¥µ£ëµòêµ£ƒΦ«╛τ╜«Σ╕║3σ░Åµù╢
+app.config['WTF_CSRF_TIME_LIMIT'] = 10800  # CSRF 令牌有效期设置为3小时
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=3)  # 会话有效期设置为3小时
 
-# Θàìτ╜«Σ╝ÜΦ»¥Σ╕║µ░╕Σ╣àµÇºτÜä∩╝îΦ┐Öµá╖σÅ»Σ╗Ñσ╗╢Θò┐Σ╝ÜΦ»¥τÜäµ£ëµòêµ£ƒ
+# 配置会话为永久性的，这样可以延长会话的有效期
 @app.before_request
 def make_session_permanent():
     session.permanent = True
 
-# Θàìτ╜« Flask-Login
+# 配置 Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
@@ -52,93 +52,93 @@ login_manager.login_view = 'login'
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# Θàìτ╜«µò░µì«σ║ô
+# 配置数据库
 database_url = os.environ.get('DATABASE_URL')
 if database_url and database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
 
 if not database_url:
-    # σªéµ₧£µ▓íµ£ëΦ«╛τ╜«τÄ»σóâσÅÿΘçÅ∩╝îΣ╜┐τö¿Θ╗ÿΦ«ñτÜäSQLiteΘàìτ╜«∩╝êτö¿Σ║Äµ£¼σ£░σ╝ÇσÅæ∩╝ë
+    # 如果没有设置环境变量，使用默认的SQLite配置（用于本地开发）
     base_dir = os.path.abspath(os.path.dirname(__file__))
     database_url = f'sqlite:///{os.path.join(base_dir, "instance", "quiz.db")}'
 
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# σ╗╢Φ┐ƒσê¥σºïσîû SQLAlchemy∩╝îΘü┐σàì debug reloader Σ╕ï _app_engines KeyError∩╝êΦ»èµû¡τ½»µ│¿σåî/τÖ╗σ╜òτ¡ë∩╝ë
+# 延迟初始化 SQLAlchemy，避免 debug reloader 下 _app_engines KeyError（诊断端注册/登录等）
 db = SQLAlchemy()
 db.init_app(app)
 
-# Θàìτ╜«µûçΣ╗╢Σ╕èΣ╝á
-UPLOAD_FOLDER = 'uploads'  # Σ┐«µö╣Σ╕║Σ╕ìσ╕ª static σëìτ╝ÇτÜäΦ╖»σ╛ä
+# 配置文件上传
+UPLOAD_FOLDER = 'uploads'  # 修改为不带 static 前缀的路径
 ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 ALLOWED_PDF_EXTENSIONS = {'pdf'}
 ALLOWED_EXCEL_EXTENSIONS = {'xlsx', 'xls'}
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # ΘÖÉσê╢µûçΣ╗╢σñºσ░ÅΣ╕║16MB
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 限制文件大小为16MB
 
-# Φ»èµû¡µ¿íσ¥ùΘóäτòÖΘàìτ╜«∩╝êsubscription scaffolding∩╝îσ╜ôσëìΣ╕ìσÉ»τö¿∩╝ë
+# 诊断模块预留配置（subscription scaffolding，当前不启用）
 app.config['BILLING_ENABLED'] = os.environ.get('BILLING_ENABLED', 'false').lower() == 'true'
 app.config['STRIPE_WEBHOOK_SECRET'] = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
-app.config['DIAG_SHOW_HELP_BUTTON'] = False  # µ£¬µ¥Ñσ╝ÇσÉ»σ╕«σè⌐σàÑσÅú
-app.config['DIAG_OFFICIAL_WEBSITE_URL'] = os.environ.get('DIAG_OFFICIAL_WEBSITE_URL', '')  # Φ»èµû¡τ│╗τ╗ƒΘí╢µáÅπÇîσ«ÿτ╜æπÇìσàÑσÅúΘô╛µÄÑ∩╝îτ⌐║σêÖµ¿íµ¥┐σåàτö¿ #
+app.config['DIAG_SHOW_HELP_BUTTON'] = False  # 未来开启帮助入口
+app.config['DIAG_OFFICIAL_WEBSITE_URL'] = os.environ.get('DIAG_OFFICIAL_WEBSITE_URL', '')  # 诊断系统顶栏「官网」入口链接，空则模板内用 #
 
-# τí«Σ┐¥Σ╕èΣ╝áτ¢«σ╜òσ¡ÿσ£¿
+# 确保上传目录存在
 os.makedirs(os.path.join('static', UPLOAD_FOLDER, 'exams'), exist_ok=True)
 os.makedirs(os.path.join('static', UPLOAD_FOLDER, 'explanations'), exist_ok=True)
 
 migrate = Migrate(app, db)
 
 def create_default_admin():
-    """σê¢σ╗║Θ╗ÿΦ«ñτ«íτÉåσæÿΦ┤ªµê╖∩╝êσªéµ₧£Σ╕ìσ¡ÿσ£¿∩╝ë"""
+    """创建默认管理员账户（如果不存在）"""
     admin = User.query.filter_by(username='admin').first()
     if not admin:
         admin = User(
             username='admin',
             email='admin@example.com',
-            password='admin123',  # Φ»╖σ£¿Θªûµ¼íτÖ╗σ╜òσÉÄτ½ïσì│Σ┐«µö╣µ¡ñσ»åτáü
+            password='admin123',  # 请在首次登录后立即修改此密码
             is_admin=True,
             is_active=True
         )
         db.session.add(admin)
         try:
             db.session.commit()
-            print("Θ╗ÿΦ«ñτ«íτÉåσæÿΦ┤ªµê╖σ╖▓σê¢σ╗║")
+            print("默认管理员账户已创建")
         except Exception as e:
             db.session.rollback()
-            print(f"σê¢σ╗║Θ╗ÿΦ«ñτ«íτÉåσæÿΦ┤ªµê╖σñ▒Φ┤Ñ: {str(e)}")
+            print(f"创建默认管理员账户失败: {str(e)}")
 
 @app.before_first_request
 def initialize_app():
-    """σ£¿τ¼¼Σ╕Çµ¼íΦ»╖µ▒éΣ╣ïσëìσê¥σºïσîûσ║öτö¿"""
+    """在第一次请求之前初始化应用"""
     create_default_admin()
 
-# τí«Σ┐¥µëÇµ£ëΦí¿σ¡ÿσ£¿σ╣╢σê¢σ╗║Θ╗ÿΦ«ñµò░µì«
+# 确保所有表存在并创建默认数据
 def init_db():
     with app.app_context():
         try:
-            print("σ╝Çσºïµò░µì«σ║ôσê¥σºïσîû...")
+            print("开始数据库初始化...")
             
-            # σàêσ░¥Φ»òσêáΘÖñµëÇµ£ëΦí¿∩╝îτä╢σÉÄΘçìµû░σê¢σ╗║
+            # 先尝试删除所有表，然后重新创建
             db.drop_all()
             db.create_all()
-            print("µò░µì«σ║ôΦí¿σê¢σ╗║µêÉσèƒ")
+            print("数据库表创建成功")
             
-            # µúÇµƒÑµÿ»σÉªΘ£ÇΦªüσê¢σ╗║Θ╗ÿΦ«ñµò░µì«
+            # 检查是否需要创建默认数据
             admin = User.query.filter_by(is_admin=True).first()
             if not admin:
-                print("σê¢σ╗║Θ╗ÿΦ«ñτ«íτÉåσæÿΦ┤ªσÅ╖...")
-                # σê¢σ╗║Θ╗ÿΦ«ñτÅ¡τ║º
+                print("创建默认管理员账号...")
+                # 创建默认班级
                 default_class = Class(
-                    name='Θ╗ÿΦ«ñτÅ¡τ║º',
-                    description='τ│╗τ╗ƒΘ╗ÿΦ«ñτÅ¡τ║º',
+                    name='默认班级',
+                    description='系统默认班级',
                     is_active=True
                 )
                 db.session.add(default_class)
-                db.session.flush()  # ΦÄ╖σÅûdefault_classτÜäID
+                db.session.flush()  # 获取default_class的ID
                 
-                # σê¢σ╗║τ«íτÉåσæÿΦ┤ªσÅ╖
+                # 创建管理员账号
                 admin = User(
                     username='admin',
                     email='admin@example.com',
@@ -149,22 +149,22 @@ def init_db():
                 )
                 db.session.add(admin)
                 db.session.commit()
-                print("Θ╗ÿΦ«ñµò░µì«σê¢σ╗║µêÉσèƒ∩╝ü")
+                print("默认数据创建成功！")
             else:
-                print("τ«íτÉåσæÿΦ┤ªσÅ╖σ╖▓σ¡ÿσ£¿∩╝îΦ╖│Φ┐çσê¢σ╗║Θ╗ÿΦ«ñµò░µì«πÇé")
+                print("管理员账号已存在，跳过创建默认数据。")
         except Exception as e:
-            print(f"µò░µì«σ║ôσê¥σºïσîûσç║ΘöÖ: {str(e)}")
-            # σªéµ₧£σç║ΘöÖ∩╝îσ╝║σê╢Θçìµû░σê¢σ╗║µò░µì«σ║ô
-            print("σ╝║σê╢Θçìµû░σê¢σ╗║µò░µì«σ║ô...")
+            print(f"数据库初始化出错: {str(e)}")
+            # 如果出错，强制重新创建数据库
+            print("强制重新创建数据库...")
             db.drop_all()
             db.create_all()
-            print("µò░µì«σ║ôΘçìµû░σê¢σ╗║µêÉσèƒ")
+            print("数据库重新创建成功")
             
-            # Θçìµû░σê¢σ╗║Θ╗ÿΦ«ñµò░µì«
+            # 重新创建默认数据
             try:
                 default_class = Class(
-                    name='Θ╗ÿΦ«ñτÅ¡τ║º',
-                    description='τ│╗τ╗ƒΘ╗ÿΦ«ñτÅ¡τ║º',
+                    name='默认班级',
+                    description='系统默认班级',
                     is_active=True
                 )
                 db.session.add(default_class)
@@ -180,76 +180,76 @@ def init_db():
                 )
                 db.session.add(admin)
                 db.session.commit()
-                print("Θ╗ÿΦ«ñµò░µì«Θçìµû░σê¢σ╗║µêÉσèƒ∩╝ü")
+                print("默认数据重新创建成功！")
             except Exception as e2:
-                print(f"Θçìµû░σê¢σ╗║Θ╗ÿΦ«ñµò░µì«σñ▒Φ┤Ñ: {str(e2)}")
+                print(f"重新创建默认数据失败: {str(e2)}")
                 db.session.rollback()
 
-# Φ»╛τ¿ïσÆîτÅ¡τ║ºτÜäσñÜσ»╣σñÜσà│ΦüöΦí¿
+# 课程和班级的多对多关联表
 lesson_class_association = db.Table('lesson_class_association',
     db.Column('lesson_id', db.Integer, db.ForeignKey('lesson.id'), primary_key=True),
     db.Column('class_id', db.Integer, db.ForeignKey('class.id'), primary_key=True)
 )
 
-# σ«ÜΣ╣ëτÅ¡τ║ºµ¿íσ₧ï
+# 定义班级模型
 class Class(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(80), nullable=False, unique=True)  # τÅ¡τ║ºσÉìτº░
-    description = db.Column(db.String(200))  # τÅ¡τ║ºµÅÅΦ┐░
-    is_active = db.Column(db.Boolean, default=True)  # µÿ»σÉªµ┐Çµ┤╗
+    name = db.Column(db.String(80), nullable=False, unique=True)  # 班级名称
+    description = db.Column(db.String(200))  # 班级描述
+    is_active = db.Column(db.Boolean, default=True)  # 是否激活
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     users = db.relationship('User', backref='class', lazy=True)
     lessons = db.relationship('Lesson', secondary=lesson_class_association, backref='classes', lazy=True)
 
-# σ«ÜΣ╣ëΦ»╛τ¿ïµ¿íσ₧ï
+# 定义课程模型
 class Lesson(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(100), nullable=False)  # Φ»╛τ¿ïµáçΘóÿ
-    description = db.Column(db.String(200))  # Φ»╛τ¿ïµÅÅΦ┐░
-    is_active = db.Column(db.Boolean, default=False)  # µÿ»σÉªσ╜ôσëìµÿ╛τñ║
-    video_url = db.Column(db.String(500))  # ΦºåΘóæσ¢₧µö╛Θô╛µÄÑ
-    # τ«íτÉåσæÿΣ╕èΣ╝áτÜäτƒÑΦ»åτé╣τ¼öΦ«░∩╝êσìòσ¢╛ URL∩╝ë∩╝¢τ⌐║σêÖσ¡ªτöƒτ½»Σ╕ìµÿ╛τñ║πÇîτƒÑΦ»åτé╣πÇìµîëΘÆ«
+    title = db.Column(db.String(100), nullable=False)  # 课程标题
+    description = db.Column(db.String(200))  # 课程描述
+    is_active = db.Column(db.Boolean, default=False)  # 是否当前显示
+    video_url = db.Column(db.Text)  # 视频回放链接（Text：避免长链接被截断导致错乱）
+    # 管理员上传的知识点笔记（单图 URL）；空则学生端不显示「知识点」按钮
     kp_notes_image_url = db.Column(db.String(512), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     questions = db.relationship('Question', backref='lesson', lazy=True)
 
-# Φ»òσì╖µûçΣ╗╢µ¿íσ₧ï
+# 试卷文件模型
 class ExamFile(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     filename = db.Column(db.String(255), nullable=False)
     path = db.Column(db.String(255), nullable=False)
     lesson_id = db.Column(db.Integer, db.ForeignKey('lesson.id'), nullable=False)
-    page_number = db.Column(db.Integer, nullable=False)  # Θí╡τáü
+    page_number = db.Column(db.Integer, nullable=False)  # 页码
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     lesson = db.relationship('Lesson', backref=db.backref('exam_files', lazy=True))
 
-# Φºúµ₧ÉµûçΣ╗╢µ¿íσ₧ï
+# 解析文件模型
 class ExplanationFile(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     filename = db.Column(db.String(255), nullable=False)
     path = db.Column(db.String(255), nullable=False)
     lesson_id = db.Column(db.Integer, db.ForeignKey('lesson.id'), nullable=False)
-    page_number = db.Column(db.Integer, nullable=False)  # Θí╡τáü
+    page_number = db.Column(db.Integer, nullable=False)  # 页码
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     lesson = db.relationship('Lesson', backref=db.backref('explanation_files', lazy=True))
 
-# σ«ÜΣ╣ëΘóÿτ¢«µ¿íσ₧ï
+# 定义题目模型
 class Question(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     lesson_id = db.Column(db.Integer, db.ForeignKey('lesson.id'), nullable=False)
-    question_number = db.Column(db.Integer, nullable=False)  # ΘóÿσÅ╖
-    type = db.Column(db.String(10), nullable=False)  # Θóÿτ¢«τ▒╗σ₧ï∩╝Üchoice∩╝êΘÇëµï⌐Θóÿ∩╝ëπÇüfill∩╝êσí½τ⌐║Θóÿ∩╝ëµêûproof∩╝êΦ»üµÿÄΘóÿ∩╝ë
-    answer = db.Column(db.String(100), nullable=False)  # µ¡úτí«τ¡öµíê
-    content = db.Column(db.String(500))  # τº╗ΘÖñnullable=Falseτ║ªµ¥ƒ
+    question_number = db.Column(db.Integer, nullable=False)  # 题号
+    type = db.Column(db.String(10), nullable=False)  # 题目类型：choice（选择题）、fill（填空题）或proof（证明题）
+    answer = db.Column(db.String(100), nullable=False)  # 正确答案
+    content = db.Column(db.String(500))  # 移除nullable=False约束
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     __table_args__ = (
         db.UniqueConstraint('lesson_id', 'question_number', name='unique_question_number'),
     )
 
-# σ«ÜΣ╣ëτö¿µê╖µ¿íσ₧ï
+# 定义用户模型
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
@@ -258,13 +258,13 @@ class User(UserMixin, db.Model):
     is_active = db.Column(db.Boolean, default=True)
     is_admin = db.Column(db.Boolean, default=False)
     class_id = db.Column(db.Integer, db.ForeignKey('class.id'))
-    achievement_count = db.Column(db.Integer, default=0)  # Φ╛╛µáçµ¼íµò░∩╝ê80%Σ╗ÑΣ╕èµ¡úτí«τÄç∩╝ë
-    badge_level = db.Column(db.Integer, default=0)  # σ╛╜τ½áτ¡ëτ║º∩╝îΘ╗ÿΦ«ñΣ╕║0∩╝êµùáσ╛╜τ½á∩╝ë
-    report_link = db.Column(db.String(500), nullable=True)  # Φ»╛σáéµÖ║Φâ╜µèÑσæèΘô╛µÄÑ
+    achievement_count = db.Column(db.Integer, default=0)  # 达标次数（80%以上正确率）
+    badge_level = db.Column(db.Integer, default=0)  # 徽章等级，默认为0（无徽章）
+    report_link = db.Column(db.String(500), nullable=True)  # 课堂智能报告链接
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # Σ╕Çσ»╣σñÜσà│τ│╗
+    # 一对多关系
     answers = db.relationship('UserAnswer', backref='user', lazy=True, cascade="all, delete-orphan")
     quiz_history = db.relationship('QuizHistory', backref='user', lazy=True, cascade="all, delete-orphan")
 
@@ -290,7 +290,7 @@ class User(UserMixin, db.Model):
             return {
                 "current_level": 0,
                 "name": "No Badge",
-                "icon": "Γ¥ô",
+                "icon": "❓",
                 "achievements": self.achievement_count,
                 "next_level_at": 1,
                 "next_achievements_needed": 1,
@@ -298,32 +298,32 @@ class User(UserMixin, db.Model):
             }
 
         badges = {
-            1: {"name": "Little Worm", "icon": "≡ƒÉ¢", "next_level": 2},
-            2: {"name": "Butterfly", "icon": "≡ƒªï", "next_level": 4},
-            3: {"name": "Python", "icon": "≡ƒÉì", "next_level": 6},
-            4: {"name": "Wolf", "icon": "≡ƒÉ║", "next_level": 8},
-            5: {"name": "Tiger", "icon": "≡ƒÉ»", "next_level": 10},
-            6: {"name": "Dragon", "icon": "≡ƒÉ▓", "next_level": 12},
-            7: {"name": "Mini Monster", "icon": "≡ƒæ╛", "next_level": 14},
-            8: {"name": "Big Monster", "icon": "≡ƒæ╣", "next_level": 16},
-            9: {"name": "Beast", "icon": "≡ƒªû", "next_level": 18},
-            10: {"name": "Dragon", "icon": "≡ƒÉë", "next_level": None}
+            1: {"name": "Little Worm", "icon": "🐛", "next_level": 2},
+            2: {"name": "Butterfly", "icon": "🦋", "next_level": 4},
+            3: {"name": "Python", "icon": "🐍", "next_level": 6},
+            4: {"name": "Wolf", "icon": "🐺", "next_level": 8},
+            5: {"name": "Tiger", "icon": "🐯", "next_level": 10},
+            6: {"name": "Dragon", "icon": "🐲", "next_level": 12},
+            7: {"name": "Mini Monster", "icon": "👾", "next_level": 14},
+            8: {"name": "Big Monster", "icon": "👹", "next_level": 16},
+            9: {"name": "Beast", "icon": "🦖", "next_level": 18},
+            10: {"name": "Dragon", "icon": "🐉", "next_level": None}
         }
         current_badge = badges.get(self.badge_level, badges[1])
         
-        # τ«ÇσîûτÜäσ╛╜τ½áσìçτ║ºΦ«íτ«ùΘÇ╗Φ╛æ
+        # 简化的徽章升级计算逻辑
         if current_badge["next_level"]:
             if self.badge_level < 3:
-                # Level 1-2: Θ£ÇΦªü60%Σ╗ÑΣ╕èµ¡úτí«τÄç
+                # Level 1-2: 需要60%以上正确率
                 if self.badge_level == 1:
                     next_achievements_needed = 2 - (self.achievement_count % 2)
                 else:  # Level 2
                     next_achievements_needed = 3 - (self.achievement_count % 3)
             elif self.badge_level < 8:
-                # Level 3-7: Θ£ÇΦªü80%Σ╗ÑΣ╕èµ¡úτí«τÄç∩╝îµ»Åµ¼í2µ¼íΦ╛╛µáç
+                # Level 3-7: 需要80%以上正确率，每次2次达标
                 next_achievements_needed = 2 - (self.achievement_count % 2)
             else:
-                # Level 8+: Θ£ÇΦªü80%Σ╗ÑΣ╕èµ¡úτí«τÄç∩╝îµ»Åµ¼í5µ¼íΦ╛╛µáç
+                # Level 8+: 需要80%以上正确率，每次5次达标
                 next_achievements_needed = 5 - (self.achievement_count % 5)
         else:
             next_achievements_needed = 0
@@ -338,31 +338,31 @@ class User(UserMixin, db.Model):
             "encouragement": encouragements.get(self.badge_level, "Amazing progress!")
         }
 
-# τö¿µê╖τ¡öΘóÿΦ«░σ╜òµ¿íσ₧ï
+# 用户答题记录模型
 class UserAnswer(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     lesson_id = db.Column(db.Integer, db.ForeignKey('lesson.id'), nullable=False)
     question_id = db.Column(db.Integer, db.ForeignKey('question.id'), nullable=False)
     quiz_history_id = db.Column(db.Integer, db.ForeignKey('quiz_history.id'), nullable=False)
-    answer = db.Column(db.Text, nullable=True)  # Σ╜┐τö¿Textτ▒╗σ₧ïµö»µîüµ¢┤Θò┐τÜäτ¡öµíê
+    answer = db.Column(db.Text, nullable=True)  # 使用Text类型支持更长的答案
     is_correct = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.now)
 
     question = db.relationship('Question', backref='user_answers')
     quiz_history = db.relationship('QuizHistory', backref='answers')
 
-# σ«ÜΣ╣ëτ¡öΘóÿσÄåσÅ▓Φ«░σ╜òµ¿íσ₧ï
+# 定义答题历史记录模型
 class QuizHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     lesson_id = db.Column(db.Integer, db.ForeignKey('lesson.id'), nullable=False)
     total_questions = db.Column(db.Integer, nullable=False)
     correct_answers = db.Column(db.Integer, nullable=False)
-    time_spent = db.Column(db.Integer, nullable=False)  # τ¡öΘóÿτö¿µù╢∩╝êτºÆ∩╝ë
+    time_spent = db.Column(db.Integer, nullable=False)  # 答题用时（秒）
     completed_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # τº╗ΘÖñ user = db.relationship('User', backref='quiz_history', lazy=True)
+    # 移除 user = db.relationship('User', backref='quiz_history', lazy=True)
     lesson = db.relationship('Lesson', backref='quiz_history', lazy=True)
     
     @property
@@ -370,7 +370,7 @@ class QuizHistory(db.Model):
         return (self.correct_answers / self.total_questions * 100) if self.total_questions > 0 else 0
 
 
-# ========== Φ»èµû¡µ¿íσ¥ùτï¼τ½ïΦí¿∩╝êdiag_ σëìτ╝Ç∩╝îΣ╕ìσ╜▒σôìτÄ░µ£ëΣ╕Üσèí∩╝ë==========
+# ========== 诊断模块独立表（diag_ 前缀，不影响现有业务）==========
 class DiagUser(db.Model):
     __tablename__ = 'diag_users'
     id = db.Column(db.Integer, primary_key=True)
@@ -378,17 +378,17 @@ class DiagUser(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    # ΘóäτòÖ∩╝Üµ£¬µ¥ÑΘé«τ«▒µë╛σ¢₧
+    # 预留：未来邮箱找回
     email = db.Column(db.String(255), nullable=True)
     email_verified = db.Column(db.Boolean, default=False, nullable=False)
-    # µ│¿σåîσ¡ªσæÿΦíÑσààΣ┐íµü»∩╝êσÅ»ΘÇë∩╝îΘ╗ÿΦ«ñΣ╕ìσ╜▒σôìµùºΦ┤ªσÅ╖∩╝ë
-    birth_year = db.Column(db.Integer, nullable=True)  # σç║τöƒσ╣┤Σ╗╜
-    school = db.Column(db.String(255), nullable=True)  # σ¡ªµáí
-    province = db.Column(db.String(32), nullable=True, default='BC')  # σ£░σî║∩╝êτ£ü/σ╖₧∩╝ë∩╝îΘ╗ÿΦ«ñ BC
+    # 注册学员补充信息（可选，默认不影响旧账号）
+    birth_year = db.Column(db.Integer, nullable=True)  # 出生年份
+    school = db.Column(db.String(255), nullable=True)  # 学校
+    province = db.Column(db.String(32), nullable=True, default='BC')  # 地区（省/州），默认 BC
 
 
 class DiagPasswordResetToken(db.Model):
-    """ΘóäτòÖ∩╝Üσ»åτáüΘçìτ╜« token∩╝îσ╜ôσëìΣ╕ìσÉ»τö¿ UI"""
+    """预留：密码重置 token，当前不启用 UI"""
     __tablename__ = 'diag_password_reset_tokens'
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('diag_users.id', ondelete='CASCADE'), nullable=False)
@@ -399,7 +399,7 @@ class DiagPasswordResetToken(db.Model):
 
 
 class DiagSubscription(db.Model):
-    """ΘóäτòÖ∩╝ÜΦ«óΘÿàτè╢µÇü∩╝îΘ╗ÿΦ«ñ allow_all∩╝îµ£¬µ¥Ñµö╢Φ┤╣µù╢σÉ»τö¿"""
+    """预留：订阅状态，默认 allow_all，未来收费时启用"""
     __tablename__ = 'diag_subscriptions'
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('diag_users.id', ondelete='CASCADE'), nullable=False)
@@ -409,14 +409,14 @@ class DiagSubscription(db.Model):
     provider = db.Column(db.String(32), nullable=True)  # stripe
     provider_customer_id = db.Column(db.String(255), nullable=True)
     provider_subscription_id = db.Column(db.String(255), nullable=True)
-    entitlements_json = db.Column(db.Text, nullable=True)  # σèƒΦâ╜σ╝Çσà│ JSON
+    entitlements_json = db.Column(db.Text, nullable=True)  # 功能开关 JSON
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     user = db.relationship('DiagUser', backref=db.backref('subscriptions', lazy=True))
 
 
 class DiagSupportTicket(db.Model):
-    """ΘóäτòÖ∩╝Üσ«óµ£ìσ╖Ñσìò∩╝îσ╜ôσëìµùá UI"""
+    """预留：客服工单，当前无 UI"""
     __tablename__ = 'diag_support_tickets'
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('diag_users.id', ondelete='CASCADE'), nullable=False)
@@ -429,7 +429,7 @@ class DiagSupportTicket(db.Model):
 
 
 class DiagAuthAudit(db.Model):
-    """ΘóäτòÖ∩╝ÜτÖ╗σ╜òσ«íΦ«í∩╝îσ╜ôσëìΣ╕ìσÉ»τö¿σÉîµù╢σ£¿τ║┐ΘÖÉσê╢"""
+    """预留：登录审计，当前不启用同时在线限制"""
     __tablename__ = 'diag_auth_audit'
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('diag_users.id', ondelete='CASCADE'), nullable=False)
@@ -451,7 +451,7 @@ class DiagSession(db.Model):
 
 
 class DiagGuestStudent(db.Model):
-    """σà¼σ╝Çµ╡ïΦ»äσàÑσÅú∩╝Üµùáµ│¿σåîΦ┤ªσÅ╖τÜäµ╡ïΦ»äσ¡ªσæÿ∩╝êΣ╗à diagnostic Φí¿∩╝ëπÇé"""
+    """公开测评入口：无注册账号的测评学员（仅 diagnostic 表）。"""
     __tablename__ = 'diag_guest_students'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
@@ -460,7 +460,7 @@ class DiagGuestStudent(db.Model):
 
 
 class DiagGuestSession(db.Model):
-    """Φ«┐σ«óΣ╝ÜΦ»¥∩╝Ücookie token τ╗æσ«Ü diag_guest_studentsπÇé"""
+    """访客会话：cookie token 绑定 diag_guest_students。"""
     __tablename__ = 'diag_guest_sessions'
     id = db.Column(db.Integer, primary_key=True)
     guest_student_id = db.Column(db.Integer, db.ForeignKey('diag_guest_students.id', ondelete='CASCADE'), nullable=False)
@@ -473,12 +473,12 @@ class DiagGuestSession(db.Model):
 class DiagCompetition(db.Model):
     __tablename__ = 'diag_competitions'
     id = db.Column(db.Integer, primary_key=True)
-    subject = db.Column(db.String(80), nullable=True, default='')   # σ¡ªτºæ∩╝îσªé∩╝Üµò░σ¡ªτ½₧Φ╡¢
-    category = db.Column(db.String(80), nullable=True, default='')  # τ½₧Φ╡¢σñºτ▒╗∩╝îσªé∩╝ÜWaterloo
-    name = db.Column(db.String(120), nullable=False)                # σà╖Σ╜ôτ½₧Φ╡¢∩╝îσªé∩╝ÜGauss7 2025
-    # σêåµ«╡σêåσÇ╝ JSON∩╝Ü[{"start":1,"end":10,"points":5},{"start":11,"end":20,"points":6}]∩╝îΘóÿσÅ╖ 1-based∩╝îµ£¬Φ«╛σêÖµ»ÅΘóÿ 1 σêå
+    subject = db.Column(db.String(80), nullable=True, default='')   # 学科，如：数学竞赛
+    category = db.Column(db.String(80), nullable=True, default='')  # 竞赛大类，如：Waterloo
+    name = db.Column(db.String(120), nullable=False)                # 具体竞赛，如：Gauss7 2025
+    # 分段分值 JSON：[{"start":1,"end":10,"points":5},{"start":11,"end":20,"points":6}]，题号 1-based，未设则每题 1 分
     score_scheme = db.Column(db.Text, nullable=True)
-    blank_bonus = db.Column(db.Integer, nullable=True, default=0)  # τ⌐║ΘóÿσèáσêåσÇ╝∩╝îµ£¬Σ╜£τ¡öµ»ÅΘóÿσèáσçáσêå∩╝îΘ╗ÿΦ«ñ 0
+    blank_bonus = db.Column(db.Integer, nullable=True, default=0)  # 空题加分值，未作答每题加几分，默认 0
 
 
 class DiagExam(db.Model):
@@ -486,11 +486,11 @@ class DiagExam(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     competition_id = db.Column(db.Integer, db.ForeignKey('diag_competitions.id'), nullable=False)
     title = db.Column(db.String(255), nullable=False)
-    year = db.Column(db.Integer, nullable=True)  # σ╣┤Σ╗╜∩╝îσªé 2025
+    year = db.Column(db.Integer, nullable=True)  # 年份，如 2025
     time_limit_sec = db.Column(db.Integer, nullable=True)
     is_published = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    # 1=G1ΓÇôG6, 2=G7ΓÇôG9, 3=G10ΓÇôG12 σêåτ║ºΦ»èµû¡σì╖∩╝¢τ⌐║Φí¿τñ║µÖ«ΘÇÜτ½₧Φ╡¢σì╖
+    # 1=G1–G6, 2=G7–G9, 3=G10–G12 分级诊断卷；空表示普通竞赛卷
     diag_placement_level = db.Column(db.Integer, nullable=True)
     competition = db.relationship('DiagCompetition', backref=db.backref('exams', lazy=True))
 
@@ -500,11 +500,11 @@ class DiagQuestion(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     competition_id = db.Column(db.Integer, db.ForeignKey('diag_competitions.id'), nullable=False)
     stem_text = db.Column(db.Text, nullable=False)
-    stem_image_url = db.Column(db.String(512), nullable=True)  # Θóÿσ╣▓σ¢╛τëç∩╝êτ▓ÿΦ┤┤Σ╕èΣ╝á∩╝ë
+    stem_image_url = db.Column(db.String(512), nullable=True)  # 题干图片（粘贴上传）
     choices_json = db.Column(db.Text, nullable=True)
     answer_key = db.Column(db.String(20), nullable=True)
     solution_text = db.Column(db.Text, nullable=True)
-    solution_image_url = db.Column(db.String(512), nullable=True)  # Φºúµ₧Éσ¢╛τëç∩╝êτ▓ÿΦ┤┤Σ╕èΣ╝á∩╝ë
+    solution_image_url = db.Column(db.String(512), nullable=True)  # 解析图片（粘贴上传）
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     competition = db.relationship('DiagCompetition', backref=db.backref('questions', lazy=True))
 
@@ -537,7 +537,7 @@ class DiagAttempt(db.Model):
 
 
 class DiagnosticBenchmarkSample(db.Model):
-    """Φ»èµû¡τ│╗τ╗ƒσÅéΦÇâµá╖µ£¼σêåσ╕â∩╝êσå╖σÉ»σè¿/τ£ƒσ«₧µá╖µ£¼∩╝ëπÇéΣ╗à diagnostic Σ╜┐τö¿∩╝îΣ╕ìσ╜▒σôìΣ╜£Σ╕Üτ╜æτ½ÖπÇé"""
+    """诊断系统参考样本分布（冷启动/真实样本）。仅 diagnostic 使用，不影响作业网站。"""
     __tablename__ = 'diagnostic_benchmark_samples'
     id = db.Column(db.Integer, primary_key=True)
     contest_key = db.Column(db.String(64), nullable=False, index=True)
@@ -610,14 +610,14 @@ class DiagQuestionBankLink(db.Model):
 
 
 class DiagQuestionAnswer(db.Model):
-    """CSV σ»╝σàÑτÜäµ»ÅΘóÿτ¡öµíêΣ╕ÄΦºúµ₧É∩╝êµîë exam+q_index σî╣Θàì∩╝ë"""
+    """CSV 导入的每题答案与解析（按 exam+q_index 匹配）"""
     __tablename__ = 'diag_question_answers'
     exam_id = db.Column(db.Integer, db.ForeignKey('diag_exams.id', ondelete='CASCADE'), primary_key=True)
     q_index = db.Column(db.Integer, primary_key=True)
     correct_answer = db.Column(db.String(50), nullable=True)
     solution_explain = db.Column(db.Text, nullable=True)
     answer_format = db.Column(db.String(20), nullable=True)
-    reserved_1 = db.Column(db.String(255), nullable=True)  # needs_image µù╢σ¡ÿ "1"
+    reserved_1 = db.Column(db.String(255), nullable=True)  # needs_image 时存 "1"
     reserved_2 = db.Column(db.String(255), nullable=True)
     reserved_3 = db.Column(db.String(255), nullable=True)
     extra_json = db.Column(db.Text, nullable=True)
@@ -625,7 +625,7 @@ class DiagQuestionAnswer(db.Model):
 
 
 class DiagQuestionKp(db.Model):
-    """CSV σ»╝σàÑτÜäµ»ÅΘóÿτƒÑΦ»åτé╣∩╝êΦç¬τö▒µûçµ£¼∩╝ë"""
+    """CSV 导入的每题知识点（自由文本）"""
     __tablename__ = 'diag_question_kp'
     exam_id = db.Column(db.Integer, db.ForeignKey('diag_exams.id', ondelete='CASCADE'), primary_key=True)
     q_index = db.Column(db.Integer, primary_key=True)
@@ -639,7 +639,7 @@ class DiagQuestionKp(db.Model):
 
 
 class DiagQuestionPracticeItem(db.Model):
-    """CSV σ»╝σàÑτÜäΘöÖΘóÿτ╗âΣ╣áΘ¢å∩╝êµ»ÅΘóÿ 5-8 Θüô∩╝ë"""
+    """CSV 导入的错题练习集（每题 5-8 道）"""
     __tablename__ = 'diag_question_practice_items'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     exam_id = db.Column(db.Integer, db.ForeignKey('diag_exams.id', ondelete='CASCADE'), nullable=False)
@@ -658,7 +658,7 @@ class DiagQuestionPracticeItem(db.Model):
 
 
 class DiagExamQuestionPracticeConfig(db.Model):
-    """CSV σ»╝σàÑτÜäµ»ÅΘóÿΘ╗ÿΦ«ñτ╗âΣ╣áµò░ΘçÅ"""
+    """CSV 导入的每题默认练习数量"""
     __tablename__ = 'diag_exam_question_practice_config'
     exam_id = db.Column(db.Integer, db.ForeignKey('diag_exams.id', ondelete='CASCADE'), primary_key=True)
     q_index = db.Column(db.Integer, primary_key=True)
@@ -705,7 +705,7 @@ class DiagPracticeSetItem(db.Model):
 
 
 class DiagPracticeAttempt(db.Model):
-    """τ╗âΣ╣áσîàµÅÉΣ║ñΦ«░σ╜ò∩╝Üµ»ÅΣ╕¬τ╗âΣ╣áσîàµ»ÅΣ║║σÅ¬Φâ╜µÅÉΣ║ñΣ╕Çµ¼í∩╝îσåìΦ┐¢σàÑµÿ╛τñ║σ╖▓σ«îµêÉΣ╕Äσ╛ùσêå"""
+    """练习包提交记录：每个练习包每人只能提交一次，再进入显示已完成与得分"""
     __tablename__ = 'diag_practice_attempts'
     id = db.Column(db.Integer, primary_key=True)
     practice_set_id = db.Column(db.Integer, db.ForeignKey('diag_practice_sets.id'), nullable=False)
@@ -722,10 +722,10 @@ def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not current_user.is_authenticated:
-            flash('Φ»╖σàêτÖ╗σ╜ò')
+            flash('请先登录')
             return redirect(url_for('login'))
         if not current_user.is_admin:
-            flash('Θ£ÇΦªüτ«íτÉåσæÿµ¥âΘÖÉ')
+            flash('需要管理员权限')
             return redirect(url_for('index'))
         return f(*args, **kwargs)
     return decorated_function
@@ -744,25 +744,25 @@ def login():
         username = request.form['username']
         password = request.form['password']
         
-        print(f"σ░¥Φ»òτÖ╗σ╜ò: τö¿µê╖σÉì = {username}")  # µ╖╗σèáµùÑσ┐ù
+        print(f"尝试登录: 用户名 = {username}")  # 添加日志
         
         user = User.query.filter_by(username=username).first()
         if user:
-            print(f"µë╛σê░τö¿µê╖: {user.username}, µ┐Çµ┤╗τè╢µÇü: {user.is_active}")  # µ╖╗σèáµùÑσ┐ù
+            print(f"找到用户: {user.username}, 激活状态: {user.is_active}")  # 添加日志
             if user.password == password:
                 if not user.is_active:
-                    flash('Φ┤ªσÅ╖µ£¬µ┐Çµ┤╗∩╝îΦ»╖Φüöτ│╗τ«íτÉåσæÿ')
+                    flash('账号未激活，请联系管理员')
                     return redirect(url_for('login'))
                 login_user(user)
-                print(f"τö¿µê╖ {username} τÖ╗σ╜òµêÉσèƒ")  # µ╖╗σèáµùÑσ┐ù
-                flash('τÖ╗σ╜òµêÉσèƒ∩╝ü')
+                print(f"用户 {username} 登录成功")  # 添加日志
+                flash('登录成功！')
                 return redirect(url_for('index'))
             else:
-                print(f"σ»åτáüΘöÖΦ»»: {username}")  # µ╖╗σèáµùÑσ┐ù
-                flash('σ»åτáüΘöÖΦ»»')
+                print(f"密码错误: {username}")  # 添加日志
+                flash('密码错误')
         else:
-            print(f"τö¿µê╖Σ╕ìσ¡ÿσ£¿: {username}")  # µ╖╗σèáµùÑσ┐ù
-            flash('τö¿µê╖σÉìΣ╕ìσ¡ÿσ£¿')
+            print(f"用户不存在: {username}")  # 添加日志
+            flash('用户名不存在')
     return render_template('login.html')
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -774,27 +774,27 @@ def register():
         class_id = request.form['class_id']
         
         if password != confirm_password:
-            flash('Σ╕ñµ¼íΦ╛ôσàÑτÜäσ»åτáüΣ╕ìΣ╕ÇΦç┤')
+            flash('两次输入的密码不一致')
             return redirect(url_for('register'))
         
         if User.query.filter_by(username=username).first():
-            flash('τö¿µê╖σÉìσ╖▓σ¡ÿσ£¿')
+            flash('用户名已存在')
             return redirect(url_for('register'))
         
-        # Σ╕║emailτöƒµêÉΣ╕ÇΣ╕¬Θ╗ÿΦ«ñσÇ╝
+        # 为email生成一个默认值
         default_email = f"{username}@example.com"
         
         new_user = User(
             username=username,
-            email=default_email,  # Σ╜┐τö¿Θ╗ÿΦ«ñemail
+            email=default_email,  # 使用默认email
             password=password,
             class_id=class_id,
-            is_active=True  # Θ╗ÿΦ«ñΦ«╛τ╜«Σ╕║µ┐Çµ┤╗τè╢µÇü
+            is_active=True  # 默认设置为激活状态
         )
         db.session.add(new_user)
         db.session.commit()
         
-        flash('µ│¿σåîµêÉσèƒ∩╝üΦ»╖τÖ╗σ╜ò')
+        flash('注册成功！请登录')
         return redirect(url_for('login'))
     
     classes = Class.query.filter_by(is_active=True).all()
@@ -804,26 +804,26 @@ def register():
 @login_required
 def logout():
     logout_user()
-    flash('σ╖▓ΘÇÇσç║τÖ╗σ╜ò')
+    flash('已退出登录')
     return redirect(url_for('login'))
 
 @app.route('/admin/dashboard')
 @admin_required
 def admin_dashboard():
-    # ΦÄ╖σÅûτ╗ƒΦ«íµò░µì«
+    # 获取统计数据
     total_students = User.query.filter_by(is_admin=False).count()
     total_lessons = Lesson.query.count()
     total_classes = Class.query.count()
 
-    # σêåΘí╡σÅéµò░
+    # 分页参数
     page = request.args.get('page', 1, type=int)
     per_page = 50
 
-    # µƒÑΦ»óµÇ╗µò░
+    # 查询总数
     total_activities = db.session.query(QuizHistory).count()
     total_pages = (total_activities + per_page - 1) // per_page
 
-    # ΦÄ╖σÅûµ£ÇΦ┐æµ┤╗σè¿∩╝êσêåΘí╡∩╝ë
+    # 获取最近活动（分页）
     recent_activities = db.session.query(
         QuizHistory,
         User.id.label('student_id'),
@@ -837,7 +837,7 @@ def admin_dashboard():
         QuizHistory.completed_at.desc()
     ).offset((page - 1) * per_page).limit(per_page).all()
 
-    # σñäτÉåµ┤╗σè¿µò░µì«
+    # 处理活动数据
     activities = []
     for activity in recent_activities:
         activities.append({
@@ -860,13 +860,13 @@ def admin_dashboard():
 @app.route('/admin/users/<int:class_id>')
 @admin_required
 def admin_users(class_id=None):
-    # ΦÄ╖σÅûµëÇµ£ëτ«íτÉåσæÿτö¿µê╖
+    # 获取所有管理员用户
     admin_users = User.query.filter_by(is_admin=True).all()
     
-    # ΦÄ╖σÅûµëÇµ£ëτÅ¡τ║º
+    # 获取所有班级
     classes = Class.query.all()
     
-    # ΦÄ╖σÅûΘ¥₧τ«íτÉåσæÿτö¿µê╖∩╝îµá╣µì«τÅ¡τ║ºIDτ¡¢ΘÇë
+    # 获取非管理员用户，根据班级ID筛选
     if class_id:
         students = User.query.filter_by(
             class_id=class_id, 
@@ -874,7 +874,7 @@ def admin_users(class_id=None):
         ).all()
         class_users = {Class.query.get(class_id): students}
     else:
-        # σªéµ₧£µ▓íµ£ëµîçσ«ÜτÅ¡τ║º∩╝îΦÄ╖σÅûµëÇµ£ëτÅ¡τ║ºτÜäτö¿µê╖
+        # 如果没有指定班级，获取所有班级的用户
         class_users = {}
         for class_ in classes:
             students = User.query.filter_by(
@@ -883,16 +883,16 @@ def admin_users(class_id=None):
             ).all()
             class_users[class_] = students
     
-    # τ╗ƒΦ«íµ»ÅΣ╕¬σ¡ªτöƒµ£¬σ«îµêÉΣ╜£Σ╕Üµò░
+    # 统计每个学生未完成作业数
     unfinished_count = defaultdict(int)
     lessons = Lesson.query.filter_by(is_active=True).all()
     for class_, students in class_users.items():
         for user in students:
-            # Φ»Ñσ¡ªτöƒµëÇσ£¿τÅ¡τ║ºτÜäµëÇµ£ëΦ»╛τ¿ï
+            # 该学生所在班级的所有课程
             user_lessons = [lesson for lesson in lessons if class_ in lesson.classes]
-            # Φ»Ñσ¡ªτöƒσ╖▓σ«îµêÉτÜäΦ»╛τ¿ïid
+            # 该学生已完成的课程id
             finished_ids = set(qh.lesson_id for qh in user.quiz_history)
-            # µ£¬σ«îµêÉΦ»╛τ¿ïµò░
+            # 未完成课程数
             unfinished_count[user.id] = len([l for l in user_lessons if l.id not in finished_ids])
     
     return render_template('admin/users.html', 
@@ -906,10 +906,10 @@ def admin_users(class_id=None):
 @admin_required
 def toggle_user_status(user_id):
     user = User.query.get_or_404(user_id)
-    # Θÿ▓µ¡óτ«íτÉåσæÿΦó½τªüτö¿
+    # 防止管理员被禁用
     if user.is_admin:
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({'success': False, 'msg': 'Σ╕ìΦâ╜τªüτö¿τ«íτÉåσæÿ'})
+            return jsonify({'success': False, 'msg': '不能禁用管理员'})
         return redirect(url_for('admin_users'))
     user.is_active = not user.is_active
     db.session.commit()
@@ -922,7 +922,7 @@ def toggle_user_status(user_id):
 def delete_user(user_id):
     user = User.query.get_or_404(user_id)
     
-    # Θÿ▓µ¡óτ«íτÉåσæÿΦó½σêáΘÖñ
+    # 防止管理员被删除
     if user.is_admin:
         return redirect(url_for('admin_users'))
     
@@ -943,18 +943,18 @@ def add_class():
     description = request.form.get('description')
     
     if not name:
-        flash('τÅ¡τ║ºσÉìτº░Σ╕ìΦâ╜Σ╕║τ⌐║')
+        flash('班级名称不能为空')
         return redirect(url_for('admin_classes'))
     
     if Class.query.filter_by(name=name).first():
-        flash('τÅ¡τ║ºσÉìτº░σ╖▓σ¡ÿσ£¿')
+        flash('班级名称已存在')
         return redirect(url_for('admin_classes'))
     
     new_class = Class(name=name, description=description)
     db.session.add(new_class)
     db.session.commit()
     
-    flash('τÅ¡τ║ºµ╖╗σèáµêÉσèƒ')
+    flash('班级添加成功')
     return redirect(url_for('admin_classes'))
 
 @app.route('/admin/class/<int:class_id>/toggle', methods=['POST'])
@@ -963,7 +963,7 @@ def toggle_class_status(class_id):
     class_ = Class.query.get_or_404(class_id)
     class_.is_active = not class_.is_active
     db.session.commit()
-    flash(f'τÅ¡τ║º {class_.name} τè╢µÇüσ╖▓µ¢┤µû░')
+    flash(f'班级 {class_.name} 状态已更新')
     return redirect(url_for('admin_classes'))
 
 @app.route('/admin/class/<int:class_id>/delete', methods=['POST'])
@@ -972,23 +972,23 @@ def delete_class(class_id):
     try:
         class_ = Class.query.get_or_404(class_id)
         
-        # σÅ¬σêáΘÖñΘ¥₧τ«íτÉåσæÿτö¿µê╖
+        # 只删除非管理员用户
         User.query.filter_by(class_id=class_id, is_admin=False).delete()
         
-        # σêáΘÖñτÅ¡τ║ºσÆîΦ»╛τ¿ïτÜäσà│Φüö∩╝êΘÇÜΦ┐çσà│ΦüöΦí¿∩╝ë
+        # 删除班级和课程的关联（通过关联表）
         db.session.execute(lesson_class_association.delete().where(
             lesson_class_association.c.class_id == class_id
         ))
         
-        # σêáΘÖñτÅ¡τ║º
+        # 删除班级
         db.session.delete(class_)
         db.session.commit()
         
-        flash(f'τÅ¡τ║º {class_.name} σÅèσà╢µëÇµ£ëΘ¥₧τ«íτÉåσæÿτö¿µê╖σ╖▓σêáΘÖñ', 'success')
+        flash(f'班级 {class_.name} 及其所有非管理员用户已删除', 'success')
     except Exception as e:
         db.session.rollback()
-        flash(f'σêáΘÖñσñ▒Φ┤Ñ∩╝Ü{str(e)}', 'error')
-        print(f"σêáΘÖñτÅ¡τ║ºµù╢σç║ΘöÖ: {str(e)}")  # µ╖╗σèáµùÑσ┐ù
+        flash(f'删除失败：{str(e)}', 'error')
+        print(f"删除班级时出错: {str(e)}")  # 添加日志
     
     return redirect(url_for('admin_classes'))
 
@@ -997,38 +997,38 @@ def delete_class(class_id):
 def edit_class(class_id):
     class_ = Class.query.get_or_404(class_id)
     
-    # ΦÄ╖σÅûΦí¿σìòµò░µì«
+    # 获取表单数据
     name = request.form.get('name')
     description = request.form.get('description')
     
     if not name:
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({'success': False, 'msg': 'τÅ¡τ║ºσÉìτº░Σ╕ìΦâ╜Σ╕║τ⌐║'})
-        flash('τÅ¡τ║ºσÉìτº░Σ╕ìΦâ╜Σ╕║τ⌐║')
+            return jsonify({'success': False, 'msg': '班级名称不能为空'})
+        flash('班级名称不能为空')
         return redirect(url_for('admin_classes'))
     
-    # µúÇµƒÑσÉìτº░µÿ»σÉªσ╖▓σ¡ÿσ£¿∩╝êµÄÆΘÖñσ╜ôσëìτÅ¡τ║º∩╝ë
+    # 检查名称是否已存在（排除当前班级）
     existing_class = Class.query.filter(Class.name == name, Class.id != class_id).first()
     if existing_class:
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({'success': False, 'msg': 'τÅ¡τ║ºσÉìτº░σ╖▓σ¡ÿσ£¿'})
-        flash('τÅ¡τ║ºσÉìτº░σ╖▓σ¡ÿσ£¿')
+            return jsonify({'success': False, 'msg': '班级名称已存在'})
+        flash('班级名称已存在')
         return redirect(url_for('admin_classes'))
     
-    # µ¢┤µû░τÅ¡τ║ºΣ┐íµü»
+    # 更新班级信息
     class_.name = name
     class_.description = description
     
     try:
         db.session.commit()
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({'success': True, 'msg': 'τÅ¡τ║ºµ¢┤µû░µêÉσèƒ'})
-        flash('τÅ¡τ║ºµ¢┤µû░µêÉσèƒ')
+            return jsonify({'success': True, 'msg': '班级更新成功'})
+        flash('班级更新成功')
     except Exception as e:
         db.session.rollback()
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({'success': False, 'msg': f'µ¢┤µû░σñ▒Φ┤Ñ∩╝Ü{str(e)}'})
-        flash(f'µ¢┤µû░σñ▒Φ┤Ñ∩╝Ü{str(e)}')
+            return jsonify({'success': False, 'msg': f'更新失败：{str(e)}'})
+        flash(f'更新失败：{str(e)}')
     
     return redirect(url_for('admin_classes'))
 
@@ -1044,19 +1044,19 @@ def admin_lessons():
 def add_lesson():
     title = request.form.get('title')
     description = request.form.get('description')
-    class_ids = request.form.getlist('class_ids')  # Σ┐«µö╣Φ┐ÖΘçî
+    class_ids = request.form.getlist('class_ids')  # 修改这里
     
     if not title or not class_ids:
         return redirect(url_for('admin_lessons'))
     
-    # σê¢σ╗║µû░Φ»╛τ¿ï
+    # 创建新课程
     new_lesson = Lesson(
         title=title,
         description=description,
         is_active=False
     )
     
-    # µ╖╗σèáτÅ¡τ║ºσà│Φüö
+    # 添加班级关联
     for class_id in class_ids:
         class_ = Class.query.get(class_id)
         if class_:
@@ -1075,16 +1075,16 @@ def add_lesson():
 def toggle_lesson_status(lesson_id):
     lesson = Lesson.query.get_or_404(lesson_id)
     
-    # τ¢┤µÄÑσêçµìóσ╜ôσëìΦ»╛τ¿ïτÜäτè╢µÇü
+    # 直接切换当前课程的状态
     lesson.is_active = not lesson.is_active
     db.session.commit()
     
-    # µúÇµƒÑµÿ»σÉªµÿ»AJAXΦ»╖µ▒é
+    # 检查是否是AJAX请求
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return jsonify({
             'success': True,
             'is_active': lesson.is_active,
-            'message': f'Φ»╛τ¿ï {lesson.title} {{ "σ╖▓µ┐Çµ┤╗" if lesson.is_active else "σ╖▓σü£τö¿" }}'
+            'message': f'课程 {lesson.title} {{ "已激活" if lesson.is_active else "已停用" }}'
         })
     
     return redirect(url_for('admin_lessons'))
@@ -1093,73 +1093,73 @@ def toggle_lesson_status(lesson_id):
 @admin_required
 def delete_lesson(lesson_id):
     try:
-        print(f"σ╝ÇσºïσêáΘÖñΦ»╛τ¿ï ID: {lesson_id}")  # Φ░âΦ»òµùÑσ┐ù
+        print(f"开始删除课程 ID: {lesson_id}")  # 调试日志
         lesson = Lesson.query.get_or_404(lesson_id)
-        print(f"µë╛σê░Φ»╛τ¿ï: {lesson.title}")  # Φ░âΦ»òµùÑσ┐ù
+        print(f"找到课程: {lesson.title}")  # 调试日志
         
-        # ΘªûσàêσêáΘÖñΣ╕ÄΦ»╛τ¿ïτ¢╕σà│τÜäµëÇµ£ëτ¡öΘóÿΦ«░σ╜ò
+        # 首先删除与课程相关的所有答题记录
         UserAnswer.query.filter_by(lesson_id=lesson_id).delete()
-        print("σêáΘÖñΣ║åτ¡öΘóÿΦ«░σ╜ò")  # Φ░âΦ»òµùÑσ┐ù
+        print("删除了答题记录")  # 调试日志
         
-        # τä╢σÉÄσêáΘÖñΦÇâΦ»òΦ«░σ╜ò
+        # 然后删除考试记录
         QuizHistory.query.filter_by(lesson_id=lesson_id).delete()
-        print("σêáΘÖñΣ║åΦÇâΦ»òΦ«░σ╜ò")  # Φ░âΦ»òµùÑσ┐ù
+        print("删除了考试记录")  # 调试日志
         
-        # σêáΘÖñΣ╕ÄΦ»╛τ¿ïτ¢╕σà│τÜäµëÇµ£ëΦ»òσì╖µûçΣ╗╢
+        # 删除与课程相关的所有试卷文件
         exam_files = ExamFile.query.filter_by(lesson_id=lesson_id).all()
-        print(f"µë╛σê░ {len(exam_files)} Σ╕¬Φ»òσì╖µûçΣ╗╢")  # Φ░âΦ»òµùÑσ┐ù
+        print(f"找到 {len(exam_files)} 个试卷文件")  # 调试日志
         for file in exam_files:
             try:
-                # σêáΘÖñτë⌐τÉåµûçΣ╗╢∩╝êσªéµ₧£µÿ»µ£¼σ£░σ¡ÿσé¿τÜäΦ»¥∩╝ë
+                # 删除物理文件（如果是本地存储的话）
                 file_path = os.path.join('static', file.path)
-                print(f"σ░¥Φ»òσêáΘÖñµûçΣ╗╢: {file_path}")  # Φ░âΦ»òµùÑσ┐ù
+                print(f"尝试删除文件: {file_path}")  # 调试日志
                 if os.path.exists(file_path):
                     os.remove(file_path)
-                    print(f"µêÉσèƒσêáΘÖñµûçΣ╗╢: {file_path}")  # Φ░âΦ»òµùÑσ┐ù
+                    print(f"成功删除文件: {file_path}")  # 调试日志
             except Exception as e:
-                print(f"σêáΘÖñµûçΣ╗╢σñ▒Φ┤Ñ: {str(e)}")  # Φ«░σ╜òµûçΣ╗╢σêáΘÖñΘöÖΦ»»Σ╜åτ╗ºτ╗¡µëºΦíî
+                print(f"删除文件失败: {str(e)}")  # 记录文件删除错误但继续执行
         
-        # σêáΘÖñµò░µì«σ║ôΣ╕¡τÜäΦ»òσì╖µûçΣ╗╢Φ«░σ╜ò
+        # 删除数据库中的试卷文件记录
         ExamFile.query.filter_by(lesson_id=lesson_id).delete()
-        print("σêáΘÖñΣ║åΦ»òσì╖µûçΣ╗╢Φ«░σ╜ò")  # Φ░âΦ»òµùÑσ┐ù
+        print("删除了试卷文件记录")  # 调试日志
 
-        # σêáΘÖñΣ╕ÄΦ»╛τ¿ïτ¢╕σà│τÜäµëÇµ£ëΦºúµ₧ÉµûçΣ╗╢
+        # 删除与课程相关的所有解析文件
         explanation_files = ExplanationFile.query.filter_by(lesson_id=lesson_id).all()
-        print(f"µë╛σê░ {len(explanation_files)} Σ╕¬Φºúµ₧ÉµûçΣ╗╢")  # Φ░âΦ»òµùÑσ┐ù
+        print(f"找到 {len(explanation_files)} 个解析文件")  # 调试日志
         for file in explanation_files:
             try:
-                # σêáΘÖñτë⌐τÉåµûçΣ╗╢∩╝êσªéµ₧£µÿ»µ£¼σ£░σ¡ÿσé¿τÜäΦ»¥∩╝ë
+                # 删除物理文件（如果是本地存储的话）
                 file_path = os.path.join('static', file.path)
-                print(f"σ░¥Φ»òσêáΘÖñΦºúµ₧ÉµûçΣ╗╢: {file_path}")  # Φ░âΦ»òµùÑσ┐ù
+                print(f"尝试删除解析文件: {file_path}")  # 调试日志
                 if os.path.exists(file_path):
                     os.remove(file_path)
-                    print(f"µêÉσèƒσêáΘÖñΦºúµ₧ÉµûçΣ╗╢: {file_path}")  # Φ░âΦ»òµùÑσ┐ù
+                    print(f"成功删除解析文件: {file_path}")  # 调试日志
             except Exception as e:
-                print(f"σêáΘÖñΦºúµ₧ÉµûçΣ╗╢σñ▒Φ┤Ñ: {str(e)}")  # Φ«░σ╜òµûçΣ╗╢σêáΘÖñΘöÖΦ»»Σ╜åτ╗ºτ╗¡µëºΦíî
+                print(f"删除解析文件失败: {str(e)}")  # 记录文件删除错误但继续执行
         
-        # σêáΘÖñµò░µì«σ║ôΣ╕¡τÜäΦºúµ₧ÉµûçΣ╗╢Φ«░σ╜ò
+        # 删除数据库中的解析文件记录
         ExplanationFile.query.filter_by(lesson_id=lesson_id).delete()
-        print("σêáΘÖñΣ║åΦºúµ₧ÉµûçΣ╗╢Φ«░σ╜ò")  # Φ░âΦ»òµùÑσ┐ù
+        print("删除了解析文件记录")  # 调试日志
         
-        # σêáΘÖñΣ╕ÄΦ»╛τ¿ïτ¢╕σà│τÜäµëÇµ£ëΘù«Θóÿ
+        # 删除与课程相关的所有问题
         Question.query.filter_by(lesson_id=lesson_id).delete()
-        print("σêáΘÖñΣ║åΘóÿτ¢«Φ«░σ╜ò")  # Φ░âΦ»òµùÑσ┐ù
+        print("删除了题目记录")  # 调试日志
         
-        # σêáΘÖñΦ»╛τ¿ïσÆîτÅ¡τ║ºτÜäσà│Φüö
+        # 删除课程和班级的关联
         lesson.classes = []
-        print("σêáΘÖñΣ║åΦ»╛τ¿ïσÆîτÅ¡τ║ºτÜäσà│Φüö")  # Φ░âΦ»òµùÑσ┐ù
+        print("删除了课程和班级的关联")  # 调试日志
         
-        # µ£ÇσÉÄσêáΘÖñΦ»╛τ¿ïµ£¼Φ║½
+        # 最后删除课程本身
         db.session.delete(lesson)
         db.session.commit()
-        print("µêÉσèƒσêáΘÖñΦ»╛τ¿ï")  # Φ░âΦ»òµùÑσ┐ù
+        print("成功删除课程")  # 调试日志
         
         return redirect(url_for('admin_lessons'))
         
     except Exception as e:
         db.session.rollback()
         error_msg = str(e)
-        print(f"σêáΘÖñΦ»╛τ¿ïµù╢σç║ΘöÖ: {error_msg}")  # Φ░âΦ»òµùÑσ┐ù
+        print(f"删除课程时出错: {error_msg}")  # 调试日志
         return redirect(url_for('admin_lessons'))
 
 @app.route('/admin/lesson/<int:lesson_id>/questions')
@@ -1178,70 +1178,69 @@ def manage_questions(lesson_id):
 @app.route('/student/dashboard')
 @login_required
 def student_dashboard():
-    # ΦÄ╖σÅûτö¿µê╖τÜäµëÇµ£ëµ╡ïΘ¬îσÄåσÅ▓Φ«░σ╜ò
+    # 获取用户的所有测验历史记录
     quiz_history = QuizHistory.query.filter_by(user_id=current_user.id).all()
-    
-    # µû░σó₧∩╝Üσ«ÜΣ╣ë correct_rate∩╝îΘÿ▓µ¡óµ£¬σ«ÜΣ╣ëµèÑΘöÖ
+    # 新增：定义 correct_rate，防止未定义报错
     if quiz_history:
-        correct_rate = quiz_history[-1].correct_rate  # µ£ÇΦ┐æΣ╕Çµ¼íµ╡ïΘ¬îτÜäµ¡úτí«τÄç
+        correct_rate = quiz_history[-1].correct_rate  # 最近一次测验的正确率
     else:
         correct_rate = 0
     
-    # σªéµ₧£τö¿µê╖Φ┐ÿµ▓íµ£ëσ«îµêÉΣ╗╗Σ╜òµ╡ïΘ¬î∩╝îσ░åσ╛╜τ½áτ¡ëτ║ºΦ«╛τ╜«Σ╕║0
+    # 如果用户还没有完成任何测验，将徽章等级设置为0
     if not quiz_history:
         current_user.badge_level = 0
         current_user.achievement_count = 0
     else:
-        # σªéµ₧£τö¿µê╖σ«îµêÉΣ║åµ╡ïΘ¬îΣ╜åΦ┐ÿµÿ»Level 0∩╝îσìçτ║ºσê░Level 1
+        # 如果用户完成了测验但还是Level 0，升级到Level 1
         if current_user.badge_level == 0:
             current_user.badge_level = 1
             current_user.achievement_count = 1
 
-            flash('µü¡σû£∩╝üΣ╜áΦÄ╖σ╛ùΣ║åτ¼¼Σ╕ÇΣ╕¬σ╛╜τ½á∩╝Üσ░Åµ»¢µ»¢ΦÖ½∩╝ü≡ƒÉ¢', 'success')
-        # Level 1 σê░ Level 3∩╝ÜΘ£ÇΦªüΦ╛╛σê░60%
+            flash('恭喜！你获得了第一个徽章：小毛毛虫！🐛', 'success')
+        # Level 1 到 Level 3：需要达到60%
         elif current_user.badge_level < 3:
             if correct_rate >= 60:
-                # Level 1 σìç Level 2 Θ£ÇΦªü2µ¼íΦ╛╛µáç
+                # Level 1 升 Level 2 需要2次达标
                 if current_user.badge_level == 1 and current_user.achievement_count % 2 == 0:
                     current_user.badge_level = 2
-                    flash(f'µü¡σû£∩╝üΣ╜áσ╖▓τ╗Åσìçτ║ºσê░ {current_user.badge_info["name"]} τ║ºσê½∩╝ü', 'success')
-                # Level 2 σìç Level 3 Θ£ÇΦªü3µ¼íΦ╛╛µáç
+                    flash(f'恭喜！你已经升级到 {current_user.badge_info["name"]} 级别！', 'success')
+                # Level 2 升 Level 3 需要3次达标
                 elif current_user.badge_level == 2 and current_user.achievement_count % 3 == 0:
                     current_user.badge_level = 3
-                    flash(f'µü¡σû£∩╝üΣ╜áσ╖▓τ╗Åσìçτ║ºσê░ {current_user.badge_info["name"]} τ║ºσê½∩╝ü', 'success')
-        # Level 3 σê░ Level 8∩╝Üµ»Åτ║ºΘ£ÇΦªüΣ╕ñµ¼í80%
+                    flash(f'恭喜！你已经升级到 {current_user.badge_info["name"]} 级别！', 'success')
+        # Level 3 到 Level 8：每级需要两次80%
         elif 3 <= current_user.badge_level < 8:
             if correct_rate >= 80 and current_user.achievement_count % 2 == 0:
                 current_user.badge_level += 1
-                flash(f'µü¡σû£∩╝üΣ╜áσ╖▓τ╗Åσìçτ║ºσê░ {current_user.badge_info["name"]} τ║ºσê½∩╝ü', 'success')
-        # Level 8Σ╗ÑΣ╕è∩╝Üµ»Åτ║ºΘ£ÇΦªüΣ║öµ¼í80%
+                flash(f'恭喜！你已经升级到 {current_user.badge_info["name"]} 级别！', 'success')
+        # Level 8以上：每级需要五次80%
         else:
             if correct_rate >= 80:
                 if current_user.achievement_count % 5 == 0:
                     current_user.badge_level += 1
-                    flash(f'σñ¬σÄëσ«│Σ║å∩╝üΣ╜áσ╖▓τ╗Åσìçτ║ºσê░ {current_user.badge_info["name"]} τ║ºσê½∩╝ü', 'success')
-        # µÇ╗µêÉσ░▒µò░Σ╛¥τä╢τ┤»Φ«í
+                    flash(f'太厉害了！你已经升级到 {current_user.badge_info["name"]} 级别！', 'success')
+        # 总成就数依然累计
         current_user.achievement_count += 1
     
-    # Φ«íτ«ùµÇ╗µ╡ïΘ¬îµò░σÆîσ╣│σ¥çµ¡úτí«τÄç
+    # 计算总测验数和平均正确率
     total_quizzes = len(quiz_history)
     if total_quizzes > 0:
         total_correct_rate = round(sum(quiz.correct_rate for quiz in quiz_history) / total_quizzes)
     else:
         total_correct_rate = 0
     
-    # ΦÄ╖σÅûσÄåσÅ▓Φ»╛τ¿ïµò░µì«
+    # 获取历史课程数据
     history_data = db.session.query(Lesson, QuizHistory)\
         .join(QuizHistory, Lesson.id == QuizHistory.lesson_id)\
         .filter(QuizHistory.user_id == current_user.id)\
         .order_by(QuizHistory.completed_at.desc())\
         .all()
     
-    # ΦÄ╖σÅûσ╖▓σ«îµêÉτÜäΦ»╛τ¿ïIDσêùΦí¿
+    # 获取已完成的课程ID列表
     completed_lesson_ids = [quiz.lesson_id for quiz in quiz_history]
     
-    # ΦÄ╖σÅûσ╜ôσëìσÅ»τö¿τÜäΦ»╛τ¿ï∩╝êµ┐Çµ┤╗τè╢µÇüΣ╕öµ£¬σ«îµêÉτÜäΦ»╛τ¿ï∩╝ë
-    # Σ┐«µö╣Φ┐ÖΘçî∩╝ÜΣ╜┐τö¿σñÜσ»╣σñÜσà│ΦüöµƒÑΦ»ó
+    # 获取当前可用的课程（激活状态且未完成的课程）
+    # 修改这里：使用多对多关联查询
     available_lessons = Lesson.query.join(
         lesson_class_association,
         Lesson.id == lesson_class_association.c.lesson_id
@@ -1251,12 +1250,12 @@ def student_dashboard():
         ~Lesson.id.in_(completed_lesson_ids) if completed_lesson_ids else True
     ).all()
     
-    # σçåσñçΦ╢ïσè┐σ¢╛µò░µì«
+    # 准备趋势图数据
     trend_data = []
     for quiz in quiz_history:
         lesson = Lesson.query.get(quiz.lesson_id)
         
-        # Φ«íτ«ùΦ»ÑΦ»╛τ¿ïτÜäτÅ¡τ║ºσ╣│σ¥çµ¡úτí«τÄç
+        # 计算该课程的班级平均正确率
         class_avg = db.session.query(func.avg(QuizHistory.correct_answers * 100.0 / QuizHistory.total_questions))\
             .filter(QuizHistory.lesson_id == quiz.lesson_id,
                    QuizHistory.user_id != current_user.id)\
@@ -1264,8 +1263,8 @@ def student_dashboard():
         
         trend_data.append({
             'date': quiz.completed_at.strftime('%Y-%m-%d'),
-            'correct_rate': round(quiz.correct_rate),  # σÅûµò┤
-            'class_avg': round(class_avg),  # σÅûµò┤
+            'correct_rate': round(quiz.correct_rate),  # 取整
+            'class_avg': round(class_avg),  # 取整
             'lesson_title': lesson.title if lesson else 'Unknown'
         })
     
@@ -1279,23 +1278,23 @@ def student_dashboard():
 @app.route('/admin/lesson/<int:lesson_id>/kp_notes', methods=['POST'])
 @admin_required
 def upload_lesson_kp_notes(lesson_id):
-    """Σ╕èΣ╝áσìòΣ╕¬Φ»╛τ¿ïτÜäτƒÑΦ»åτé╣τ¼öΦ«░σ¢╛τëç∩╝êσåÖσàÑ Cloudinary URL∩╝ëπÇé"""
+    """上传单个课程的知识点笔记图片（写入 Cloudinary URL）。"""
     lesson = Lesson.query.get_or_404(lesson_id)
     file = request.files.get('kp_notes_image')
     if not file or not file.filename:
-        flash('Φ»╖ΘÇëµï⌐σ¢╛τëçµûçΣ╗╢', 'error')
+        flash('请选择图片文件', 'error')
         return redirect(url_for('admin_lessons'))
     ext_ok = allowed_file(file.filename, ALLOWED_IMAGE_EXTENSIONS)
     if not ext_ok:
-        flash('Σ╗àµö»µîü png / jpg / jpeg / gif σ¢╛τëç', 'error')
+        flash('仅支持 png / jpg / jpeg / gif 图片', 'error')
         return redirect(url_for('admin_lessons'))
     url = upload_to_cloudinary(file, resource_type='image')
     if not url:
-        flash('Σ╕èΣ╝áσñ▒Φ┤Ñ∩╝îΦ»╖τ¿ìσÉÄΘçìΦ»ò', 'error')
+        flash('上传失败，请稍后重试', 'error')
         return redirect(url_for('admin_lessons'))
     lesson.kp_notes_image_url = url
     db.session.commit()
-    flash('τƒÑΦ»åτé╣τ¼öΦ«░σ╖▓Σ┐¥σ¡ÿ', 'success')
+    flash('知识点笔记已保存', 'success')
     return redirect(url_for('admin_lessons'))
 
 @app.route('/admin/lesson/<int:lesson_id>/kp_notes/clear', methods=['POST'])
@@ -1304,16 +1303,16 @@ def clear_lesson_kp_notes(lesson_id):
     lesson = Lesson.query.get_or_404(lesson_id)
     lesson.kp_notes_image_url = None
     db.session.commit()
-    flash('σ╖▓µ╕àΘÖñτƒÑΦ»åτé╣τ¼öΦ«░', 'info')
+    flash('已清除知识点笔记', 'info')
     return redirect(url_for('admin_lessons'))
 
 @app.route('/student/lesson/<int:lesson_id>/kp_notes')
 @login_required
 def student_lesson_kp_notes(lesson_id):
-    """σ¡ªτöƒµƒÑτ£ïτƒÑΦ»åτé╣τ¼öΦ«░σ¢╛∩╝êΘí╗σ▒₧Σ║ÄΦ»ÑτöƒτÅ¡τ║ºσà│ΦüöΦ»╛τ¿ï∩╝ë∩╝¢τ«íτÉåσæÿσÅ»ΘÜÅµù╢ΘóäΦºêπÇé"""
+    """学生查看知识点笔记图（须属于该生班级关联课程）；管理员可随时预览。"""
     lesson = Lesson.query.get_or_404(lesson_id)
     if not (lesson.kp_notes_image_url or '').strip():
-        flash('µÜéµùáτƒÑΦ»åτé╣τ¼öΦ«░', 'warning')
+        flash('暂无知识点笔记', 'warning')
         return redirect(url_for('student_dashboard'))
     if getattr(current_user, 'is_admin', False):
         return render_template('student/kp_notes_image.html',
@@ -1321,7 +1320,7 @@ def student_lesson_kp_notes(lesson_id):
                                image_url=lesson.kp_notes_image_url.strip())
     user_class = Class.query.get(current_user.class_id)
     if not user_class or user_class not in lesson.classes:
-        flash('µùáµ¥âµƒÑτ£ïΦ»Ñσåàσ«╣', 'error')
+        flash('无权查看该内容', 'error')
         return redirect(url_for('student_dashboard'))
     return render_template('student/kp_notes_image.html',
                            lesson_title=lesson.title,
@@ -1332,20 +1331,20 @@ def student_lesson_kp_notes(lesson_id):
 def edit_lesson(lesson_id):
     lesson = Lesson.query.get_or_404(lesson_id)
     
-    # ΦÄ╖σÅûΦí¿σìòµò░µì«
+    # 获取表单数据
     title = request.form.get('title')
     description = request.form.get('description')
-    class_ids = request.form.getlist('class_ids')  # µ│¿µäÅΦ┐ÖΘçîΣ╜┐τö¿class_idsΦÇîΣ╕ìµÿ»class_id
+    class_ids = request.form.getlist('class_ids')  # 注意这里使用class_ids而不是class_id
     
     if not title or not class_ids:
         return redirect(url_for('admin_lessons'))
     
-    # µ¢┤µû░Φ»╛τ¿ïΣ┐íµü»
+    # 更新课程信息
     lesson.title = title
     lesson.description = description
     
-    # µ¢┤µû░τÅ¡τ║ºσà│Φüö
-    lesson.classes = []  # µ╕àΘÖñτÄ░µ£ëσà│Φüö
+    # 更新班级关联
+    lesson.classes = []  # 清除现有关联
     for class_id in class_ids:
         class_ = Class.query.get(class_id)
         if class_:
@@ -1372,54 +1371,54 @@ def upload_exam(lesson_id):
 def start_quiz(lesson_id):
     user = current_user
     lesson = Lesson.query.get_or_404(lesson_id)
-    print(f"σ╝Çσºïτ¡öΘóÿ - Φ»╛τ¿ïID: {lesson_id}, Φ»╛τ¿ïσÉìτº░: {lesson.title}")
+    print(f"开始答题 - 课程ID: {lesson_id}, 课程名称: {lesson.title}")
 
-    # Θ¬îΦ»üΦ»╛τ¿ïµÿ»σÉªσ▒₧Σ║Äτö¿µê╖τÅ¡τ║ºΣ╕öσ╖▓µ┐Çµ┤╗
+    # 验证课程是否属于用户班级且已激活
     user_class = Class.query.get(user.class_id)
     if user_class not in lesson.classes or not lesson.is_active:
-        flash('µùáµ│òΦ«┐Θù«Φ»ÑΦ»╛τ¿ï')
+        flash('无法访问该课程')
         return redirect(url_for('student_dashboard'))
 
-    # µúÇµƒÑµÿ»σÉªσ╖▓τ╗Åσ«îµêÉΦ┐çΦ┐ÖΣ╕¬Φ»╛τ¿ïτÜäτ¡öΘóÿ∩╝êσÅ¬σàüΦ«╕Σ╕Çµ¼í∩╝ë
+    # 检查是否已经完成过这个课程的答题（只允许一次）
     existing_quiz = QuizHistory.query.filter_by(
         user_id=user.id,
         lesson_id=lesson_id
     ).order_by(QuizHistory.completed_at.asc()).first()
 
     if existing_quiz:
-        flash('Σ╜áσ╖▓τ╗Åσ«îµêÉΦ┐çΦ┐ÖΣ╕¬Φ»╛τ¿ïτÜäτ¡öΘóÿ∩╝îΣ╕ìΦâ╜Θçìσñìτ¡öΘóÿ', 'warning')
+        flash('你已经完成过这个课程的答题，不能重复答题', 'warning')
         return redirect(url_for('view_history', lesson_id=lesson_id))
 
-    # µúÇµƒÑΦ»╛τ¿ïµÿ»σÉªµ£ëΘóÿτ¢«
+    # 检查课程是否有题目
     questions = Question.query.filter_by(lesson_id=lesson_id).order_by(Question.question_number).all()
-    print(f"Θóÿτ¢«µò░ΘçÅ: {len(questions)}")
+    print(f"题目数量: {len(questions)}")
     for q in questions:
-        print(f"ΘóÿσÅ╖: {q.question_number}, τ▒╗σ₧ï: {q.type}, τ¡öµíê: {q.answer}")
+        print(f"题号: {q.question_number}, 类型: {q.type}, 答案: {q.answer}")
 
-    # τ╗Öµ»ÅΣ╕¬Θóÿτ¢«σèáΘ╗ÿΦ«ñσ¡ùµò░ΘÖÉσê╢∩╝êσªé200σ¡ù∩╝ë
+    # 给每个题目加默认字数限制（如200字）
     for q in questions:
         if not hasattr(q, 'word_limit') or q.word_limit is None:
             q.word_limit = 200
 
     if not questions:
-        flash('Φ»ÑΦ»╛τ¿ïΦ┐ÿµ▓íµ£ëΘóÿτ¢«∩╝îΦ»╖τ¡ëσ╛àµòÖσ╕êΣ╕èΣ╝áΘóÿτ¢«')
+        flash('该课程还没有题目，请等待教师上传题目')
         return redirect(url_for('student_dashboard'))
 
-    # ΦÄ╖σÅûΦ»òΘóÿµûçΣ╗╢
+    # 获取试题文件
     exam_files = ExamFile.query.filter_by(lesson_id=lesson_id).order_by(ExamFile.page_number).all()
-    print(f"Φ»òΘóÿµûçΣ╗╢µò░ΘçÅ: {len(exam_files)}")
+    print(f"试题文件数量: {len(exam_files)}")
     for f in exam_files:
-        print(f"µûçΣ╗╢ID: {f.id}, Θí╡τáü: {f.page_number}, Φ╖»σ╛ä: {f.path}")
+        print(f"文件ID: {f.id}, 页码: {f.page_number}, 路径: {f.path}")
 
     if not exam_files:
-        flash('Φ»ÑΦ»╛τ¿ïΦ┐ÿµ▓íµ£ëΣ╕èΣ╝áΦ»òσì╖∩╝îΦ»╖τ¡ëσ╛àµòÖσ╕êΣ╕èΣ╝áΦ»òσì╖')
+        flash('该课程还没有上传试卷，请等待教师上传试卷')
         return redirect(url_for('student_dashboard'))
 
-    # ΦÄ╖σÅûΦºúµ₧ÉµûçΣ╗╢
+    # 获取解析文件
     explanation_files = ExplanationFile.query.filter_by(lesson_id=lesson_id).order_by(ExplanationFile.page_number).all()
-    print(f"Φºúµ₧ÉµûçΣ╗╢µò░ΘçÅ: {len(explanation_files)}")
+    print(f"解析文件数量: {len(explanation_files)}")
 
-    # σê¢σ╗║Σ╕ÇΣ╕¬τ⌐║τÜäΦí¿σìòτö¿Σ║ÄCSRFΣ┐¥µèñ
+    # 创建一个空的表单用于CSRF保护
     form = FlaskForm()
 
     return render_template('student/quiz.html',
@@ -1430,7 +1429,7 @@ def start_quiz(lesson_id):
                          form=form)
 
 def _homework_image_maps(lesson_id):
-    """µîëΘóÿσÅ╖σÅûΦ»òΘóÿσ¢╛πÇüΦºúµ₧Éσ¢╛ URLπÇé"""
+    """按题号取试题图、解析图 URL。"""
     exam_by_page = {
         f.page_number: f.path
         for f in ExamFile.query.filter_by(lesson_id=lesson_id).all()
@@ -1446,8 +1445,8 @@ def _homework_image_maps(lesson_id):
 
 def _grade_homework_question(question, user_answer, exam_by_page=None, expl_by_page=None):
     """
-    Σ╜£Σ╕ÜσìòΘóÿσêñσêå∩╝ÜσàêΦºäσêÖ∩╝îΦºäσêÖσêñΘöÖµêûΦºúτ¡öΘóÿµù╢τö¿ GPT∩╝êσ»╣τàºµáçσçåτ¡öµíê + Φ»òΘóÿ/Φºúµ₧Éσ¢╛∩╝ëπÇé
-    τ⌐║τ¡ö/IDK Φ┐öσ¢₧ FalseπÇé
+    作业单题判分：先规则，规则判错或解答题时用 GPT（对照标准答案 + 试题/解析图）。
+    空答/IDK 返回 False。
     """
     from ai_grading import maybe_upgrade_with_ai, ai_grading_available
 
@@ -1502,47 +1501,47 @@ def _grade_homework_question(question, user_answer, exam_by_page=None, expl_by_p
 @login_required
 def submit_quiz(lesson_id):
     try:
-        # µúÇµƒÑµÿ»σÉªσ╖▓τ╗Åσ«îµêÉΦ┐çΦ┐ÖΣ╕¬Φ»╛τ¿ïτÜäτ¡öΘóÿ∩╝êσÅ¬σàüΦ«╕Σ╕Çµ¼í∩╝ë
+        # 检查是否已经完成过这个课程的答题（只允许一次）
         existing_quiz = QuizHistory.query.filter_by(
             user_id=current_user.id,
             lesson_id=lesson_id
         ).order_by(QuizHistory.completed_at.asc()).first()
 
         if existing_quiz:
-            flash('Σ╜áσ╖▓τ╗Åσ«îµêÉΦ┐çΦ┐ÖΣ╕¬Φ»╛τ¿ïτÜäτ¡öΘóÿ∩╝îΣ╕ìΦâ╜ΘçìσñìµÅÉΣ║ñ', 'warning')
+            flash('你已经完成过这个课程的答题，不能重复提交', 'warning')
             return redirect(url_for('view_history', lesson_id=lesson_id))
 
-        # ΦÄ╖σÅûµëÇµ£ëΘóÿτ¢«
+        # 获取所有题目
         questions = Question.query.filter_by(lesson_id=lesson_id).order_by(Question.question_number).all()
         if not questions:
-            flash('µ£¬µë╛σê░Θóÿτ¢«', 'error')
+            flash('未找到题目', 'error')
             return redirect(url_for('student_dashboard'))
 
-        # ΦÄ╖σÅûτ¡öΘóÿτö¿µù╢
+        # 获取答题用时
         time_spent = int(request.form.get('time_spent', 0))
 
-        # σê¢σ╗║τ¡öΘóÿσÄåσÅ▓Φ«░σ╜ò
+        # 创建答题历史记录
         quiz_history = QuizHistory(
             user_id=current_user.id,
             lesson_id=lesson_id,
             total_questions=len(questions),
-            correct_answers=0,  # σê¥σºïσîûΣ╕║0∩╝îσÉÄΘ¥óΣ╝Üµ¢┤µû░
+            correct_answers=0,  # 初始化为0，后面会更新
             time_spent=time_spent,
             completed_at=datetime.now()
         )
         db.session.add(quiz_history)
-        db.session.flush()  # ΦÄ╖σÅûquiz_history.id
+        db.session.flush()  # 获取quiz_history.id
 
         correct_count = 0
         exam_by_page, expl_by_page = _homework_image_maps(lesson_id)
 
-        # σñäτÉåµ»ÅΣ╕¬Θóÿτ¢«τÜäτ¡öµíê
+        # 处理每个题目的答案
         for question in questions:
-            # µúÇµƒÑµÿ»σÉªΘÇëµï⌐Σ║å"Σ╕ìΣ╝ÜσüÜ"
+            # 检查是否选择了"不会做"
             idk_answer = request.form.get(f'answer_{question.id}_idk')
             user_answer = request.form.get(f'answer_{question.id}', '').strip()
             
-            # σªéµ₧£ΘÇëµï⌐Σ║å"Σ╕ìΣ╝ÜσüÜ"µêûµ▓íµ£ëµÅÉΣ║ñτ¡öµíê∩╝îµáçΦ«░Σ╕║µ£¬Σ╜£τ¡ö
+            # 如果选择了"不会做"或没有提交答案，标记为未作答
             if idk_answer == 'IDK' or not user_answer:
                 answer_record = UserAnswer(
                     user_id=current_user.id,
@@ -1559,7 +1558,7 @@ def submit_quiz(lesson_id):
                 question, user_answer, exam_by_page, expl_by_page
             )
 
-            # σê¢σ╗║τö¿µê╖τ¡öµíêΦ«░σ╜ò
+            # 创建用户答案记录
             answer_record = UserAnswer(
                 user_id=current_user.id,
                 lesson_id=lesson_id,
@@ -1573,50 +1572,50 @@ def submit_quiz(lesson_id):
             if is_correct:
                 correct_count += 1
 
-        # µ¢┤µû░τ¡öΘóÿσÄåσÅ▓τÜäµ¡úτí«Θóÿτ¢«µò░
+        # 更新答题历史的正确题目数
         quiz_history.correct_answers = correct_count
         
-        # Φ«íτ«ùµ¡úτí«τÄç
+        # 计算正确率
         correct_rate = (correct_count / len(questions)) * 100
 
-        # µ¢┤µû░µêÉσ░▒Φ«íµò░σÆîσ╛╜τ½áτ¡ëτ║º
-        # µÇ╗µêÉσ░▒µò░τ┤»Φ«í
+        # 更新成就计数和徽章等级
+        # 总成就数累计
         current_user.achievement_count += 1
         
-        # τ«ÇσîûτÜäσ╛╜τ½áσìçτ║ºΘÇ╗Φ╛æ
-        # Level 0 σê░ Level 1∩╝ÜσÅ¬ΦªüµÅÉΣ║ñΣ╜£Σ╕Üσ░▒σìçτ║º
+        # 简化的徽章升级逻辑
+        # Level 0 到 Level 1：只要提交作业就升级
         if current_user.badge_level == 0:
             current_user.badge_level = 1
-            flash('µü¡σû£∩╝üΣ╜áΦÄ╖σ╛ùΣ║åτ¼¼Σ╕ÇΣ╕¬σ╛╜τ½á∩╝Üσ░Åµ»¢µ»¢ΦÖ½∩╝ü≡ƒÉ¢', 'success')
-        # Level 1 σê░ Level 3∩╝ÜΘ£ÇΦªüΦ╛╛σê░60%∩╝îσƒ║Σ║ÄµÇ╗µêÉσ░▒µò░
+            flash('恭喜！你获得了第一个徽章：小毛毛虫！🐛', 'success')
+        # Level 1 到 Level 3：需要达到60%，基于总成就数
         elif current_user.badge_level < 3:
             if correct_rate >= 60:
                 if current_user.badge_level == 1 and current_user.achievement_count % 2 == 0:
                     current_user.badge_level = 2
-                    flash(f'µü¡σû£∩╝üΣ╜áσ╖▓τ╗Åσìçτ║ºσê░ {current_user.badge_info["name"]} τ║ºσê½∩╝ü', 'success')
+                    flash(f'恭喜！你已经升级到 {current_user.badge_info["name"]} 级别！', 'success')
                 elif current_user.badge_level == 2 and current_user.achievement_count % 3 == 0:
                     current_user.badge_level = 3
-                    flash(f'µü¡σû£∩╝üΣ╜áσ╖▓τ╗Åσìçτ║ºσê░ {current_user.badge_info["name"]} τ║ºσê½∩╝ü', 'success')
-        # Level 3 σê░ Level 8∩╝Üµ»Åτ║ºΘ£ÇΦªüΣ╕ñµ¼í80%
+                    flash(f'恭喜！你已经升级到 {current_user.badge_info["name"]} 级别！', 'success')
+        # Level 3 到 Level 8：每级需要两次80%
         elif 3 <= current_user.badge_level < 8:
             if correct_rate >= 80 and current_user.achievement_count % 2 == 0:
                 current_user.badge_level += 1
-                flash(f'µü¡σû£∩╝üΣ╜áσ╖▓τ╗Åσìçτ║ºσê░ {current_user.badge_info["name"]} τ║ºσê½∩╝ü', 'success')
-        # Level 8Σ╗ÑΣ╕è∩╝Üµ»Åτ║ºΘ£ÇΦªüΣ║öµ¼í80%
+                flash(f'恭喜！你已经升级到 {current_user.badge_info["name"]} 级别！', 'success')
+        # Level 8以上：每级需要五次80%
         else:
             if correct_rate >= 80 and current_user.achievement_count % 5 == 0:
                 current_user.badge_level += 1
-                flash(f'σñ¬σÄëσ«│Σ║å∩╝üΣ╜áσ╖▓τ╗Åσìçτ║ºσê░ {current_user.badge_info["name"]} τ║ºσê½∩╝ü', 'success')
+                flash(f'太厉害了！你已经升级到 {current_user.badge_info["name"]} 级别！', 'success')
         
         db.session.commit()
 
-        flash('τ¡öΘóÿσ«îµêÉ∩╝ü', 'success')
+        flash('答题完成！', 'success')
         return redirect(url_for('view_history', lesson_id=lesson_id))
 
     except Exception as e:
         db.session.rollback()
         print(f"Error in submit_quiz: {str(e)}")
-        flash('µÅÉΣ║ñτ¡öµíêµù╢σç║ΘöÖ', 'error')
+        flash('提交答案时出错', 'error')
         return redirect(url_for('student_dashboard'))
 
 @app.route('/admin/question/<int:lesson_id>/add', methods=['POST'])
@@ -1627,11 +1626,11 @@ def add_question(lesson_id):
     explanation = request.form.get('explanation')
     
     if not content or not answer:
-        flash('Θóÿτ¢«σåàσ«╣σÆîµ¡úτí«τ¡öµíêΣ╕ìΦâ╜Σ╕║τ⌐║')
+        flash('题目内容和正确答案不能为空')
         return redirect(url_for('manage_questions', lesson_id=lesson_id))
     
     if answer not in ['A', 'B', 'C', 'D']:
-        flash('µ¡úτí«τ¡öµíêσ┐àΘí╗µÿ»AπÇüBπÇüCµêûD')
+        flash('正确答案必须是A、B、C或D')
         return redirect(url_for('manage_questions', lesson_id=lesson_id))
     
     new_question = Question(
@@ -1643,7 +1642,7 @@ def add_question(lesson_id):
     db.session.add(new_question)
     db.session.commit()
     
-    flash('Θóÿτ¢«µ╖╗σèáµêÉσèƒ')
+    flash('题目添加成功')
     return redirect(url_for('manage_questions', lesson_id=lesson_id))
 
 @app.route('/admin/question/<int:question_id>/edit', methods=['POST'])
@@ -1651,22 +1650,22 @@ def add_question(lesson_id):
 def edit_question(question_id):
     question = Question.query.get_or_404(question_id)
     
-    # ΦÄ╖σÅûΦí¿σìòµò░µì«
+    # 获取表单数据
     content = request.form.get('content')
     answer = request.form.get('answer')
     explanation = request.form.get('explanation')
     
     if not content or not answer:
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({'success': False, 'msg': 'Θóÿτ¢«σåàσ«╣σÆîτ¡öµíêΣ╕ìΦâ╜Σ╕║τ⌐║'})
-        flash('Θóÿτ¢«σåàσ«╣σÆîτ¡öµíêΣ╕ìΦâ╜Σ╕║τ⌐║')
+            return jsonify({'success': False, 'msg': '题目内容和答案不能为空'})
+        flash('题目内容和答案不能为空')
         return redirect(url_for('manage_questions', lesson_id=question.lesson_id))
     
-    # Θ¬îΦ»üτ¡öµíêµá╝σ╝Å
+    # 验证答案格式
     if question.type == 'choice' and answer not in ['A', 'B', 'C', 'D']:
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({'success': False, 'msg': 'ΘÇëµï⌐Θóÿτ¡öµíêσ┐àΘí╗µÿ»AπÇüBπÇüCµêûD'})
-        flash('ΘÇëµï⌐Θóÿτ¡öµíêσ┐àΘí╗µÿ»AπÇüBπÇüCµêûD')
+            return jsonify({'success': False, 'msg': '选择题答案必须是A、B、C或D'})
+        flash('选择题答案必须是A、B、C或D')
         return redirect(url_for('manage_questions', lesson_id=question.lesson_id))
     
     try:
@@ -1676,13 +1675,13 @@ def edit_question(question_id):
         db.session.commit()
         
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({'success': True, 'msg': 'Θóÿτ¢«µ¢┤µû░µêÉσèƒ'})
-        flash('Θóÿτ¢«µ¢┤µû░µêÉσèƒ')
+            return jsonify({'success': True, 'msg': '题目更新成功'})
+        flash('题目更新成功')
     except Exception as e:
         db.session.rollback()
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({'success': False, 'msg': f'µ¢┤µû░σñ▒Φ┤Ñ∩╝Ü{str(e)}'})
-        flash(f'µ¢┤µû░σñ▒Φ┤Ñ∩╝Ü{str(e)}')
+            return jsonify({'success': False, 'msg': f'更新失败：{str(e)}'})
+        flash(f'更新失败：{str(e)}')
     
     return redirect(url_for('manage_questions', lesson_id=question.lesson_id))
 
@@ -1694,23 +1693,23 @@ def delete_question(question_id):
     db.session.delete(question)
     db.session.commit()
     
-    flash('Θóÿτ¢«σêáΘÖñµêÉσèƒ')
+    flash('题目删除成功')
     return redirect(url_for('manage_questions', lesson_id=lesson_id))
 
 @app.route('/admin/question/<int:lesson_id>/import', methods=['POST'])
 @admin_required
 def import_questions(lesson_id):
     if 'file' not in request.files:
-        flash('µ▓íµ£ëΘÇëµï⌐µûçΣ╗╢', 'error')
+        flash('没有选择文件', 'error')
         return redirect(url_for('manage_questions', lesson_id=lesson_id))
     
     file = request.files['file']
     if file.filename == '':
-        flash('µ▓íµ£ëΘÇëµï⌐µûçΣ╗╢', 'error')
+        flash('没有选择文件', 'error')
         return redirect(url_for('manage_questions', lesson_id=lesson_id))
     
     if not file.filename.endswith(tuple(ALLOWED_EXCEL_EXTENSIONS)):
-        flash('σÅ¬µö»µîüExcelµûçΣ╗╢∩╝ê.xlsxµêû.xls∩╝ë', 'error')
+        flash('只支持Excel文件（.xlsx或.xls）', 'error')
         return redirect(url_for('manage_questions', lesson_id=lesson_id))
     
     try:
@@ -1720,29 +1719,29 @@ def import_questions(lesson_id):
         
         for _, row in df.iterrows():
             try:
-                if pd.notna(row[0]) and pd.notna(row[1]):  # τí«Σ┐¥ΘóÿσÅ╖σÆîτ¡öµíêΣ╕ìΣ╕║τ⌐║
+                if pd.notna(row[0]) and pd.notna(row[1]):  # 确保题号和答案不为空
                     question_number = int(row[0])
                     answer = str(row[1]).strip().upper()
-                    content = str(row[2]) if len(row) > 2 and pd.notna(row[2]) else "Θóÿτ¢«σåàσ«╣σ╛àΦíÑσàà"
+                    content = str(row[2]) if len(row) > 2 and pd.notna(row[2]) else "题目内容待补充"
                     explanation = str(row[3]) if len(row) > 3 and pd.notna(row[3]) else None
                     
-                    # µá╣µì«τ¡öµíêσêñµû¡Θóÿτ¢«τ▒╗σ₧ï
+                    # 根据答案判断题目类型
                     question_type = 'choice' if answer in ['A', 'B', 'C', 'D'] else 'fill'
                     
-                    # µƒÑµë╛µÿ»σÉªσ╖▓σ¡ÿσ£¿Φ»ÑΘóÿσÅ╖τÜäΘóÿτ¢«
+                    # 查找是否已存在该题号的题目
                     question = Question.query.filter_by(
                         lesson_id=lesson_id,
                         question_number=question_number
                     ).first()
                     
                     if question:
-                        # µ¢┤µû░τÄ░µ£ëΘóÿτ¢«
+                        # 更新现有题目
                         question.type = question_type
                         question.answer = answer
                         question.content = content
                         question.explanation = explanation
                     else:
-                        # σê¢σ╗║µû░Θóÿτ¢«
+                        # 创建新题目
                         question = Question(
                             lesson_id=lesson_id,
                             question_number=question_number,
@@ -1756,16 +1755,16 @@ def import_questions(lesson_id):
                     success_count += 1
             except Exception as e:
                 error_count += 1
-                print(f"σ»╝σàÑΘóÿτ¢«µù╢σç║ΘöÖ: {str(e)}")
+                print(f"导入题目时出错: {str(e)}")
                 continue
         
         db.session.commit()
-        flash_message = f'µêÉσèƒσ»╝σàÑ{success_count}ΘüôΘóÿτ¢«'
+        flash_message = f'成功导入{success_count}道题目'
         if error_count > 0:
-            flash_message += f'∩╝î{error_count}ΘüôΘóÿτ¢«σ»╝σàÑσñ▒Φ┤Ñ'
+            flash_message += f'，{error_count}道题目导入失败'
         flash(flash_message, 'success' if error_count == 0 else 'warning')
     except Exception as e:
-        flash(f'σ»╝σàÑσñ▒Φ┤Ñ∩╝Ü{str(e)}', 'error')
+        flash(f'导入失败：{str(e)}', 'error')
     
     return redirect(url_for('manage_questions', lesson_id=lesson_id))
 
@@ -1774,7 +1773,7 @@ def import_questions(lesson_id):
 def view_history(lesson_id):
     from flask_login import current_user
     user_id = request.args.get('user_id', type=int)
-    # σªéµ₧£µÿ»τ«íτÉåσæÿΣ╕öΣ╝áΣ║åuser_idσÅéµò░∩╝îσêÖµƒÑµîçσ«Üσ¡ªτöƒ∩╝îσÉªσêÖµƒÑσ╜ôσëìτö¿µê╖
+    # 如果是管理员且传了user_id参数，则查指定学生，否则查当前用户
     is_admin_view = hasattr(current_user, 'is_admin') and current_user.is_admin and user_id
     if hasattr(current_user, 'is_admin') and current_user.is_admin and user_id:
         target_user_id = user_id
@@ -1788,7 +1787,7 @@ def view_history(lesson_id):
     ).order_by(QuizHistory.completed_at.desc()).all()
     if quiz_history:
         latest_quiz = quiz_history[0]
-        # σ¢║σ«ÜµîëΘóÿσÅ╖Θí║σ║ÅΦ┐öσ¢₧∩╝îΘü┐σàìτ«íτÉåσæÿµö╣σ»╣/µö╣ΘöÖσÉÄΘí╡Θ¥óΘçìµû░σèáΦ╜╜σç║τÄ░Θóÿτ¢«Θí║σ║Åµèûσè¿
+        # 固定按题号顺序返回，避免管理员改对/改错后页面重新加载出现题目顺序抖动
         latest_answers = (
             UserAnswer.query.filter_by(quiz_history_id=latest_quiz.id)
             .join(Question, Question.id == UserAnswer.question_id)
@@ -1808,9 +1807,9 @@ def view_history(lesson_id):
                              is_admin_view=is_admin_view)
     else:
         if not lesson.is_active:
-            flash('Φ»ÑΦ»╛τ¿ïσ╜ôσëìµ£¬µ┐Çµ┤╗∩╝îΣ╕öµé¿µ▓íµ£ëσÄåσÅ▓τ¡öΘóÿΦ«░σ╜òπÇé', 'warning')
+            flash('该课程当前未激活，且您没有历史答题记录。', 'warning')
             return redirect(url_for('student_dashboard'))
-        flash('Φ┐ÿµ▓íµ£ëτ¡öΘóÿΦ«░σ╜ò', 'info')
+        flash('还没有答题记录', 'info')
         return render_template('student/quiz_history.html', lesson=lesson, quiz_history=None, is_admin_view=is_admin_view)
 
 @app.route('/student/quiz/detail/<int:history_id>')
@@ -1819,34 +1818,34 @@ def quiz_detail(history_id):
     user = current_user
     quiz_history = QuizHistory.query.get_or_404(history_id)
     
-    # Θ¬îΦ»üσÄåσÅ▓Φ«░σ╜òµÿ»σÉªσ▒₧Σ║Äσ╜ôσëìτö¿µê╖
+    # 验证历史记录是否属于当前用户
     if quiz_history.user_id != user.id:
-        flash('µùáµ¥âΦ«┐Θù«Φ»ÑΦ«░σ╜ò')
+        flash('无权访问该记录')
         return redirect(url_for('student_dashboard'))
-    
-    # ΦÄ╖σÅûΦ»Ñµ¼íτ¡öΘóÿτÜäµëÇµ£ëτ¡öµíê
+
+    # 获取该次答题的所有答案
     user_answers = UserAnswer.query.filter_by(
         user_id=user.id,
         lesson_id=quiz_history.lesson_id,
         created_at=quiz_history.completed_at
     ).order_by(UserAnswer.question_id).all()
     
-    # ΦÄ╖σÅûµëÇµ£ëΘù«Θóÿ
+    # 获取所有问题
     questions = Question.query.filter_by(
         lesson_id=quiz_history.lesson_id
     ).order_by(Question.question_number).all()
     
-    # ΦÄ╖σÅûΦ»òσì╖µûçΣ╗╢
+    # 获取试卷文件
     exam_files = ExamFile.query.filter_by(
         lesson_id=quiz_history.lesson_id
     ).order_by(ExamFile.page_number).all()
     
-    # ΦÄ╖σÅûΦºúµ₧ÉµûçΣ╗╢
+    # 获取解析文件
     explanation_files = ExplanationFile.query.filter_by(
         lesson_id=quiz_history.lesson_id
     ).order_by(ExplanationFile.page_number).all()
     
-    # σê¢σ╗║Θù«ΘóÿσÆîτ¡öµíêτÜäµÿáσ░ä∩╝êΣ╜┐τö¿µÅÉΣ║ñµù╢σåÖσàÑτÜäσêñσêåτ╗ôµ₧£∩╝îσÉ½ GPT σêñσêå∩╝ë
+    # 创建问题和答案的映射（使用提交时写入的判分结果，含 GPT 判分）
     question_answers = {}
     for answer in user_answers:
         question = Question.query.get(answer.question_id)
@@ -1865,21 +1864,21 @@ def quiz_detail(history_id):
 def allowed_file(filename, allowed_extensions):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_extensions
 
-# µûçΣ╗╢σñäτÉåσç╜µò░
+# 文件处理函数
 def save_uploaded_file(file, allowed_extensions):
     if file and file.filename != '' and allowed_file(file.filename, allowed_extensions):
-        # τí«Σ┐¥Σ╕èΣ╝áτ¢«σ╜òσ¡ÿσ£¿
+        # 确保上传目录存在
         os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-        # τöƒµêÉσ«ëσà¿τÜäµûçΣ╗╢σÉì
+        # 生成安全的文件名
         filename = secure_filename(file.filename)
-        # µ╖╗σèáµù╢Θù┤µê│Θü┐σàìµûçΣ╗╢σÉìσå▓τ¬ü
+        # 添加时间戳避免文件名冲突
         filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
-        # Σ┐¥σ¡ÿµûçΣ╗╢
+        # 保存文件
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
         return filename
     return None
 
-# Φ»òσì╖τ«íτÉåτ¢╕σà│Φ╖»τö▒
+# 试卷管理相关路由
 @app.route('/admin/lesson/<int:lesson_id>/manage_exam')
 @admin_required
 def manage_exam(lesson_id):
@@ -1896,17 +1895,15 @@ def manage_exam(lesson_id):
 @app.route('/admin/lesson/<int:lesson_id>/question_stats')
 @admin_required
 def question_stats(lesson_id):
-    """Θóÿτ¢«σ╛ùσêåτÄçτ╗ƒΦ«íΘí╡Θ¥ó"""
+    """题目得分率统计页面"""
     lesson = Lesson.query.get_or_404(lesson_id)
     questions = Question.query.filter_by(lesson_id=lesson_id).order_by(Question.question_number).all()
     
-    # ΦÄ╖σÅûµëÇµ£ëτ¡öΘóÿΦ«░σ╜ò
     quiz_histories = QuizHistory.query.filter_by(lesson_id=lesson_id).all()
-    
-    # τ╗ƒΦ«íµ»ÅΘüôΘóÿτÜäσ╛ùσêåτÄç
+    # 统计每道题的得分率
     question_stats = []
     for question in questions:
-        # ΦÄ╖σÅûΦ┐ÖΘüôΘóÿτÜäµëÇµ£ëτ¡öΘóÿΦ«░σ╜ò
+        # 获取这道题的所有答题记录
         user_answers = UserAnswer.query.filter_by(
             lesson_id=lesson_id,
             question_id=question.id
@@ -1915,7 +1912,7 @@ def question_stats(lesson_id):
         total_attempts = len(user_answers)
         correct_attempts = len([ua for ua in user_answers if ua.is_correct])
         
-        # Φ«íτ«ùσ╛ùσêåτÄç
+        # 计算得分率
         success_rate = (correct_attempts / total_attempts * 100) if total_attempts > 0 else 0
         
         question_stats.append({
@@ -1934,14 +1931,14 @@ def question_stats(lesson_id):
 @app.route('/admin/lesson/<int:lesson_id>/question_stats_data')
 @admin_required
 def question_stats_data(lesson_id):
-    """Φ┐öσ¢₧Θóÿτ¢«σ╛ùσêåτÄçµò░µì«τÜäJSONµÄÑσÅú"""
+    """返回题目得分率数据的JSON接口"""
     lesson = Lesson.query.get_or_404(lesson_id)
     questions = Question.query.filter_by(lesson_id=lesson_id).order_by(Question.question_number).all()
     
-    # τ╗ƒΦ«íµ»ÅΘüôΘóÿτÜäσ╛ùσêåτÄç
+    # 统计每道题的得分率
     question_stats = []
     for question in questions:
-        # ΦÄ╖σÅûΦ┐ÖΘüôΘóÿτÜäµëÇµ£ëτ¡öΘóÿΦ«░σ╜ò
+        # 获取这道题的所有答题记录
         user_answers = UserAnswer.query.filter_by(
             lesson_id=lesson_id,
             question_id=question.id
@@ -1950,7 +1947,7 @@ def question_stats_data(lesson_id):
         total_attempts = len(user_answers)
         correct_attempts = len([ua for ua in user_answers if ua.is_correct])
         
-        # Φ«íτ«ùσ╛ùσêåτÄç
+        # 计算得分率
         success_rate = (correct_attempts / total_attempts * 100) if total_attempts > 0 else 0
         
         question_stats.append({
@@ -1965,7 +1962,7 @@ def question_stats_data(lesson_id):
     return jsonify(question_stats)
 
 def upload_to_cloudinary(file_data, resource_type='image'):
-    """Σ╕èΣ╝áµûçΣ╗╢σê░ Cloudinary σ╣╢Φ┐öσ¢₧ URL∩╝êµùá print∩╝îΘü┐σàì Windows µÄºσê╢σÅ░τ╝ûτáüΘöÖΦ»»∩╝ë"""
+    """上传文件到 Cloudinary 并返回 URL（无 print，避免 Windows 控制台编码错误）"""
     try:
         if isinstance(file_data, str) and file_data.startswith('data:image'):
             result = cloudinary.uploader.upload(
@@ -1989,32 +1986,32 @@ def upload_exam_files(lesson_id):
     try:
         lesson = Lesson.query.get_or_404(lesson_id)
         if 'files[]' not in request.files:
-            flash('µ▓íµ£ëΘÇëµï⌐µûçΣ╗╢', 'error')
+            flash('没有选择文件', 'error')
             return redirect(url_for('manage_questions', lesson_id=lesson_id))
         
         files = request.files.getlist('files[]')
-        print(f"µö╢σê░{len(files)}Σ╕¬µûçΣ╗╢Σ╕èΣ╝áΦ»╖µ▒é")
+        print(f"收到{len(files)}个文件上传请求")
         
-        # ΦÄ╖σÅûσ╜ôσëìµ£ÇσñºΘí╡τáü
+        # 获取当前最大页码
         max_page = db.session.query(func.max(ExamFile.page_number)).filter_by(lesson_id=lesson_id).scalar() or 0
         
         success_count = 0
         for file in files:
             if file and allowed_file(file.filename, ALLOWED_PDF_EXTENSIONS.union(ALLOWED_IMAGE_EXTENSIONS)):
                 try:
-                    # τöƒµêÉσ«ëσà¿τÜäµûçΣ╗╢σÉì
+                    # 生成安全的文件名
                     original_filename = secure_filename(file.filename)
                     filename = f"{lesson_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{original_filename}"
                     
-                    # Σ╕èΣ╝áσê░ Cloudinary
+                    # 上传到 Cloudinary
                     cloudinary_url = upload_to_cloudinary(file)
                     if not cloudinary_url:
-                        raise Exception("Cloudinary Σ╕èΣ╝áσñ▒Φ┤Ñ")
+                        raise Exception("Cloudinary 上传失败")
                     
-                    # σê¢σ╗║Φ»òσì╖µûçΣ╗╢Φ«░σ╜ò
+                    # 创建试卷文件记录
                     exam_file = ExamFile(
                         filename=filename,
-                        path=cloudinary_url,  # Σ╜┐τö¿ Cloudinary URL
+                        path=cloudinary_url,  # 使用 Cloudinary URL
                         lesson_id=lesson_id,
                         page_number=max_page + 1 + success_count
                     )
@@ -2022,24 +2019,24 @@ def upload_exam_files(lesson_id):
                     success_count += 1
                     
                 except Exception as e:
-                    print(f"Σ╕èΣ╝áσñ▒Φ┤Ñ: {str(e)}")
-                    flash(f'µûçΣ╗╢ {file.filename} Σ╕èΣ╝áσñ▒Φ┤Ñ∩╝Ü{str(e)}', 'error')
+                    print(f"上传失败: {str(e)}")
+                    flash(f'文件 {file.filename} 上传失败：{str(e)}', 'error')
                     continue
         
         if success_count > 0:
             try:
                 db.session.commit()
-                flash(f'µêÉσèƒΣ╕èΣ╝á{success_count}Σ╕¬µûçΣ╗╢', 'success')
+                flash(f'成功上传{success_count}个文件', 'success')
             except Exception as e:
                 db.session.rollback()
-                print(f"Σ┐¥σ¡ÿσê░µò░µì«σ║ôσñ▒Φ┤Ñ: {str(e)}")
-                flash('Σ┐¥σ¡ÿµûçΣ╗╢Φ«░σ╜òσñ▒Φ┤Ñ∩╝îΦ»╖ΘçìΦ»ò', 'error')
+                print(f"保存到数据库失败: {str(e)}")
+                flash('保存文件记录失败，请重试', 'error')
         
         return redirect(url_for('manage_questions', lesson_id=lesson_id))
         
     except Exception as e:
-        print(f"µûçΣ╗╢Σ╕èΣ╝áΦ┐çτ¿ïσç║ΘöÖ: {str(e)}")
-        flash('µûçΣ╗╢Σ╕èΣ╝áΦ┐çτ¿ïσç║ΘöÖ∩╝îΦ»╖ΘçìΦ»ò', 'error')
+        print(f"文件上传过程出错: {str(e)}")
+        flash('文件上传过程出错，请重试', 'error')
         return redirect(url_for('manage_questions', lesson_id=lesson_id))
 
 @app.route('/admin/exam_file/<int:file_id>/delete', methods=['POST'])
@@ -2049,18 +2046,18 @@ def delete_exam_file(file_id):
     lesson_id = exam_file.lesson_id
     
     try:
-        # µ₧äσ╗║σ«îµò┤τÜäµûçΣ╗╢Φ╖»σ╛ä
+        # 构建完整的文件路径
         file_path = os.path.join('static', exam_file.path)
         if os.path.exists(file_path):
             os.remove(file_path)
         
-        # σêáΘÖñµò░µì«σ║ôΦ«░σ╜ò
+        # 删除数据库记录
         db.session.delete(exam_file)
         db.session.commit()
-        flash('µûçΣ╗╢σêáΘÖñµêÉσèƒ', 'success')
+        flash('文件删除成功', 'success')
     except Exception as e:
-        print(f"σêáΘÖñµûçΣ╗╢σñ▒Φ┤Ñ: {str(e)}")
-        flash('µûçΣ╗╢σêáΘÖñσñ▒Φ┤Ñ', 'error')
+        print(f"删除文件失败: {str(e)}")
+        flash('文件删除失败', 'error')
         
     return redirect(url_for('manage_questions', lesson_id=lesson_id))
 
@@ -2069,7 +2066,7 @@ def delete_exam_file(file_id):
 def import_answers(lesson_id):
     lesson = Lesson.query.get_or_404(lesson_id)
     if 'file' not in request.files:
-        flash('µ▓íµ£ëΘÇëµï⌐µûçΣ╗╢', 'error')
+        flash('没有选择文件', 'error')
         return redirect(url_for('manage_exam', lesson_id=lesson_id))
     
     file = request.files['file']
@@ -2079,18 +2076,18 @@ def import_answers(lesson_id):
             for _, row in df.iterrows():
                 question = Question(
                     lesson_id=lesson_id,
-                    question_text=row['Θóÿτ¢«'],
-                    correct_answer=row['τ¡öµíê'],
-                    points=row['σêåσÇ╝']
+                    question_text=row['题目'],
+                    correct_answer=row['答案'],
+                    points=row['分值']
                 )
                 db.session.add(question)
             db.session.commit()
-            flash('τ¡öµíêσ»╝σàÑµêÉσèƒ', 'success')
+            flash('答案导入成功', 'success')
         except Exception as e:
             db.session.rollback()
-            flash('τ¡öµíêσ»╝σàÑσñ▒Φ┤Ñ', 'error')
+            flash('答案导入失败', 'error')
     else:
-        flash('Φ»╖Σ╕èΣ╝áExcelµûçΣ╗╢', 'error')
+        flash('请上传Excel文件', 'error')
         
     return redirect(url_for('manage_exam', lesson_id=lesson_id))
 
@@ -2099,13 +2096,13 @@ def import_answers(lesson_id):
 def upload_explanation_files(lesson_id):
     lesson = Lesson.query.get_or_404(lesson_id)
     if 'files[]' not in request.files:
-        flash('µ▓íµ£ëΘÇëµï⌐µûçΣ╗╢', 'error')
+        flash('没有选择文件', 'error')
         return redirect(url_for('manage_questions', lesson_id=lesson_id))
     
     files = request.files.getlist('files[]')
-    print(f"µö╢σê░{len(files)}Σ╕¬Φºúµ₧ÉµûçΣ╗╢Σ╕èΣ╝áΦ»╖µ▒é")
+    print(f"收到{len(files)}个解析文件上传请求")
     
-    # ΦÄ╖σÅûσ╜ôσëìµ£ÇσñºΘí╡τáü
+    # 获取当前最大页码
     max_page = db.session.query(func.max(ExplanationFile.page_number)).filter_by(lesson_id=lesson_id).scalar() or 0
     
     success_count = 0
@@ -2113,19 +2110,19 @@ def upload_explanation_files(lesson_id):
         for file in files:
             if file and allowed_file(file.filename, ALLOWED_PDF_EXTENSIONS):
                 try:
-                    # τöƒµêÉσ«ëσà¿τÜäµûçΣ╗╢σÉì
+                    # 生成安全的文件名
                     original_filename = secure_filename(file.filename)
                     filename = f"{lesson_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{original_filename}"
                     
-                    # Σ╕èΣ╝áσê░ Cloudinary
+                    # 上传到 Cloudinary
                     cloudinary_url = upload_to_cloudinary(file)
                     if not cloudinary_url:
-                        raise Exception("Cloudinary Σ╕èΣ╝áσñ▒Φ┤Ñ")
+                        raise Exception("Cloudinary 上传失败")
                     
-                    # σê¢σ╗║Φºúµ₧ÉµûçΣ╗╢Φ«░σ╜ò
+                    # 创建解析文件记录
                     explanation_file = ExplanationFile(
                         filename=filename,
-                        path=cloudinary_url,  # Σ╜┐τö¿ Cloudinary URL
+                        path=cloudinary_url,  # 使用 Cloudinary URL
                         lesson_id=lesson_id,
                         page_number=max_page + 1 + success_count
                     )
@@ -2133,21 +2130,21 @@ def upload_explanation_files(lesson_id):
                     success_count += 1
                     
                 except Exception as e:
-                    print(f"Σ╕èΣ╝áΦºúµ₧ÉµûçΣ╗╢σñ▒Φ┤Ñ: {str(e)}")
-                    flash(f'µûçΣ╗╢ {file.filename} Σ╕èΣ╝áσñ▒Φ┤Ñ∩╝Ü{str(e)}', 'error')
+                    print(f"上传解析文件失败: {str(e)}")
+                    flash(f'文件 {file.filename} 上传失败：{str(e)}', 'error')
                     continue
         
         if success_count > 0:
             try:
                 db.session.commit()
-                flash(f'µêÉσèƒΣ╕èΣ╝á{success_count}Σ╕¬Φºúµ₧ÉµûçΣ╗╢', 'success')
+                flash(f'成功上传{success_count}个解析文件', 'success')
             except Exception as e:
                 db.session.rollback()
-                print(f"Σ┐¥σ¡ÿσê░µò░µì«σ║ôσñ▒Φ┤Ñ: {str(e)}")
-                flash('Σ┐¥σ¡ÿµûçΣ╗╢Φ«░σ╜òσñ▒Φ┤Ñ∩╝îΦ»╖ΘçìΦ»ò', 'error')
+                print(f"保存到数据库失败: {str(e)}")
+                flash('保存文件记录失败，请重试', 'error')
     except Exception as e:
-        print(f"µûçΣ╗╢Σ╕èΣ╝áΦ┐çτ¿ïσç║ΘöÖ: {str(e)}")
-        flash('µûçΣ╗╢Σ╕èΣ╝áΦ┐çτ¿ïσç║ΘöÖ∩╝îΦ»╖ΘçìΦ»ò', 'error')
+        print(f"文件上传过程出错: {str(e)}")
+        flash('文件上传过程出错，请重试', 'error')
     
     return redirect(url_for('manage_questions', lesson_id=lesson_id))
 
@@ -2158,160 +2155,160 @@ def delete_explanation_file(file_id):
     lesson_id = explanation_file.lesson_id
     
     try:
-        # µ₧äσ╗║σ«îµò┤τÜäµûçΣ╗╢Φ╖»σ╛ä
+        # 构建完整的文件路径
         file_path = os.path.join('static', explanation_file.path)
         if os.path.exists(file_path):
             os.remove(file_path)
             
-        # σêáΘÖñµò░µì«σ║ôΦ«░σ╜ò
+        # 删除数据库记录
         db.session.delete(explanation_file)
         db.session.commit()
-        flash('Φºúµ₧ÉµûçΣ╗╢σêáΘÖñµêÉσèƒ', 'success')
+        flash('解析文件删除成功', 'success')
     except Exception as e:
-        print(f"σêáΘÖñµûçΣ╗╢σñ▒Φ┤Ñ: {str(e)}")
-        flash('Φºúµ₧ÉµûçΣ╗╢σêáΘÖñσñ▒Φ┤Ñ', 'error')
+        print(f"删除文件失败: {str(e)}")
+        flash('解析文件删除失败', 'error')
         
     return redirect(url_for('manage_questions', lesson_id=lesson_id))
 
 @app.route('/uploads/<path:filename>')
 def serve_upload(filename):
-    """Σ╕èΣ╝áµûçΣ╗╢µ£ìσèí"""
+    """上传文件服务"""
     try:
-        # µ₧äσ╗║σÅ»Φâ╜τÜäµûçΣ╗╢Φ╖»σ╛ä
+        # 构建可能的文件路径
         paths_to_try = [
-            os.path.join(app.static_folder, 'uploads', filename),  # µáçσçåΦ╖»σ╛ä
-            os.path.join(app.static_folder, filename),  # σ«îµò┤Φ╖»σ╛ä
-            os.path.join('uploads', filename),  # τ¢╕σ»╣Φ╖»σ╛ä
-            filename  # σÄƒσºïΦ╖»σ╛ä
+            os.path.join(app.static_folder, 'uploads', filename),  # 标准路径
+            os.path.join(app.static_folder, filename),  # 完整路径
+            os.path.join('uploads', filename),  # 相对路径
+            filename  # 原始路径
         ]
         
-        # σ░¥Φ»òµëÇµ£ëσÅ»Φâ╜τÜäΦ╖»σ╛ä
+        # 尝试所有可能的路径
         for path in paths_to_try:
-            print(f"σ░¥Φ»òΦ«┐Θù«Φ╖»σ╛ä: {path}")  # µ╖╗σèáΦ░âΦ»òµùÑσ┐ù
+            print(f"尝试访问路径: {path}")  # 添加调试日志
             if os.path.exists(path):
                 dir_path = os.path.dirname(path)
                 base_name = os.path.basename(path)
-                print(f"µë╛σê░µûçΣ╗╢: {path}")  # µ╖╗σèáΦ░âΦ»òµùÑσ┐ù
+                print(f"找到文件: {path}")  # 添加调试日志
                 return send_from_directory(dir_path, base_name)
         
-        # σªéµ₧£µëÇµ£ëΦ╖»σ╛äΘâ╜Σ╕ìσ¡ÿσ£¿∩╝îΦ«░σ╜òΘöÖΦ»»σ╣╢Φ┐öσ¢₧404
-        print(f"µûçΣ╗╢Σ╕ìσ¡ÿσ£¿∩╝îσ░¥Φ»òΦ┐çΣ╗ÑΣ╕ïΦ╖»σ╛ä: {paths_to_try}")
-        return f"µûçΣ╗╢Σ╕ìσ¡ÿσ£¿∩╝îσ░¥Φ»òΦ┐çΣ╗ÑΣ╕ïΦ╖»σ╛ä: {paths_to_try}", 404
+        # 如果所有路径都不存在，记录错误并返回404
+        print(f"文件不存在，尝试过以下路径: {paths_to_try}")
+        return f"文件不存在，尝试过以下路径: {paths_to_try}", 404
         
     except Exception as e:
-        print(f"Φ«┐Θù«µûçΣ╗╢σç║ΘöÖ: {str(e)}")
-        return f"Φ«┐Θù«µûçΣ╗╢σç║ΘöÖ: {str(e)}", 500
+        print(f"访问文件出错: {str(e)}")
+        return f"访问文件出错: {str(e)}", 500
 
 @app.route('/static/<path:filename>')
 def serve_static(filename):
-    """σñäτÉåΘ¥ÖµÇüµûçΣ╗╢Φ»╖µ▒é"""
-    # σªéµ₧£µÿ»σ«îµò┤τÜäURL∩╝êσîàµï¼ΘöÖΦ»»µá╝σ╝ÅτÜäURL∩╝ë∩╝îµÅÉσÅûσ«₧ΘÖàτÜäURLσ╣╢Θçìσ«ÜσÉæ
+    """处理静态文件请求"""
+    # 如果是完整的URL（包括错误格式的URL），提取实际的URL并重定向
     if 'https://' in filename or 'http://' in filename:
-        # σñäτÉåΘöÖΦ»»µá╝σ╝ÅτÜäURL∩╝êσîàσÉ½/static/σëìτ╝ÇτÜäµâàσå╡∩╝ë
+        # 处理错误格式的URL（包含/static/前缀的情况）
         if filename.startswith('https://') or filename.startswith('http://'):
             actual_url = filename
         else:
-            # Σ╗ÄΦ╖»σ╛äΣ╕¡µÅÉσÅûσ«₧ΘÖàτÜäURL
+            # 从路径中提取实际的URL
             actual_url = filename[filename.find('http'):]
         return redirect(actual_url)
         
     try:
         return send_from_directory(app.static_folder, filename)
     except Exception as e:
-        print(f"Θ¥ÖµÇüµûçΣ╗╢Φ«┐Θù«ΘöÖΦ»»: {str(e)}")
+        print(f"静态文件访问错误: {str(e)}")
         abort(404)
 
 @app.route('/admin/lesson/<int:lesson_id>/add_questions', methods=['POST'])
 @admin_required
 def add_questions(lesson_id):
     try:
-        print("σ╝Çσºïµ╖╗σèáΘóÿτ¢«...")  # Φ░âΦ»òµùÑσ┐ù
+        print("开始添加题目...")  # 调试日志
         
-        # Θ¬îΦ»üCSRFΣ╗ñτëî
+        # 验证CSRF令牌
         if not request.form.get('csrf_token'):
-            raise ValueError('CSRFΘ¬îΦ»üσñ▒Φ┤Ñ')
+            raise ValueError('CSRF验证失败')
             
-        # ΦÄ╖σÅûµëÇµ£ëτ¡öµíê
+        # 获取所有答案
         answers = request.form.getlist('answers[]')
-        print(f"µö╢σê░τÜäτ¡öµíêµò░ΘçÅ: {len(answers)}")  # Φ░âΦ»òµùÑσ┐ù
+        print(f"收到的答案数量: {len(answers)}")  # 调试日志
         
         if not answers:
-            flash('µ▓íµ£ëµö╢σê░τ¡öµíêµò░µì«', 'error')
+            flash('没有收到答案数据', 'error')
             return redirect(url_for('manage_questions', lesson_id=lesson_id))
         
-        # σ╝ÇσÉ»µò░µì«σ║ôΣ║ïσèí
+        # 开启数据库事务
         success_count = 0
         error_messages = []
         
-        # ΦÄ╖σÅûσ╜ôσëìΦ»╛τ¿ïτÜäµ£ÇσñºΘóÿσÅ╖
+        # 获取当前课程的最大题号
         max_number = db.session.query(func.max(Question.question_number))\
             .filter_by(lesson_id=lesson_id)\
             .scalar() or 0
         
-        print(f"σ╜ôσëìµ£ÇσñºΘóÿσÅ╖: {max_number}")  # Φ░âΦ»òµùÑσ┐ù
+        print(f"当前最大题号: {max_number}")  # 调试日志
         
-        # µë╣ΘçÅµ╖╗σèáµû░Θóÿτ¢«
+        # 批量添加新题目
         for i, answer in enumerate(answers, 1):
             try:
                 question_number = max_number + i
-                answer = answer.strip().upper() if answer else ''  # Φ╜¼µìóΣ╕║σñºσåÖσ╣╢σÄ╗ΘÖñτ⌐║τÖ╜
-                print(f"σñäτÉåτ¼¼{question_number}Θóÿτ¡öµíê: {answer}")  # Φ░âΦ»òµùÑσ┐ù
+                answer = answer.strip().upper() if answer else ''  # 转换为大写并去除空白
+                print(f"处理第{question_number}题答案: {answer}")  # 调试日志
                 
-                # µá╣µì«τ¡öµíêσêñµû¡Θóÿτ¢«τ▒╗σ₧ï
-                if not answer:  # τ⌐║τ¡öµíêΦí¿τñ║Φ»üµÿÄΘóÿ
+                # 根据答案判断题目类型
+                if not answer:  # 空答案表示证明题
                     question_type = 'proof'
-                    answer = 'Φ»üµÿÄΘóÿ'
-                elif answer in ['A', 'B', 'C', 'D', 'E']:  # ABCDEΦí¿τñ║ΘÇëµï⌐Θóÿ
+                    answer = '证明题'
+                elif answer in ['A', 'B', 'C', 'D', 'E']:  # ABCDE表示选择题
                     question_type = 'choice'
-                else:  # σà╢Σ╗ûµâàσå╡Σ╕║σí½τ⌐║Θóÿ
+                else:  # 其他情况为填空题
                     question_type = 'fill'
                 
-                print(f"Θóÿτ¢«τ▒╗σ₧ï: {question_type}")  # Φ░âΦ»òµùÑσ┐ù
+                print(f"题目类型: {question_type}")  # 调试日志
                 
-                # µúÇµƒÑΘóÿσÅ╖µÿ»σÉªσ╖▓σ¡ÿσ£¿
+                # 检查题号是否已存在
                 existing_question = Question.query.filter_by(
                     lesson_id=lesson_id,
                     question_number=question_number
                 ).first()
                 
                 if existing_question:
-                    error_messages.append(f"τ¼¼{question_number}Θóÿσ╖▓σ¡ÿσ£¿")
+                    error_messages.append(f"第{question_number}题已存在")
                     continue
                 
-                # σê¢σ╗║µû░Θóÿτ¢«
+                # 创建新题目
                 question = Question(
                     lesson_id=lesson_id,
                     question_number=question_number,
                     type=question_type,
                     answer=answer,
-                    content=f"τ¼¼{question_number}Θóÿ"  # µ╖╗σèáΘ╗ÿΦ«ñσåàσ«╣
+                    content=f"第{question_number}题"  # 添加默认内容
                 )
                 db.session.add(question)
                 success_count += 1
-                print(f"µêÉσèƒµ╖╗σèáΘóÿτ¢«∩╝îΘóÿσÅ╖: {question_number}")  # Φ░âΦ»òµùÑσ┐ù
+                print(f"成功添加题目，题号: {question_number}")  # 调试日志
                 
             except Exception as e:
-                error_messages.append(f"τ¼¼{question_number}Θóÿµ╖╗σèáσñ▒Φ┤Ñ: {str(e)}")
-                print(f"µ╖╗σèáΘóÿτ¢«σñ▒Φ┤Ñ: {str(e)}")  # Φ░âΦ»òµùÑσ┐ù
+                error_messages.append(f"第{question_number}题添加失败: {str(e)}")
+                print(f"添加题目失败: {str(e)}")  # 调试日志
                 continue
         
         if success_count > 0:
             try:
                 db.session.commit()
-                flash(f'µêÉσèƒµ╖╗σèá{success_count}ΘüôΘóÿτ¢«', 'success')
+                flash(f'成功添加{success_count}道题目', 'success')
                 if error_messages:
-                    flash('Θâ¿σêåΘóÿτ¢«µ╖╗σèáσñ▒Φ┤Ñ∩╝Ü' + '; '.join(error_messages), 'warning')
+                    flash('部分题目添加失败：' + '; '.join(error_messages), 'warning')
             except Exception as e:
                 db.session.rollback()
-                flash(f'Σ┐¥σ¡ÿΘóÿτ¢«σñ▒Φ┤Ñ∩╝Ü{str(e)}', 'error')
-                print(f"Σ┐¥σ¡ÿσê░µò░µì«σ║ôσñ▒Φ┤Ñ: {str(e)}")  # Φ░âΦ»òµùÑσ┐ù
+                flash(f'保存题目失败：{str(e)}', 'error')
+                print(f"保存到数据库失败: {str(e)}")  # 调试日志
         else:
-            flash('µëÇµ£ëΘóÿτ¢«µ╖╗σèáσñ▒Φ┤Ñ∩╝Ü' + '; '.join(error_messages), 'error')
+            flash('所有题目添加失败：' + '; '.join(error_messages), 'error')
         
     except Exception as e:
         db.session.rollback()
-        print(f"τ│╗τ╗ƒΘöÖΦ»»: {str(e)}")  # Φ░âΦ»òµùÑσ┐ù
-        flash(f'µ╖╗σèáΘóÿτ¢«σñ▒Φ┤Ñ∩╝Üτ│╗τ╗ƒΘöÖΦ»» - {str(e)}', 'error')
+        print(f"系统错误: {str(e)}")  # 调试日志
+        flash(f'添加题目失败：系统错误 - {str(e)}', 'error')
     
     return redirect(url_for('manage_questions', lesson_id=lesson_id))
 
@@ -2321,41 +2318,41 @@ def upload_individual_exam_files(lesson_id):
     lesson = Lesson.query.get_or_404(lesson_id)
     
     try:
-        # ΦÄ╖σÅûBase64σ¢╛τëçµò░µì«
+        # 获取Base64图片数据
         image_data = request.form.get('file')
         if not image_data or not image_data.startswith('data:image'):
-            flash('µùáµòêτÜäσ¢╛τëçµò░µì«', 'error')
+            flash('无效的图片数据', 'error')
             return redirect(url_for('manage_questions', lesson_id=lesson_id))
         
-        # ΦÄ╖σÅûσ╜ôσëìµ£ÇσñºΘí╡τáü
+        # 获取当前最大页码
         max_page = db.session.query(func.max(ExamFile.page_number)).filter_by(lesson_id=lesson_id).scalar() or 0
         
-        # τöƒµêÉµûçΣ╗╢σÉì
+        # 生成文件名
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
         random_suffix = random.randint(1000, 9999)
         filename = f"{lesson_id}_{timestamp}_{random_suffix}.png"
         
-        # Σ╕èΣ╝áσê░ Cloudinary
+        # 上传到 Cloudinary
         cloudinary_url = upload_to_cloudinary(image_data)
         if not cloudinary_url:
-            raise Exception("Cloudinary Σ╕èΣ╝áσñ▒Φ┤Ñ")
+            raise Exception("Cloudinary 上传失败")
         
-        # σê¢σ╗║Φ»òσì╖µûçΣ╗╢Φ«░σ╜ò
+        # 创建试卷文件记录
         exam_file = ExamFile(
             filename=filename,
-            path=cloudinary_url,  # Σ╜┐τö¿ Cloudinary URL
+            path=cloudinary_url,  # 使用 Cloudinary URL
             lesson_id=lesson_id,
             page_number=max_page + 1
         )
         db.session.add(exam_file)
         db.session.commit()
         
-        flash('Φ»òΘóÿΣ╕èΣ╝áµêÉσèƒ', 'success')
+        flash('试题上传成功', 'success')
         
     except Exception as e:
         db.session.rollback()
-        print(f"Σ╕èΣ╝áσñ▒Φ┤Ñ: {str(e)}")
-        flash(f'σ¢╛τëçΣ╕èΣ╝áσñ▒Φ┤Ñ∩╝Ü{str(e)}', 'error')
+        print(f"上传失败: {str(e)}")
+        flash(f'图片上传失败：{str(e)}', 'error')
     
     return redirect(url_for('manage_questions', lesson_id=lesson_id))
 
@@ -2365,189 +2362,189 @@ def upload_individual_explanation_files(lesson_id):
     lesson = Lesson.query.get_or_404(lesson_id)
     
     try:
-        # ΦÄ╖σÅûBase64σ¢╛τëçµò░µì«
+        # 获取Base64图片数据
         image_data = request.form.get('file')
         if not image_data or not image_data.startswith('data:image'):
-            flash('µùáµòêτÜäσ¢╛τëçµò░µì«', 'error')
+            flash('无效的图片数据', 'error')
             return redirect(url_for('manage_questions', lesson_id=lesson_id))
         
-        # ΦÄ╖σÅûσ╜ôσëìµ£ÇσñºΘí╡τáü
+        # 获取当前最大页码
         max_page = db.session.query(func.max(ExplanationFile.page_number)).filter_by(lesson_id=lesson_id).scalar() or 0
         
-        # τöƒµêÉµûçΣ╗╢σÉì
+        # 生成文件名
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
         random_suffix = random.randint(1000, 9999)
         filename = f"{lesson_id}_{timestamp}_{random_suffix}.png"
         
-        # Σ╕èΣ╝áσê░ Cloudinary
+        # 上传到 Cloudinary
         cloudinary_url = upload_to_cloudinary(image_data)
         if not cloudinary_url:
-            raise Exception("Cloudinary Σ╕èΣ╝áσñ▒Φ┤Ñ")
+            raise Exception("Cloudinary 上传失败")
         
-        # σê¢σ╗║Φºúµ₧ÉµûçΣ╗╢Φ«░σ╜ò
+        # 创建解析文件记录
         explanation_file = ExplanationFile(
             filename=filename,
-            path=cloudinary_url,  # Σ╜┐τö¿ Cloudinary URL
+            path=cloudinary_url,  # 使用 Cloudinary URL
             lesson_id=lesson_id,
             page_number=max_page + 1
         )
         db.session.add(explanation_file)
         db.session.commit()
         
-        flash('Φºúµ₧ÉΣ╕èΣ╝áµêÉσèƒ', 'success')
+        flash('解析上传成功', 'success')
         
     except Exception as e:
         db.session.rollback()
-        print(f"Σ╕èΣ╝áσñ▒Φ┤Ñ: {str(e)}")
-        flash(f'σ¢╛τëçΣ╕èΣ╝áσñ▒Φ┤Ñ∩╝Ü{str(e)}', 'error')
+        print(f"上传失败: {str(e)}")
+        flash(f'图片上传失败：{str(e)}', 'error')
     
     return redirect(url_for('manage_questions', lesson_id=lesson_id))
 
 @app.route('/admin/lesson/<int:lesson_id>/upload_batch_exam_files', methods=['POST'])
 @admin_required
 def upload_batch_exam_files(lesson_id):
-    """µë╣ΘçÅΣ╕èΣ╝áΦ»òΘóÿσ¢╛τëç∩╝îΘü┐σàìσ╣╢σÅæσ»╝Φç┤τÜäpage_numberΘçìσñìΘù«Θóÿ"""
+    """批量上传试题图片，避免并发导致的page_number重复问题"""
     lesson = Lesson.query.get_or_404(lesson_id)
     
     try:
-        # ΦÄ╖σÅûµëÇµ£ëBase64σ¢╛τëçµò░µì«
+        # 获取所有Base64图片数据
         image_files = request.form.getlist('files[]')
         if not image_files:
-            return jsonify({'success': False, 'message': 'µ▓íµ£ëµÄÑµö╢σê░σ¢╛τëçµò░µì«'}), 400
+            return jsonify({'success': False, 'message': '没有接收到图片数据'}), 400
         
-        # ΦÄ╖σÅûσ╜ôσëìµ£ÇσñºΘí╡τáü∩╝êσÅ¬µƒÑΦ»óΣ╕Çµ¼í∩╝ë
+        # 获取当前最大页码（只查询一次）
         max_page = db.session.query(func.max(ExamFile.page_number)).filter_by(lesson_id=lesson_id).scalar() or 0
         
         success_count = 0
         failed_count = 0
         
-        # µîëΘí║σ║ÅσñäτÉåµëÇµ£ëσ¢╛τëç
+        # 按顺序处理所有图片
         for index, image_data in enumerate(image_files):
             try:
                 if not image_data or not image_data.startswith('data:image'):
-                    print(f"Φ╖│Φ┐çµùáµòêτÜäσ¢╛τëçµò░µì«∩╝îτ┤óσ╝ò: {index}")
+                    print(f"跳过无效的图片数据，索引: {index}")
                     failed_count += 1
                     continue
                 
-                # τöƒµêÉµûçΣ╗╢σÉì
+                # 生成文件名
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
                 random_suffix = random.randint(1000, 9999)
                 filename = f"{lesson_id}_{timestamp}_{random_suffix}.png"
                 
-                # Σ╕èΣ╝áσê░ Cloudinary
+                # 上传到 Cloudinary
                 cloudinary_url = upload_to_cloudinary(image_data)
                 if not cloudinary_url:
-                    print(f"Cloudinary Σ╕èΣ╝áσñ▒Φ┤Ñ∩╝îτ┤óσ╝ò: {index}")
+                    print(f"Cloudinary 上传失败，索引: {index}")
                     failed_count += 1
                     continue
                 
-                # σê¢σ╗║Φ»òσì╖µûçΣ╗╢Φ«░σ╜ò∩╝îΣ╜┐τö¿ΘÇÆσó₧τÜäΘí╡τáü
+                # 创建试卷文件记录，使用递增的页码
                 exam_file = ExamFile(
                     filename=filename,
                     path=cloudinary_url,
                     lesson_id=lesson_id,
-                    page_number=max_page + index + 1  # τí«Σ┐¥Θí╡τáüΦ┐₧τ╗¡Σ╕öσö»Σ╕Ç
+                    page_number=max_page + index + 1  # 确保页码连续且唯一
                 )
                 db.session.add(exam_file)
                 success_count += 1
                 
             except Exception as e:
-                print(f"σñäτÉåσ¢╛τëçσñ▒Φ┤Ñ∩╝îτ┤óσ╝ò {index}: {str(e)}")
+                print(f"处理图片失败，索引 {index}: {str(e)}")
                 failed_count += 1
                 continue
         
-        # Σ╕Çµ¼íµÇºµÅÉΣ║ñµëÇµ£ëµêÉσèƒτÜäΦ«░σ╜ò
+        # 一次性提交所有成功的记录
         if success_count > 0:
             db.session.commit()
-            print(f"µë╣ΘçÅΣ╕èΣ╝áµêÉσèƒ: {success_count} σ╝áσ¢╛τëç")
+            print(f"批量上传成功: {success_count} 张图片")
         
         if failed_count > 0:
-            print(f"Θâ¿σêåΣ╕èΣ╝áσñ▒Φ┤Ñ: {failed_count} σ╝áσ¢╛τëç")
+            print(f"部分上传失败: {failed_count} 张图片")
         
         return jsonify({
             'success': True,
-            'message': f'µêÉσèƒΣ╕èΣ╝á {success_count} σ╝áσ¢╛τëç' + (f'∩╝î{failed_count} σ╝áσñ▒Φ┤Ñ' if failed_count > 0 else ''),
+            'message': f'成功上传 {success_count} 张图片' + (f'，{failed_count} 张失败' if failed_count > 0 else ''),
             'success_count': success_count,
             'failed_count': failed_count
         })
         
     except Exception as e:
         db.session.rollback()
-        print(f"µë╣ΘçÅΣ╕èΣ╝áσñ▒Φ┤Ñ: {str(e)}")
-        return jsonify({'success': False, 'message': f'Σ╕èΣ╝áσñ▒Φ┤Ñ∩╝Ü{str(e)}'}), 500
+        print(f"批量上传失败: {str(e)}")
+        return jsonify({'success': False, 'message': f'上传失败：{str(e)}'}), 500
 
 @app.route('/admin/lesson/<int:lesson_id>/upload_batch_explanation_files', methods=['POST'])
 @admin_required
 def upload_batch_explanation_files(lesson_id):
-    """µë╣ΘçÅΣ╕èΣ╝áΦºúµ₧Éσ¢╛τëç∩╝îΘü┐σàìσ╣╢σÅæσ»╝Φç┤τÜäpage_numberΘçìσñìΘù«Θóÿ"""
+    """批量上传解析图片，避免并发导致的page_number重复问题"""
     lesson = Lesson.query.get_or_404(lesson_id)
     
     try:
-        # ΦÄ╖σÅûµëÇµ£ëBase64σ¢╛τëçµò░µì«
+        # 获取所有Base64图片数据
         image_files = request.form.getlist('files[]')
         if not image_files:
-            return jsonify({'success': False, 'message': 'µ▓íµ£ëµÄÑµö╢σê░σ¢╛τëçµò░µì«'}), 400
+            return jsonify({'success': False, 'message': '没有接收到图片数据'}), 400
         
-        # ΦÄ╖σÅûσ╜ôσëìµ£ÇσñºΘí╡τáü∩╝êσÅ¬µƒÑΦ»óΣ╕Çµ¼í∩╝ë
+        # 获取当前最大页码（只查询一次）
         max_page = db.session.query(func.max(ExplanationFile.page_number)).filter_by(lesson_id=lesson_id).scalar() or 0
         
         success_count = 0
         failed_count = 0
         
-        # µîëΘí║σ║ÅσñäτÉåµëÇµ£ëσ¢╛τëç
+        # 按顺序处理所有图片
         for index, image_data in enumerate(image_files):
             try:
                 if not image_data or not image_data.startswith('data:image'):
-                    print(f"Φ╖│Φ┐çµùáµòêτÜäσ¢╛τëçµò░µì«∩╝îτ┤óσ╝ò: {index}")
+                    print(f"跳过无效的图片数据，索引: {index}")
                     failed_count += 1
                     continue
                 
-                # τöƒµêÉµûçΣ╗╢σÉì
+                # 生成文件名
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
                 random_suffix = random.randint(1000, 9999)
                 filename = f"{lesson_id}_{timestamp}_{random_suffix}.png"
                 
-                # Σ╕èΣ╝áσê░ Cloudinary
+                # 上传到 Cloudinary
                 cloudinary_url = upload_to_cloudinary(image_data)
                 if not cloudinary_url:
-                    print(f"Cloudinary Σ╕èΣ╝áσñ▒Φ┤Ñ∩╝îτ┤óσ╝ò: {index}")
+                    print(f"Cloudinary 上传失败，索引: {index}")
                     failed_count += 1
                     continue
                 
-                # σê¢σ╗║Φºúµ₧ÉµûçΣ╗╢Φ«░σ╜ò∩╝îΣ╜┐τö¿ΘÇÆσó₧τÜäΘí╡τáü
+                # 创建解析文件记录，使用递增的页码
                 explanation_file = ExplanationFile(
                     filename=filename,
                     path=cloudinary_url,
                     lesson_id=lesson_id,
-                    page_number=max_page + index + 1  # τí«Σ┐¥Θí╡τáüΦ┐₧τ╗¡Σ╕öσö»Σ╕Ç
+                    page_number=max_page + index + 1  # 确保页码连续且唯一
                 )
                 db.session.add(explanation_file)
                 success_count += 1
                 
             except Exception as e:
-                print(f"σñäτÉåσ¢╛τëçσñ▒Φ┤Ñ∩╝îτ┤óσ╝ò {index}: {str(e)}")
+                print(f"处理图片失败，索引 {index}: {str(e)}")
                 failed_count += 1
                 continue
         
-        # Σ╕Çµ¼íµÇºµÅÉΣ║ñµëÇµ£ëµêÉσèƒτÜäΦ«░σ╜ò
+        # 一次性提交所有成功的记录
         if success_count > 0:
             db.session.commit()
-            print(f"µë╣ΘçÅΣ╕èΣ╝áµêÉσèƒ: {success_count} σ╝áσ¢╛τëç")
+            print(f"批量上传成功: {success_count} 张图片")
         
         if failed_count > 0:
-            print(f"Θâ¿σêåΣ╕èΣ╝áσñ▒Φ┤Ñ: {failed_count} σ╝áσ¢╛τëç")
+            print(f"部分上传失败: {failed_count} 张图片")
         
         return jsonify({
             'success': True,
-            'message': f'µêÉσèƒΣ╕èΣ╝á {success_count} σ╝áσ¢╛τëç' + (f'∩╝î{failed_count} σ╝áσñ▒Φ┤Ñ' if failed_count > 0 else ''),
+            'message': f'成功上传 {success_count} 张图片' + (f'，{failed_count} 张失败' if failed_count > 0 else ''),
             'success_count': success_count,
             'failed_count': failed_count
         })
         
     except Exception as e:
         db.session.rollback()
-        print(f"µë╣ΘçÅΣ╕èΣ╝áσñ▒Φ┤Ñ: {str(e)}")
-        return jsonify({'success': False, 'message': f'Σ╕èΣ╝áσñ▒Φ┤Ñ∩╝Ü{str(e)}'}), 500
+        print(f"批量上传失败: {str(e)}")
+        return jsonify({'success': False, 'message': f'上传失败：{str(e)}'}), 500
 
 @app.route('/admin/badge_rules')
 @admin_required
@@ -2557,33 +2554,32 @@ def badge_rules():
 @app.route('/admin/student/<int:user_id>/dashboard')
 @admin_required
 def student_dashboard_admin(user_id):
-    # ΦÄ╖σÅûσ¡ªτöƒτö¿µê╖
+    # 获取学生用户
     student = User.query.get_or_404(user_id)
     if student.is_admin:
-        flash('µùáµ│òµƒÑτ£ïτ«íτÉåσæÿτÜäΣ╗¬Φí¿τ¢ÿ')
+        flash('无法查看管理员的仪表盘')
         return redirect(url_for('admin_users'))
     
-    # ΦÄ╖σÅûΦ»Ñσ¡ªτöƒτÜäµëÇµ£ëµ╡ïΘ¬îσÄåσÅ▓Φ«░σ╜ò
+    # 获取该学生的所有测验历史记录
     quiz_history = QuizHistory.query.filter_by(user_id=student.id).all()
-    
-    # Φ«íτ«ùµÇ╗µ╡ïΘ¬îµò░σÆîσ╣│σ¥çµ¡úτí«τÄç
+    # 计算总测验数和平均正确率
     total_quizzes = len(quiz_history)
     if total_quizzes > 0:
         total_correct_rate = round(sum(quiz.correct_rate for quiz in quiz_history) / total_quizzes)
     else:
         total_correct_rate = 0
     
-    # ΦÄ╖σÅûσÄåσÅ▓Φ»╛τ¿ïµò░µì«
+    # 获取历史课程数据
     history_data = db.session.query(Lesson, QuizHistory)\
         .join(QuizHistory, Lesson.id == QuizHistory.lesson_id)\
         .filter(QuizHistory.user_id == student.id)\
         .order_by(QuizHistory.completed_at.desc())\
         .all()
     
-    # ΦÄ╖σÅûσ╖▓σ«îµêÉτÜäΦ»╛τ¿ïIDσêùΦí¿
+    # 获取已完成的课程ID列表
     completed_lesson_ids = [quiz.lesson_id for quiz in quiz_history]
     
-    # ΦÄ╖σÅûσ╜ôσëìσÅ»τö¿τÜäΦ»╛τ¿ï∩╝êµ┐Çµ┤╗τè╢µÇüΣ╕öµ£¬σ«îµêÉτÜäΦ»╛τ¿ï∩╝ë
+    # 获取当前可用的课程（激活状态且未完成的课程）
     available_lessons = Lesson.query.join(
         lesson_class_association,
         Lesson.id == lesson_class_association.c.lesson_id
@@ -2593,12 +2589,12 @@ def student_dashboard_admin(user_id):
         ~Lesson.id.in_(completed_lesson_ids) if completed_lesson_ids else True
     ).all()
     
-    # σçåσñçΦ╢ïσè┐σ¢╛µò░µì«
+    # 准备趋势图数据
     trend_data = []
     for quiz in quiz_history:
         lesson = Lesson.query.get(quiz.lesson_id)
         
-        # Φ«íτ«ùΦ»ÑΦ»╛τ¿ïτÜäτÅ¡τ║ºσ╣│σ¥çµ¡úτí«τÄç
+        # 计算该课程的班级平均正确率
         class_avg = db.session.query(func.avg(QuizHistory.correct_answers * 100.0 / QuizHistory.total_questions))\
             .filter(QuizHistory.lesson_id == quiz.lesson_id,
                    QuizHistory.user_id != student.id)\
@@ -2606,24 +2602,24 @@ def student_dashboard_admin(user_id):
         
         trend_data.append({
             'date': quiz.completed_at.strftime('%Y-%m-%d'),
-            'correct_rate': round(quiz.correct_rate),  # σÅûµò┤
-            'class_avg': round(class_avg),  # σÅûµò┤
+            'correct_rate': round(quiz.correct_rate),  # 取整
+            'class_avg': round(class_avg),  # 取整
             'lesson_title': lesson.title if lesson else 'Unknown'
         })
     
     return render_template('student/dashboard.html',
-                         current_user=student,  # Σ╜┐τö¿σ¡ªτöƒτö¿µê╖Σ┐íµü»
+                         current_user=student,  # 使用学生用户信息
                          total_quizzes=total_quizzes,
                          average_correct_rate=total_correct_rate,
                          history_data=history_data,
                          trend_data=json.dumps(trend_data),
                          lessons=available_lessons,
-                         is_admin_view=True)  # µáçΦ«░Φ┐Öµÿ»τ«íτÉåσæÿΦºåσ¢╛
+                         is_admin_view=True)  # 标记这是管理员视图
 
 @app.route('/student/wrong_questions')
 @login_required
 def wrong_questions():
-    # ΦÄ╖σÅûτö¿µê╖µëÇµ£ëτÜäΘöÖΘóÿΦ«░σ╜ò
+    # 获取用户所有的错题记录
     wrong_answers = (db.session.query(
         UserAnswer, Question, Lesson, QuizHistory
     ).join(
@@ -2640,11 +2636,11 @@ def wrong_questions():
         Question.question_number
     ).all())
 
-    # ΦÄ╖σÅûσîàσÉ½ΘöÖΘóÿτÜäΦ»╛τ¿ïσêùΦí¿
+    # 获取包含错题的课程列表
     lessons = list(set(wa.Lesson for wa in wrong_answers))
     lessons.sort(key=lambda x: x.id)
 
-    # ΦÄ╖σÅûµ»ÅΣ╕¬ΘöÖΘóÿσ»╣σ║öτÜäΦ»òσì╖σÆîΦºúµ₧Éσ¢╛τëç
+    # 获取每个错题对应的试卷和解析图片
     images = {}
     for wa in wrong_answers:
         lesson_id = wa.Lesson.id
@@ -2652,13 +2648,13 @@ def wrong_questions():
         key = (lesson_id, question_number)
         
         if key not in images:
-            # ΦÄ╖σÅûσ»╣σ║öτÜäΦ»òσì╖σ¢╛τëç
+            # 获取对应的试卷图片
             exam_file = ExamFile.query.filter_by(
                 lesson_id=lesson_id,
                 page_number=question_number
             ).first()
             
-            # ΦÄ╖σÅûσ»╣σ║öτÜäΦºúµ₧Éσ¢╛τëç
+            # 获取对应的解析图片
             explanation_file = ExplanationFile.query.filter_by(
                 lesson_id=lesson_id,
                 page_number=question_number
@@ -2743,7 +2739,7 @@ def add_user():
     email = request.form.get('email')
     password = request.form.get('password')
     role = request.form.get('role')
-    class_ids = request.form.getlist('classes')  # ΦÄ╖σÅûσñÜΣ╕¬τÅ¡τ║ºID
+    class_ids = request.form.getlist('classes')  # 获取多个班级ID
     
     if not username or not email or not password:
         return redirect(url_for('admin_users'))
@@ -2754,7 +2750,7 @@ def add_user():
     if User.query.filter_by(email=email).first():
         return redirect(url_for('admin_users'))
     
-    # σê¢σ╗║µû░τö¿µê╖
+    # 创建新用户
     new_user = User(
         username=username,
         email=email,
@@ -2762,11 +2758,11 @@ def add_user():
         is_active=True
     )
     
-    # Φ«╛τ╜«τö¿µê╖ΦºÆΦë▓
+    # 设置用户角色
     if role == 'admin':
         new_user.is_admin = True
     elif role == 'student' and class_ids:
-        # σªéµ₧£µÿ»σ¡ªτöƒ∩╝îµ╖╗σèáτÅ¡τ║ºσà│Φüö
+        # 如果是学生，添加班级关联
         for class_id in class_ids:
             class_ = Class.query.get(class_id)
             if class_:
@@ -2782,9 +2778,9 @@ def add_user():
 
 @app.route('/debug/static/<path:filename>')
 def debug_static(filename):
-    """Φ░âΦ»òΘ¥ÖµÇüµûçΣ╗╢Φ«┐Θù«"""
+    """调试静态文件访问"""
     try:
-        # µúÇµƒÑµûçΣ╗╢µÿ»σÉªσ¡ÿσ£¿
+        # 检查文件是否存在
         file_path = os.path.join(app.static_folder, filename)
         if os.path.exists(file_path):
             return {
@@ -2809,98 +2805,98 @@ def debug_static(filename):
 @app.route('/admin/fix_file_paths')
 @admin_required
 def fix_file_paths():
-    """Σ┐«σñìµò░µì«σ║ôΣ╕¡τÜäµûçΣ╗╢Φ╖»σ╛ä"""
+    """修复数据库中的文件路径"""
     try:
-        # ΦÄ╖σÅûµëÇµ£ëΦ»òσì╖µûçΣ╗╢Φ«░σ╜ò
+        # 获取所有试卷文件记录
         exam_files = ExamFile.query.all()
         fixed_count = 0
         
         for file in exam_files:
-            # µúÇµƒÑµûçΣ╗╢µÿ»σÉªσ¡ÿσ£¿
+            # 检查文件是否存在
             current_path = os.path.join('static', file.path)
             if not os.path.exists(current_path):
-                # σ░¥Φ»òσ£¿uploads/examsτ¢«σ╜òΣ╕¡µƒÑµë╛µûçΣ╗╢
+                # 尝试在uploads/exams目录中查找文件
                 filename = os.path.basename(file.path)
                 new_path = f'uploads/exams/{filename}'
                 new_full_path = os.path.join('static', new_path)
                 
                 if os.path.exists(new_full_path):
-                    # µ¢┤µû░µò░µì«σ║ôΣ╕¡τÜäΦ╖»σ╛ä
+                    # 更新数据库中的路径
                     file.path = new_path
                     fixed_count += 1
         
         if fixed_count > 0:
             db.session.commit()
-            flash(f'µêÉσèƒΣ┐«σñì {fixed_count} Σ╕¬µûçΣ╗╢Φ╖»σ╛ä', 'success')
+            flash(f'成功修复 {fixed_count} 个文件路径', 'success')
         else:
-            flash('µ▓íµ£ëΘ£ÇΦªüΣ┐«σñìτÜäµûçΣ╗╢Φ╖»σ╛ä', 'info')
+            flash('没有需要修复的文件路径', 'info')
             
     except Exception as e:
         db.session.rollback()
-        flash(f'Σ┐«σñìµûçΣ╗╢Φ╖»σ╛äµù╢σç║ΘöÖ∩╝Ü{str(e)}', 'error')
+        flash(f'修复文件路径时出错：{str(e)}', 'error')
     
     return redirect(url_for('admin_lessons'))
 
 @app.route('/admin/fix_render_paths')
 @admin_required
 def fix_render_paths():
-    """Σ┐«σñì Render τ½»µò░µì«σ║ôΣ╕¡τÜäµûçΣ╗╢Φ╖»σ╛ä"""
+    """修复 Render 端数据库中的文件路径"""
     try:
-        # ΦÄ╖σÅûµëÇµ£ëΦ»òσì╖µûçΣ╗╢Φ«░σ╜ò
+        # 获取所有试卷文件记录
         exam_files = ExamFile.query.all()
         fixed_count = 0
         
         for file in exam_files:
-            # µúÇµƒÑσ╣╢Σ┐«µ¡úµûçΣ╗╢Φ╖»σ╛ä
+            # 检查并修正文件路径
             current_path = file.path
             filename = os.path.basename(current_path)
             
-            # τí«Σ┐¥Φ╖»σ╛äµá╝σ╝Åµ¡úτí«
+            # 确保路径格式正确
             if not current_path.startswith('uploads/'):
-                # σªéµ₧£Φ╖»σ╛äΣ╗Ñ static/ σ╝Çσñ┤∩╝îτº╗ΘÖñσ«â
+                # 如果路径以 static/ 开头，移除它
                 if current_path.startswith('static/'):
                     current_path = current_path[7:]
-                # σªéµ₧£Φ╖»σ╛äΣ╕ìσîàσÉ½ uploads/∩╝îµ╖╗σèáσ«â
+                # 如果路径不包含 uploads/，添加它
                 if not current_path.startswith('uploads/'):
                     current_path = f'uploads/exams/{filename}'
                 
-                # µ¢┤µû░µò░µì«σ║ôΦ«░σ╜ò
+                # 更新数据库记录
                 file.path = current_path
                 fixed_count += 1
-                print(f"Σ┐«σñìµûçΣ╗╢Φ╖»σ╛ä: {file.path} -> {current_path}")
+                print(f"修复文件路径: {file.path} -> {current_path}")
         
         if fixed_count > 0:
             db.session.commit()
-            flash(f'µêÉσèƒΣ┐«σñì {fixed_count} Σ╕¬µûçΣ╗╢Φ╖»σ╛ä', 'success')
+            flash(f'成功修复 {fixed_count} 个文件路径', 'success')
         else:
-            flash('µ▓íµ£ëΘ£ÇΦªüΣ┐«σñìτÜäµûçΣ╗╢Φ╖»σ╛ä', 'info')
+            flash('没有需要修复的文件路径', 'info')
             
     except Exception as e:
         db.session.rollback()
-        flash(f'Σ┐«σñìµûçΣ╗╢Φ╖»σ╛äµù╢σç║ΘöÖ∩╝Ü{str(e)}', 'error')
-        print(f"Σ┐«σñìµûçΣ╗╢Φ╖»σ╛äµù╢σç║ΘöÖ: {str(e)}")
+        flash(f'修复文件路径时出错：{str(e)}', 'error')
+        print(f"修复文件路径时出错: {str(e)}")
     
     return redirect(url_for('admin_lessons'))
 
 @app.route('/admin/fix_db_paths')
 @admin_required
 def fix_db_paths():
-    """Σ┐«σñìµò░µì«σ║ôΣ╕¡τÜäµûçΣ╗╢Φ╖»σ╛äΦ«░σ╜ò"""
+    """修复数据库中的文件路径记录"""
     try:
-        # ΦÄ╖σÅûµëÇµ£ëΦ»òσì╖µûçΣ╗╢Φ«░σ╜ò
+        # 获取所有试卷文件记录
         exam_files = ExamFile.query.all()
         explanation_files = ExplanationFile.query.all()
         
         exam_fixed = 0
         explanation_fixed = 0
         
-        # Σ┐«σñìΦ»òσì╖µûçΣ╗╢Φ╖»σ╛ä
+        # 修复试卷文件路径
         for file in exam_files:
             if 'uploads/uploads/' in file.path:
                 file.path = file.path.replace('uploads/uploads/', 'uploads/')
                 exam_fixed += 1
         
-        # Σ┐«σñìΦºúµ₧ÉµûçΣ╗╢Φ╖»σ╛ä
+        # 修复解析文件路径
         for file in explanation_files:
             if 'uploads/uploads/' in file.path:
                 file.path = file.path.replace('uploads/uploads/', 'uploads/')
@@ -2908,21 +2904,21 @@ def fix_db_paths():
         
         if exam_fixed > 0 or explanation_fixed > 0:
             db.session.commit()
-            flash(f'µêÉσèƒΣ┐«σñì {exam_fixed} Σ╕¬Φ»òσì╖µûçΣ╗╢σÆî {explanation_fixed} Σ╕¬Φºúµ₧ÉµûçΣ╗╢τÜäΦ╖»σ╛ä', 'success')
+            flash(f'成功修复 {exam_fixed} 个试卷文件和 {explanation_fixed} 个解析文件的路径', 'success')
         else:
-            flash('µ▓íµ£ëΘ£ÇΦªüΣ┐«σñìτÜäµûçΣ╗╢Φ╖»σ╛ä', 'info')
+            flash('没有需要修复的文件路径', 'info')
         
         return redirect(url_for('admin_lessons'))
         
     except Exception as e:
-        flash(f'Σ┐«σñìµûçΣ╗╢Φ╖»σ╛äµù╢σç║ΘöÖ∩╝Ü{str(e)}', 'error')
+        flash(f'修复文件路径时出错：{str(e)}', 'error')
         return redirect(url_for('admin_lessons'))
 
 @app.route('/debug/check_file/<path:filename>')
 def debug_check_file(filename):
-    """µúÇµƒÑτë╣σ«ÜµûçΣ╗╢τÜäΦ«┐Θù«µâàσå╡"""
+    """检查特定文件的访问情况"""
     try:
-        # µ₧äσ╗║µëÇµ£ëσÅ»Φâ╜τÜäΦ╖»σ╛ä
+        # 构建所有可能的路径
         possible_paths = [
             os.path.join(app.static_folder, 'uploads', 'exams', filename),
             os.path.join(app.static_folder, 'uploads', filename),
@@ -2941,7 +2937,7 @@ def debug_check_file(filename):
             }
             results.append(result)
             
-        # µúÇµƒÑµò░µì«σ║ôΣ╕¡τÜäΦ«░σ╜ò
+        # 检查数据库中的记录
         exam_file = ExamFile.query.filter(
             ExamFile.path.like(f'%{filename}')
         ).first()
@@ -2970,9 +2966,9 @@ def debug_check_file(filename):
 
 @app.route('/debug/file_paths')
 def debug_file_paths():
-    """Φ░âΦ»òµûçΣ╗╢Φ╖»σ╛äΘù«Θóÿ"""
+    """调试文件路径问题"""
     try:
-        # ΦÄ╖σÅûµëÇµ£ëΦ»òσì╖σÆîΦºúµ₧ÉµûçΣ╗╢Φ«░σ╜ò
+        # 获取所有试卷和解析文件记录
         exam_files = ExamFile.query.all()
         explanation_files = ExplanationFile.query.all()
         
@@ -2983,7 +2979,7 @@ def debug_file_paths():
             'upload_folder': UPLOAD_FOLDER
         }
         
-        # µúÇµƒÑΦ»òσì╖µûçΣ╗╢
+        # 检查试卷文件
         for file in exam_files:
             file_info = {
                 'id': file.id,
@@ -2993,7 +2989,7 @@ def debug_file_paths():
                 'page_number': file.page_number
             }
             
-            # µúÇµƒÑΣ╕ìσÉîτÜäσÅ»Φâ╜Φ╖»σ╛ä
+            # 检查不同的可能路径
             possible_paths = [
                 os.path.join(app.static_folder, file.path),
                 os.path.join(app.static_folder, 'uploads', file.filename),
@@ -3011,7 +3007,7 @@ def debug_file_paths():
             
             results['exam_files'].append(file_info)
         
-        # µúÇµƒÑΦºúµ₧ÉµûçΣ╗╢
+        # 检查解析文件
         for file in explanation_files:
             file_info = {
                 'id': file.id,
@@ -3021,7 +3017,7 @@ def debug_file_paths():
                 'page_number': file.page_number
             }
             
-            # µúÇµƒÑΣ╕ìσÉîτÜäσÅ»Φâ╜Φ╖»σ╛ä
+            # 检查不同的可能路径
             possible_paths = [
                 os.path.join(app.static_folder, file.path),
                 os.path.join(app.static_folder, 'uploads', file.filename),
@@ -3046,7 +3042,7 @@ def debug_file_paths():
             'error': str(e)
         }), 500
 
-# µ╕àτÉåσÄåσÅ▓µò░µì«∩╝ÜσÅ¬Σ┐¥τòÖµ»ÅΣ╕¬σ¡ªτöƒµ»ÅΘù¿Φ»╛τÜäτ¼¼Σ╕Çµ¼íτ¡öΘóÿΦ«░σ╜ò∩╝îσà╢Σ╜Öσà¿Θâ¿σêáΘÖñ
+# 清理历史数据：只保留每个学生每门课的第一次答题记录，其余全部删除
 def clean_duplicate_quiz_history():
     from sqlalchemy import and_
     all_histories = QuizHistory.query.order_by(QuizHistory.user_id, QuizHistory.lesson_id, QuizHistory.completed_at.asc()).all()
@@ -3059,7 +3055,7 @@ def clean_duplicate_quiz_history():
         else:
             seen.add(key)
     for qh in to_delete:
-        # σêáΘÖñτ¢╕σà│τÜä UserAnswer
+        # 删除相关的 UserAnswer
         UserAnswer.query.filter_by(quiz_history_id=qh.id).delete()
         db.session.delete(qh)
     db.session.commit()
@@ -3072,24 +3068,24 @@ def mark_answer(user_answer_id):
     is_correct = str(is_correct_str).lower() == 'true'
     user_answer.is_correct = is_correct
 
-    # Θçìµû░τ╗ƒΦ«íΦ»Ñµ¼íΣ╜£Σ╕ÜτÜäµ¡úτí«Θóÿµò░
+    # 重新统计该次作业的正确题数
     quiz_history = QuizHistory.query.get(user_answer.quiz_history_id)
     quiz_history.correct_answers = UserAnswer.query.filter_by(
         quiz_history_id=quiz_history.id, is_correct=True
     ).count()
     db.session.commit()
-    flash('σêñσ«Üσ╖▓Σ┐«µö╣', 'success')
+    flash('判定已修改', 'success')
     return redirect(request.referrer or url_for('admin_dashboard'))
 
 
 @app.route('/admin/quiz_history/<int:quiz_history_id>/ai_regrade', methods=['POST'])
 @admin_required
 def ai_regrade_quiz(quiz_history_id):
-    """τ«íτÉåσæÿσ»╣σ╖▓µÅÉΣ║ñΣ╜£Σ╕Üτö¿ GPT Θçìσêñ∩╝êΣ╕╗Φªüτö¿Σ║ÄσåÖµ│òΣ╕ìσÉîΦó½Φ»»σêñΣ╕║ΘöÖτÜäΘóÿ∩╝ëπÇé"""
+    """管理员对已提交作业用 GPT 重判（主要用于写法不同被误判为错的题）。"""
     from ai_grading import ai_grading_available
 
     if not ai_grading_available():
-        flash('µ£¬Θàìτ╜« OPENAI_API_KEY∩╝îµùáµ│òΣ╜┐τö¿ AI Θçìσêñ', 'error')
+        flash('未配置 OPENAI_API_KEY，无法使用 AI 重判', 'error')
         return redirect(request.referrer or url_for('admin_dashboard'))
 
     quiz_history = QuizHistory.query.get_or_404(quiz_history_id)
@@ -3111,7 +3107,7 @@ def ai_regrade_quiz(quiz_history_id):
                 ua.is_correct = False
                 changed += 1
             continue
-        # σ╖▓σêñσ»╣τÜäΘÇëµï⌐Θóÿ/σí½τ⌐║ΘóÿΦ╖│Φ┐ç∩╝êτ£üΦ┤╣τö¿∩╝ë∩╝¢Φºúτ¡öΘóÿΣ╕ÄσêñΘöÖΘóÿΘçìσêñ
+        # 已判对的选择题/填空题跳过（省费用）；解答题与判错题重判
         if ua.is_correct and q.type != 'proof':
             continue
         new_ok = _grade_homework_question(q, raw, exam_by_page, expl_by_page)
@@ -3123,14 +3119,14 @@ def ai_regrade_quiz(quiz_history_id):
         quiz_history_id=quiz_history.id, is_correct=True
     ).count()
     db.session.commit()
-    flash(f'AI Θçìσêñσ«îµêÉ∩╝îµ¢┤µû░Σ║å {changed} Θóÿσêñσ«Ü', 'success')
+    flash(f'AI 重判完成，更新了 {changed} 题判定', 'success')
     return redirect(request.referrer or url_for(
         'view_history', lesson_id=quiz_history.lesson_id, user_id=quiz_history.user_id
     ))
 
 
 def _can_access_user_answer(user_answer):
-    """µ£¼Σ║║µêûτ«íτÉåσæÿσÅ»Φ«┐Θù«Φ»Ñτ¡öΘóÿΦ«░σ╜òπÇé"""
+    """本人或管理员可访问该答题记录。"""
     if not current_user.is_authenticated:
         return False
     if getattr(current_user, 'is_admin', False):
@@ -3139,10 +3135,10 @@ def _can_access_user_answer(user_answer):
 
 
 def _tutor_context_for_answer(user_answer):
-    """τ╗äΦúàσ»╝σ¡ªΣ╕èΣ╕ïµûç∩╝¢µùáµ¥âµêûΣ╕ìσ¡ÿσ£¿Φ┐öσ¢₧ (None, error_response)πÇé"""
+    """组装导学上下文；无权或不存在返回 (None, error_response)。"""
     q = user_answer.question
     if not q:
-        return None, (jsonify({'ok': False, 'reply': 'Φ»ÑΘóÿΘ£ÇΦªüΦ»óΘù«ΦÇüσ╕êτ¡öτûæ', 'can_teach': False, 'done': True}), 404)
+        return None, (jsonify({'ok': False, 'reply': '该题需要询问老师答疑', 'can_teach': False, 'done': True}), 404)
     exam_by_page, expl_by_page = _homework_image_maps(user_answer.lesson_id)
     qnum = q.question_number
     image_urls = [u for u in (exam_by_page.get(qnum), expl_by_page.get(qnum)) if u]
@@ -3172,7 +3168,7 @@ def ai_tutor_start():
 
     ua = UserAnswer.query.get_or_404(answer_id)
     if not _can_access_user_answer(ua):
-        return jsonify({'ok': False, 'reply': 'µùáµ¥âΦ«┐Θù«', 'can_teach': False, 'done': True}), 403
+        return jsonify({'ok': False, 'reply': '无权访问', 'can_teach': False, 'done': True}), 403
 
     if not tutor_available():
         return jsonify({
@@ -3226,15 +3222,15 @@ def ai_tutor_chat():
 
     ua = UserAnswer.query.get_or_404(answer_id)
     if not _can_access_user_answer(ua):
-        return jsonify({'ok': False, 'reply': 'µùáµ¥âΦ«┐Θù«', 'can_teach': False, 'done': True}), 403
+        return jsonify({'ok': False, 'reply': '无权访问', 'can_teach': False, 'done': True}), 403
 
-    # σ¡ªτöƒσÅæΦ¿Çµ¼íµò░ = history Σ╕¡ user µ¥íµò░ + µ£¼µ¥í
+    # 学生发言次数 = history 中 user 条数 + 本条
     prior_user = sum(1 for h in history if isinstance(h, dict) and h.get('role') == 'user')
     turns_used = prior_user + 1
     if turns_used > MAX_STUDENT_TURNS:
         return jsonify({
             'ok': False,
-            'reply': 'µ£¼Φ»╛σ»╝σ¡ªσ¢₧σÉêσ╖▓τö¿σ«îπÇé' + TEACHER_FALLBACK,
+            'reply': '本课导学回合已用完。' + TEACHER_FALLBACK,
             'can_teach': False,
             'done': True,
             'turns_used': MAX_STUDENT_TURNS,
@@ -3300,10 +3296,10 @@ def upload_courseware(lesson_id):
     lesson = Lesson.query.get_or_404(lesson_id)
     file = request.files.get('courseware')
     if not file or not (file.filename.endswith('.ppt') or file.filename.endswith('.pptx')):
-        flash('Φ»╖Σ╕èΣ╝áPPTµûçΣ╗╢', 'error')
+        flash('请上传PPT文件', 'error')
         return redirect(url_for('admin_lessons'))
     filename = secure_filename(file.filename)
-    # Σ╕èΣ╝áσê░ Cloudinary
+    # 上传到 Cloudinary
     result = cloudinary.uploader.upload(
         file,
         resource_type='raw',
@@ -3316,13 +3312,13 @@ def upload_courseware(lesson_id):
     )
     db.session.add(courseware)
     db.session.commit()
-    flash('Φ»╛Σ╗╢Σ╕èΣ╝áµêÉσèƒ', 'success')
+    flash('课件上传成功', 'success')
     return redirect(url_for('admin_lessons'))
 
 @app.route('/admin/lesson/<int:lesson_id>/courseware')
 @admin_required
 def view_lesson_courseware(lesson_id):
-    """τ«íτÉåσæÿµƒÑτ£ïµƒÉΦ»╛τ¿ïΣ╕ïσ╖▓Σ╕èΣ╝áτÜäΦ»╛Σ╗╢σêùΦí¿∩╝îσÅ»Σ╕ïΦ╜╜µêûτ╗ºτ╗¡Σ╕èΣ╝áπÇé"""
+    """管理员查看某课程下已上传的课件列表，可下载或继续上传。"""
     lesson = Lesson.query.get_or_404(lesson_id)
     files = lesson.courseware_files or []
     return render_template('admin/lesson_courseware.html', lesson=lesson, courseware_files=files)
@@ -3331,14 +3327,14 @@ def view_lesson_courseware(lesson_id):
 @login_required
 def download_courseware(courseware_id):
     courseware = CoursewareFile.query.get_or_404(courseware_id)
-    # Σ╗Ä Cloudinary µïëσÅûµûçΣ╗╢σåàσ«╣
+    # 从 Cloudinary 拉取文件内容
     response = requests.get(courseware.path)
     file_stream = BytesIO(response.content)
-    # τö¿ send_file Φ┐öσ¢₧∩╝îΦç¬σè¿σ╕ªΣ╕èσÄƒσºïµûçΣ╗╢σÉì
+    # 用 send_file 返回，自动带上原始文件名
     return send_file(
         file_stream,
         as_attachment=True,
-        download_name=courseware.filename  # Flask 2.0+ µÄ¿ΦìÉτö¿ download_name
+        download_name=courseware.filename  # Flask 2.0+ 推荐用 download_name
     )
 
 @app.route('/admin/user/<int:user_id>/edit', methods=['POST'])
@@ -3347,8 +3343,8 @@ def edit_user(user_id):
     user = User.query.get_or_404(user_id)
     if user.is_admin:
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({'success': False, 'msg': 'Σ╕ìΦâ╜τ╝ûΦ╛æτ«íτÉåσæÿΦ┤ªµê╖'})
-        flash('Σ╕ìΦâ╜τ╝ûΦ╛æτ«íτÉåσæÿΦ┤ªµê╖', 'error')
+            return jsonify({'success': False, 'msg': '不能编辑管理员账户'})
+        flash('不能编辑管理员账户', 'error')
         return redirect(url_for('admin_users'))
 
     username = request.form.get('username')
@@ -3357,16 +3353,16 @@ def edit_user(user_id):
 
     if not username or not class_id:
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({'success': False, 'msg': 'τö¿µê╖σÉìσÆîτÅ¡τ║ºΣ╕ìΦâ╜Σ╕║τ⌐║'})
-        flash('τö¿µê╖σÉìσÆîτÅ¡τ║ºΣ╕ìΦâ╜Σ╕║τ⌐║', 'error')
+            return jsonify({'success': False, 'msg': '用户名和班级不能为空'})
+        flash('用户名和班级不能为空', 'error')
         return redirect(url_for('admin_users'))
 
-    # µúÇµƒÑτö¿µê╖σÉìµÿ»σÉªσ╖▓σ¡ÿσ£¿∩╝êµÄÆΘÖñσ╜ôσëìτö¿µê╖∩╝ë
+    # 检查用户名是否已存在（排除当前用户）
     existing_user = User.query.filter(User.username == username, User.id != user_id).first()
     if existing_user:
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({'success': False, 'msg': 'τö¿µê╖σÉìσ╖▓σ¡ÿσ£¿'})
-        flash('τö¿µê╖σÉìσ╖▓σ¡ÿσ£¿', 'error')
+            return jsonify({'success': False, 'msg': '用户名已存在'})
+        flash('用户名已存在', 'error')
         return redirect(url_for('admin_users'))
 
     user.username = username
@@ -3376,13 +3372,13 @@ def edit_user(user_id):
     try:
         db.session.commit()
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({'success': True, 'msg': 'τö¿µê╖Σ┐íµü»µ¢┤µû░µêÉσèƒ'})
-        flash('τö¿µê╖Σ┐íµü»µ¢┤µû░µêÉσèƒ', 'success')
+            return jsonify({'success': True, 'msg': '用户信息更新成功'})
+        flash('用户信息更新成功', 'success')
     except Exception as e:
         db.session.rollback()
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({'success': False, 'msg': f'µ¢┤µû░σñ▒Φ┤Ñ: {e}'})
-        flash(f'µ¢┤µû░σñ▒Φ┤Ñ: {e}', 'error')
+            return jsonify({'success': False, 'msg': f'更新失败: {e}'})
+        flash(f'更新失败: {e}', 'error')
 
     return redirect(url_for('admin_users'))
 
@@ -3390,22 +3386,22 @@ def edit_user(user_id):
 @admin_required
 def lesson_students(lesson_id):
     lesson = Lesson.query.get_or_404(lesson_id)
-    # ΦÄ╖σÅûµëÇµ£ëτÅ¡τ║ºτÜäσ¡ªτöƒ
+    # 获取所有班级的学生
     students = []
     for c in lesson.classes:
         students.extend(c.users)
-    students = list(set(students))  # σÄ╗Θçì
-    # µƒÑΦ»óσ╖▓σ«îµêÉΦ»ÑΦ»╛τ¿ïτÜäσ¡ªτöƒ
+    students = list(set(students))  # 去重
+    # 查询已完成该课程的学生
     completed_histories = QuizHistory.query.filter_by(lesson_id=lesson_id).all()
     completed_students = set(h.user for h in completed_histories)
     completed = [s for s in students if s in completed_students]
-    # µ£¬σ«îµêÉ∩╝ÜΦ┐çµ╗ñµÄëσ╖▓Φó½σü£τö¿∩╝êµ£¬µ┐Çµ┤╗∩╝ëτÜäσ¡ªτöƒ
+    # 未完成：过滤掉已被停用（未激活）的学生
     not_completed = [s for s in students if s not in completed_students and getattr(s, 'is_active', True)]
 
-    # τ╗ƒΦ«íµ»ÅΣ╕¬σ╖▓σ«îµêÉσ¡ªτöƒτÜäσ╛ùσêå
+    # 统计每个已完成学生的得分
     completed_scores = []
     for student in completed:
-        # σÅ¬σÅûΦ»Ñτöƒτ¼¼Σ╕Çµ¼íσ«îµêÉΦ»ÑΦ»╛τ¿ïτÜäΦ«░σ╜ò
+        # 只取该生第一次完成该课程的记录
         quiz = QuizHistory.query.filter_by(user_id=student.id, lesson_id=lesson_id).order_by(QuizHistory.completed_at.asc()).first()
         if quiz:
             score = round(quiz.correct_answers / quiz.total_questions * 100, 1) if quiz.total_questions > 0 else 0
@@ -3413,10 +3409,10 @@ def lesson_students(lesson_id):
                 'student': student,
                 'score': score
             })
-    # µîëσ╛ùσêåΘÖìσ║ÅµÄÆσ║Å
+    # 按得分降序排序
     completed_scores.sort(key=lambda x: x['score'], reverse=True)
 
-    # τ╗ƒΦ«íΘóÿτ¢«σ╛ùσêåτÄç
+    # 统计题目得分率
     questions = Question.query.filter_by(lesson_id=lesson_id).order_by(Question.question_number).all()
     question_stats = []
     for question in questions:
@@ -3442,7 +3438,7 @@ def lesson_students(lesson_id):
 @app.route('/admin/lesson/<int:lesson_id>/student/<int:user_id>/reset', methods=['POST'])
 @admin_required
 def admin_reset_student_lesson_status(lesson_id, user_id):
-    """σ░åµîçσ«Üσ¡ªτöƒσ£¿Φ»Ñ lesson τÜäσ«îµêÉτè╢µÇüΘçìτ╜«Σ╕║µ£¬σ«îµêÉπÇé"""
+    """将指定学生在该 lesson 的完成状态重置为未完成。"""
     lesson = Lesson.query.get_or_404(lesson_id)
     user = User.query.get_or_404(user_id)
 
@@ -3452,7 +3448,7 @@ def admin_reset_student_lesson_status(lesson_id, user_id):
     ).all()
 
     if not quiz_histories:
-        flash(f'{user.username} σ╜ôσëìµ▓íµ£ëΦ»ÑΣ╜£Σ╕ÜτÜäσ«îµêÉΦ«░σ╜òπÇé', 'info')
+        flash(f'{user.username} 当前没有该作业的完成记录。', 'info')
         return redirect(url_for('lesson_students', lesson_id=lesson_id))
 
     deleted_answers = 0
@@ -3464,7 +3460,7 @@ def admin_reset_student_lesson_status(lesson_id, user_id):
 
     db.session.commit()
     flash(
-        f'σ╖▓Θçìτ╜« {user.username} σ£¿πÇè{lesson.title}πÇïτÜäΣ╜£Σ╕Üτè╢µÇü∩╝êσêáΘÖñ {deleted_quizzes} µ¥íΣ╜£Σ╕ÜΦ«░σ╜ò∩╝î{deleted_answers} µ¥íτ¡öΘóÿΦ«░σ╜ò∩╝ëπÇé',
+        f'已重置 {user.username} 在《{lesson.title}》的作业状态（删除 {deleted_quizzes} 条作业记录，{deleted_answers} 条答题记录）。',
         'success'
     )
     return redirect(url_for('lesson_students', lesson_id=lesson_id))
@@ -3474,12 +3470,12 @@ def admin_reset_student_lesson_status(lesson_id, user_id):
 @admin_required
 def admin_mark_all_question_correct(lesson_id, question_number):
     """
-    σ░åµƒÉΘüôΘóÿσ£¿Φ»Ñ lesson Σ╕ïτÜäµëÇµ£ë UserAnswer τ╜«Σ╕║µ¡úτí«∩╝î
-    σ╣╢σÉîµ¡ÑΘçìτ«ùµ»ÅΣ╕¬σÅùσ╜▒σôìσ¡ªτöƒ∩╝êQuizHistory∩╝ëτÜä correct_answers∩╝îΣ╗ÄΦÇîµ¢┤µû░µÇ╗σêå/µ¡úτí«τÄçπÇé
+    将某道题在该 lesson 下的所有 UserAnswer 置为正确，
+    并同步重算每个受影响学生（QuizHistory）的 correct_answers，从而更新总分/正确率。
     """
     question = Question.query.filter_by(lesson_id=lesson_id, question_number=question_number).first()
     if not question:
-        return jsonify({'success': False, 'msg': 'µ£¬µë╛σê░Φ»ÑΘóÿ'}), 404
+        return jsonify({'success': False, 'msg': '未找到该题'}), 404
 
     user_answers = UserAnswer.query.filter_by(
         lesson_id=lesson_id,
@@ -3487,7 +3483,7 @@ def admin_mark_all_question_correct(lesson_id, question_number):
     ).all()
 
     if not user_answers:
-        return jsonify({'success': False, 'msg': 'Φ»ÑΘóÿµÜéµùáτ¡öΘóÿΦ«░σ╜ò∩╝îµùáµ│òτ║áµ¡úπÇé'}), 404
+        return jsonify({'success': False, 'msg': '该题暂无答题记录，无法纠正。'}), 404
 
     affected_quiz_ids = set()
     changed_count = 0
@@ -3497,7 +3493,7 @@ def admin_mark_all_question_correct(lesson_id, question_number):
             changed_count += 1
         affected_quiz_ids.add(ua.quiz_history_id)
 
-    # Θçìτ«ùµ»ÅΣ╕¬σÅùσ╜▒σôì QuizHistory τÜä correct_answers
+    # 重算每个受影响 QuizHistory 的 correct_answers
     for qh_id in affected_quiz_ids:
         qh = QuizHistory.query.get(qh_id)
         if not qh:
@@ -3511,13 +3507,13 @@ def admin_mark_all_question_correct(lesson_id, question_number):
 
     return jsonify({
         'success': True,
-        'msg': 'σ╖▓σ░åΦ»ÑΘóÿµáçΦ«░Σ╕║σà¿σæÿµ¡úτí«',
+        'msg': '已将该题标记为全员正确',
         'question_number': question_number,
         'changed_answers': changed_count,
         'affected_quiz_histories': len(affected_quiz_ids),
     })
 
-# Φ»èµû¡µ¿íσ¥ùΦô¥σ¢╛∩╝êτï¼τ½ïΦ╖»τö▒Σ╕ÄΦí¿∩╝îΣ╕ìσ╜▒σôìτÄ░µ£ëΣ╕Üσèí∩╝ë
+# 诊断模块蓝图（独立路由与表，不影响现有业务）
 from diagnostic.routes import diagnostic_bp
 from diagnostic.admin_routes import diagnostic_admin_bp
 from diagnostic.billing import billing_bp
@@ -3526,16 +3522,16 @@ app.register_blueprint(diagnostic_admin_bp)
 app.register_blueprint(billing_bp)
 
 if __name__ == '__main__':
-    # init_db()  # µ│¿ΘçèµÄëΦç¬σè¿σê¥σºïσîû∩╝îΘü┐σàìµ»Åµ¼íσÉ»σè¿Θâ╜µ╕àτ⌐║µò░µì«
+    # init_db()  # 注释掉自动初始化，避免每次启动都清空数据
     with app.app_context():
         import subprocess
         r = subprocess.run(['flask', 'db', 'upgrade'], capture_output=True, text=True, env={**os.environ, 'FLASK_APP': 'app.py'})
         if r.returncode != 0:
-            # Φ┐üτº╗σñ▒Φ┤Ñµù╢ stamp σ¢₧σê¥σºïτëêµ£¼σÉÄΘçìΦ»ò∩╝êσñäτÉåΦí¿σ╖▓σ¡ÿσ£¿Σ╜åτëêµ£¼Σ╕ìσÉîµ¡Ñ∩╝ë
+            # 迁移失败时 stamp 回初始版本后重试（处理表已存在但版本不同步）
             subprocess.run(['flask', 'db', 'stamp', 'b4fefe386c31'], check=False, env={**os.environ, 'FLASK_APP': 'app.py'})
             r = subprocess.run(['flask', 'db', 'upgrade'], capture_output=True, text=True, env={**os.environ, 'FLASK_APP': 'app.py'})
         if r.returncode != 0:
-            print('DB upgrade σñ▒Φ┤Ñ:', r.stderr or r.stdout)
+            print('DB upgrade 失败:', r.stderr or r.stdout)
             raise SystemExit(1)
-        clean_duplicate_quiz_history()  # Φç¬σè¿µ╕àτÉåΘçìσñìτ¡öΘóÿΦ«░σ╜ò
+        clean_duplicate_quiz_history()  # 自动清理重复答题记录
     app.run(debug=True, host='0.0.0.0', port=5000) 
