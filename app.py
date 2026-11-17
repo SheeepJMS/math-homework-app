@@ -361,13 +361,100 @@ class QuizHistory(db.Model):
     correct_answers = db.Column(db.Integer, nullable=False)
     time_spent = db.Column(db.Integer, nullable=False)  # 答题用时（秒）
     completed_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # in_progress = 未交卷草稿；completed = 已正式提交
+    status = db.Column(db.String(20), nullable=False, default='completed')
     
     # 移除 user = db.relationship('User', backref='quiz_history', lazy=True)
     lesson = db.relationship('Lesson', backref='quiz_history', lazy=True)
+
+    @property
+    def is_completed(self):
+        return (self.status or 'completed') == 'completed'
+
+    @property
+    def is_in_progress(self):
+        return (self.status or 'completed') == 'in_progress'
     
     @property
     def correct_rate(self):
         return (self.correct_answers / self.total_questions * 100) if self.total_questions > 0 else 0
+
+
+def _quiz_completed_filter():
+    """兼容旧数据：status 为空时视为已完成。"""
+    return db.or_(
+        QuizHistory.status == 'completed',
+        QuizHistory.status.is_(None),
+        QuizHistory.status == '',
+    )
+
+
+def _get_completed_quiz(user_id, lesson_id):
+    return (
+        QuizHistory.query.filter_by(user_id=user_id, lesson_id=lesson_id)
+        .filter(_quiz_completed_filter())
+        .order_by(QuizHistory.completed_at.asc())
+        .first()
+    )
+
+
+def _get_in_progress_quiz(user_id, lesson_id):
+    return (
+        QuizHistory.query.filter_by(
+            user_id=user_id, lesson_id=lesson_id, status='in_progress'
+        )
+        .order_by(QuizHistory.completed_at.desc())
+        .first()
+    )
+
+
+def _collect_homework_answers_payload(questions):
+    """从 JSON 或 form 中收集作业答案。返回 {question_id: {'answer': str, 'idk': bool}}"""
+    payload = request.get_json(silent=True)
+    answers = {}
+    if isinstance(payload, dict) and isinstance(payload.get('answers'), dict):
+        raw = payload['answers']
+        for q in questions:
+            item = raw.get(str(q.id), raw.get(q.id, {})) or {}
+            if isinstance(item, dict):
+                idk = bool(item.get('idk'))
+                value = (item.get('value') or item.get('answer') or '').strip()
+            else:
+                idk = False
+                value = str(item or '').strip()
+            answers[q.id] = {'answer': 'IDK' if idk else value, 'idk': idk}
+        return answers
+
+    for q in questions:
+        idk = request.form.get(f'answer_{q.id}_idk') == 'IDK'
+        value = (request.form.get(f'answer_{q.id}', '') or '').strip()
+        answers[q.id] = {'answer': 'IDK' if idk else value, 'idk': idk}
+    return answers
+
+
+def _upsert_draft_answers(quiz_history, questions, answer_map):
+    """写入/更新草稿答案（不判分）。"""
+    existing = {
+        ua.question_id: ua
+        for ua in UserAnswer.query.filter_by(quiz_history_id=quiz_history.id).all()
+    }
+    for q in questions:
+        item = answer_map.get(q.id) or {'answer': '', 'idk': False}
+        answer_text = item.get('answer') or ''
+        ua = existing.get(q.id)
+        if ua is None:
+            ua = UserAnswer(
+                user_id=quiz_history.user_id,
+                lesson_id=quiz_history.lesson_id,
+                question_id=q.id,
+                quiz_history_id=quiz_history.id,
+                answer=answer_text,
+                is_correct=False,
+            )
+            db.session.add(ua)
+        else:
+            ua.answer = answer_text
+            ua.is_correct = False
 
 
 # ========== 诊断模块独立表（diag_ 前缀，不影响现有业务）==========
@@ -819,8 +906,8 @@ def admin_dashboard():
     page = request.args.get('page', 1, type=int)
     per_page = 50
 
-    # 查询总数
-    total_activities = db.session.query(QuizHistory).count()
+    # 查询总数（仅已正式提交）
+    total_activities = db.session.query(QuizHistory).filter(_quiz_completed_filter()).count()
     total_pages = (total_activities + per_page - 1) // per_page
 
     # 获取最近活动（分页）
@@ -833,6 +920,8 @@ def admin_dashboard():
         User, QuizHistory.user_id == User.id
     ).join(
         Lesson, QuizHistory.lesson_id == Lesson.id
+    ).filter(
+        _quiz_completed_filter()
     ).order_by(
         QuizHistory.completed_at.desc()
     ).offset((page - 1) * per_page).limit(per_page).all()
@@ -1178,8 +1267,14 @@ def manage_questions(lesson_id):
 @app.route('/student/dashboard')
 @login_required
 def student_dashboard():
-    # 获取用户的所有测验历史记录
-    quiz_history = QuizHistory.query.filter_by(user_id=current_user.id).all()
+    # 仅统计已正式提交的作业；草稿不算完成
+    quiz_history = (
+        QuizHistory.query.filter_by(user_id=current_user.id)
+        .filter(_quiz_completed_filter())
+        .all()
+    )
+    _auto_upgrade_fill_grades(quiz_history)
+    
     # 新增：定义 correct_rate，防止未定义报错
     if quiz_history:
         correct_rate = quiz_history[-1].correct_rate  # 最近一次测验的正确率
@@ -1229,15 +1324,22 @@ def student_dashboard():
     else:
         total_correct_rate = 0
     
-    # 获取历史课程数据
+    # 获取历史课程数据（仅已提交）
     history_data = db.session.query(Lesson, QuizHistory)\
         .join(QuizHistory, Lesson.id == QuizHistory.lesson_id)\
         .filter(QuizHistory.user_id == current_user.id)\
+        .filter(_quiz_completed_filter())\
         .order_by(QuizHistory.completed_at.desc())\
         .all()
     
     # 获取已完成的课程ID列表
     completed_lesson_ids = [quiz.lesson_id for quiz in quiz_history]
+    in_progress_lesson_ids = {
+        q.lesson_id
+        for q in QuizHistory.query.filter_by(
+            user_id=current_user.id, status='in_progress'
+        ).all()
+    }
     
     # 获取当前可用的课程（激活状态且未完成的课程）
     # 修改这里：使用多对多关联查询
@@ -1255,10 +1357,11 @@ def student_dashboard():
     for quiz in quiz_history:
         lesson = Lesson.query.get(quiz.lesson_id)
         
-        # 计算该课程的班级平均正确率
+        # 计算该课程的班级平均正确率（仅已提交）
         class_avg = db.session.query(func.avg(QuizHistory.correct_answers * 100.0 / QuizHistory.total_questions))\
             .filter(QuizHistory.lesson_id == quiz.lesson_id,
                    QuizHistory.user_id != current_user.id)\
+            .filter(_quiz_completed_filter())\
             .scalar() or 0
         
         trend_data.append({
@@ -1273,7 +1376,8 @@ def student_dashboard():
                          average_correct_rate=total_correct_rate,
                          history_data=history_data,
                          trend_data=json.dumps(trend_data),
-                         lessons=available_lessons)
+                         lessons=available_lessons,
+                         in_progress_lesson_ids=in_progress_lesson_ids)
 
 @app.route('/admin/lesson/<int:lesson_id>/kp_notes', methods=['POST'])
 @admin_required
@@ -1379,15 +1483,13 @@ def start_quiz(lesson_id):
         flash('无法访问该课程')
         return redirect(url_for('student_dashboard'))
 
-    # 检查是否已经完成过这个课程的答题（只允许一次）
-    existing_quiz = QuizHistory.query.filter_by(
-        user_id=user.id,
-        lesson_id=lesson_id
-    ).order_by(QuizHistory.completed_at.asc()).first()
-
+    # 已正式提交则不可再答；有草稿则可继续
+    existing_quiz = _get_completed_quiz(user.id, lesson_id)
     if existing_quiz:
         flash('你已经完成过这个课程的答题，不能重复答题', 'warning')
         return redirect(url_for('view_history', lesson_id=lesson_id))
+
+    draft_quiz = _get_in_progress_quiz(user.id, lesson_id)
 
     # 检查课程是否有题目
     questions = Question.query.filter_by(lesson_id=lesson_id).order_by(Question.question_number).all()
@@ -1421,12 +1523,26 @@ def start_quiz(lesson_id):
     # 创建一个空的表单用于CSRF保护
     form = FlaskForm()
 
+    saved_answers = {}
+    saved_time_spent = 0
+    if draft_quiz:
+        saved_time_spent = draft_quiz.time_spent or 0
+        for ua in UserAnswer.query.filter_by(quiz_history_id=draft_quiz.id).all():
+            ans = ua.answer or ''
+            saved_answers[str(ua.question_id)] = {
+                'value': '' if ans.upper() == 'IDK' else ans,
+                'idk': ans.upper() == 'IDK',
+            }
+
     return render_template('student/quiz.html',
                          lesson=lesson,
                          questions=questions,
                          exam_files=exam_files,
                          explanation_files=explanation_files,
-                         form=form)
+                         form=form,
+                         saved_answers=saved_answers,
+                         saved_time_spent=saved_time_spent,
+                         has_draft=bool(draft_quiz))
 
 def _homework_image_maps(lesson_id):
     """按题号取试题图、解析图 URL。"""
@@ -1448,7 +1564,7 @@ def _grade_homework_question(question, user_answer, exam_by_page=None, expl_by_p
     作业单题判分：先规则，规则判错或解答题时用 GPT（对照标准答案 + 试题/解析图）。
     空答/IDK 返回 False。
     """
-    from ai_grading import maybe_upgrade_with_ai, ai_grading_available
+    from ai_grading import maybe_upgrade_with_ai, ai_grading_available, fill_answers_match
 
     ans = (user_answer or '').strip()
     if not ans or ans.upper() == 'IDK':
@@ -1480,7 +1596,7 @@ def _grade_homework_question(question, user_answer, exam_by_page=None, expl_by_p
     if question.type == 'choice':
         is_correct = ans.upper() == key.upper()
     else:
-        is_correct = ans.lower() == key.strip().lower()
+        is_correct = fill_answers_match(ans, key)
 
     if is_correct:
         return True
@@ -1497,15 +1613,116 @@ def _grade_homework_question(question, user_answer, exam_by_page=None, expl_by_p
     return bool(upgraded) if upgraded is not None else False
 
 
+def _auto_upgrade_fill_grades(quiz_histories):
+    """
+    打开记录时自动纠正：用当前填空规则把误判为错的题改成对（只升不降）。
+    例如 13 与 13km。不调用 GPT，不点按钮。
+    """
+    from ai_grading import fill_answers_match
+
+    if not quiz_histories:
+        return 0
+    if not isinstance(quiz_histories, (list, tuple)):
+        quiz_histories = [quiz_histories]
+
+    changed = 0
+    touched = []
+    for qh in quiz_histories:
+        if qh is None:
+            continue
+        answers = UserAnswer.query.filter_by(quiz_history_id=qh.id).all()
+        for ua in answers:
+            if ua.is_correct:
+                continue
+            q = ua.question
+            if not q or (q.type or 'fill') == 'choice' or q.type == 'proof':
+                continue
+            raw = (ua.answer or '').strip()
+            if not raw or raw.upper() == 'IDK':
+                continue
+            if fill_answers_match(raw, q.answer or ''):
+                ua.is_correct = True
+                changed += 1
+                touched.append(qh)
+        if qh in touched:
+            qh.correct_answers = UserAnswer.query.filter_by(
+                quiz_history_id=qh.id, is_correct=True
+            ).count()
+    if changed:
+        db.session.commit()
+    return changed
+
+
+@app.route('/student/lesson/<int:lesson_id>/save_progress', methods=['POST'])
+@login_required
+def save_quiz_progress(lesson_id):
+    """自动/手动保存作业草稿，下次可继续作答。"""
+    try:
+        lesson = Lesson.query.get_or_404(lesson_id)
+        user_class = Class.query.get(current_user.class_id)
+        if user_class not in lesson.classes or not lesson.is_active:
+            return jsonify({'success': False, 'message': '无法访问该课程'}), 403
+
+        if _get_completed_quiz(current_user.id, lesson_id):
+            return jsonify({'success': False, 'message': '该作业已提交，无法再保存草稿'}), 400
+
+        questions = Question.query.filter_by(lesson_id=lesson_id).order_by(Question.question_number).all()
+        if not questions:
+            return jsonify({'success': False, 'message': '未找到题目'}), 400
+
+        payload = request.get_json(silent=True) or {}
+        try:
+            time_spent = int(payload.get('time_spent', request.form.get('time_spent', 0)) or 0)
+        except (TypeError, ValueError):
+            time_spent = 0
+        time_spent = max(0, time_spent)
+
+        answer_map = _collect_homework_answers_payload(questions)
+        draft = _get_in_progress_quiz(current_user.id, lesson_id)
+        if draft is None:
+            draft = QuizHistory(
+                user_id=current_user.id,
+                lesson_id=lesson_id,
+                total_questions=len(questions),
+                correct_answers=0,
+                time_spent=time_spent,
+                completed_at=datetime.now(),
+                status='in_progress',
+            )
+            db.session.add(draft)
+            db.session.flush()
+        else:
+            draft.total_questions = len(questions)
+            draft.time_spent = time_spent
+            draft.completed_at = datetime.now()
+
+        _upsert_draft_answers(draft, questions, answer_map)
+        db.session.commit()
+
+        answered = sum(
+            1 for item in answer_map.values()
+            if item.get('idk') or (item.get('answer') or '').strip()
+        )
+        return jsonify({
+            'success': True,
+            'message': '已保存进度',
+            'answered': answered,
+            'total': len(questions),
+            'time_spent': time_spent,
+            'saved_at': draft.completed_at.strftime('%H:%M:%S'),
+        })
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error in save_quiz_progress: {str(e)}")
+        return jsonify({'success': False, 'message': '保存失败，请稍后重试'}), 500
+
+
 @app.route('/student/lesson/<int:lesson_id>/submit_quiz', methods=['POST'])
 @login_required
 def submit_quiz(lesson_id):
     try:
         # 检查是否已经完成过这个课程的答题（只允许一次）
-        existing_quiz = QuizHistory.query.filter_by(
-            user_id=current_user.id,
-            lesson_id=lesson_id
-        ).order_by(QuizHistory.completed_at.asc()).first()
+        existing_quiz = _get_completed_quiz(current_user.id, lesson_id)
 
         if existing_quiz:
             flash('你已经完成过这个课程的答题，不能重复提交', 'warning')
@@ -1520,35 +1737,48 @@ def submit_quiz(lesson_id):
         # 获取答题用时
         time_spent = int(request.form.get('time_spent', 0))
 
-        # 创建答题历史记录
-        quiz_history = QuizHistory(
-            user_id=current_user.id,
-            lesson_id=lesson_id,
-            total_questions=len(questions),
-            correct_answers=0,  # 初始化为0，后面会更新
-            time_spent=time_spent,
-            completed_at=datetime.now()
-        )
-        db.session.add(quiz_history)
-        db.session.flush()  # 获取quiz_history.id
+        # 复用草稿记录，或新建正式记录
+        quiz_history = _get_in_progress_quiz(current_user.id, lesson_id)
+        if quiz_history is None:
+            quiz_history = QuizHistory(
+                user_id=current_user.id,
+                lesson_id=lesson_id,
+                total_questions=len(questions),
+                correct_answers=0,
+                time_spent=time_spent,
+                completed_at=datetime.now(),
+                status='completed',
+            )
+            db.session.add(quiz_history)
+            db.session.flush()
+        else:
+            quiz_history.total_questions = len(questions)
+            quiz_history.time_spent = time_spent
+            quiz_history.completed_at = datetime.now()
+            quiz_history.status = 'completed'
+            UserAnswer.query.filter_by(quiz_history_id=quiz_history.id).delete()
+            db.session.flush()
 
         correct_count = 0
         exam_by_page, expl_by_page = _homework_image_maps(lesson_id)
+        answer_map = _collect_homework_answers_payload(questions)
 
         # 处理每个题目的答案
         for question in questions:
-            # 检查是否选择了"不会做"
-            idk_answer = request.form.get(f'answer_{question.id}_idk')
-            user_answer = request.form.get(f'answer_{question.id}', '').strip()
-            
+            item = answer_map.get(question.id) or {'answer': '', 'idk': False}
+            idk_answer = bool(item.get('idk'))
+            user_answer = (item.get('answer') or '').strip()
+            if idk_answer:
+                user_answer = 'IDK'
+
             # 如果选择了"不会做"或没有提交答案，标记为未作答
-            if idk_answer == 'IDK' or not user_answer:
+            if idk_answer or not user_answer or user_answer.upper() == 'IDK':
                 answer_record = UserAnswer(
                     user_id=current_user.id,
                     lesson_id=lesson_id,
                     question_id=question.id,
                     quiz_history_id=quiz_history.id,
-                    answer='IDK' if idk_answer == 'IDK' else '',
+                    answer='IDK' if idk_answer or (user_answer or '').upper() == 'IDK' else '',
                     is_correct=False
                 )
                 db.session.add(answer_record)
@@ -1568,20 +1798,21 @@ def submit_quiz(lesson_id):
                 is_correct=is_correct
             )
             db.session.add(answer_record)
-            
+
             if is_correct:
                 correct_count += 1
 
         # 更新答题历史的正确题目数
         quiz_history.correct_answers = correct_count
-        
+        quiz_history.status = 'completed'
+
         # 计算正确率
         correct_rate = (correct_count / len(questions)) * 100
 
         # 更新成就计数和徽章等级
         # 总成就数累计
         current_user.achievement_count += 1
-        
+
         # 简化的徽章升级逻辑
         # Level 0 到 Level 1：只要提交作业就升级
         if current_user.badge_level == 0:
@@ -1606,7 +1837,7 @@ def submit_quiz(lesson_id):
             if correct_rate >= 80 and current_user.achievement_count % 5 == 0:
                 current_user.badge_level += 1
                 flash(f'太厉害了！你已经升级到 {current_user.badge_info["name"]} 级别！', 'success')
-        
+
         db.session.commit()
 
         flash('答题完成！', 'success')
@@ -1781,12 +2012,18 @@ def view_history(lesson_id):
         target_user_id = current_user.id
 
     lesson = Lesson.query.get_or_404(lesson_id)
-    quiz_history = QuizHistory.query.filter_by(
-        user_id=target_user_id,
-        lesson_id=lesson_id
-    ).order_by(QuizHistory.completed_at.desc()).all()
+    quiz_history = (
+        QuizHistory.query.filter_by(
+            user_id=target_user_id,
+            lesson_id=lesson_id
+        )
+        .filter(_quiz_completed_filter())
+        .order_by(QuizHistory.completed_at.desc())
+        .all()
+    )
     if quiz_history:
         latest_quiz = quiz_history[0]
+        _auto_upgrade_fill_grades(quiz_history)
         # 固定按题号顺序返回，避免管理员改对/改错后页面重新加载出现题目顺序抖动
         latest_answers = (
             UserAnswer.query.filter_by(quiz_history_id=latest_quiz.id)
@@ -1823,6 +2060,8 @@ def quiz_detail(history_id):
         flash('无权访问该记录')
         return redirect(url_for('student_dashboard'))
 
+    _auto_upgrade_fill_grades(quiz_history)
+    
     # 获取该次答题的所有答案
     user_answers = UserAnswer.query.filter_by(
         user_id=user.id,
@@ -1899,15 +2138,25 @@ def question_stats(lesson_id):
     lesson = Lesson.query.get_or_404(lesson_id)
     questions = Question.query.filter_by(lesson_id=lesson_id).order_by(Question.question_number).all()
     
-    quiz_histories = QuizHistory.query.filter_by(lesson_id=lesson_id).all()
+    quiz_histories = (
+        QuizHistory.query.filter_by(lesson_id=lesson_id)
+        .filter(_quiz_completed_filter())
+        .all()
+    )
+    _auto_upgrade_fill_grades(quiz_histories)
+    completed_history_ids = {qh.id for qh in quiz_histories}
+    
     # 统计每道题的得分率
     question_stats = []
     for question in questions:
-        # 获取这道题的所有答题记录
-        user_answers = UserAnswer.query.filter_by(
-            lesson_id=lesson_id,
-            question_id=question.id
-        ).all()
+        # 获取这道题的所有答题记录（仅已提交）
+        user_answers = [
+            ua for ua in UserAnswer.query.filter_by(
+                lesson_id=lesson_id,
+                question_id=question.id
+            ).all()
+            if ua.quiz_history_id in completed_history_ids
+        ]
         
         total_attempts = len(user_answers)
         correct_attempts = len([ua for ua in user_answers if ua.is_correct])
@@ -1934,15 +2183,22 @@ def question_stats_data(lesson_id):
     """返回题目得分率数据的JSON接口"""
     lesson = Lesson.query.get_or_404(lesson_id)
     questions = Question.query.filter_by(lesson_id=lesson_id).order_by(Question.question_number).all()
+    completed_history_ids = {
+        qh.id
+        for qh in QuizHistory.query.filter_by(lesson_id=lesson_id).filter(_quiz_completed_filter()).all()
+    }
     
-    # 统计每道题的得分率
+    # 统计每道题的得分率（仅已提交）
     question_stats = []
     for question in questions:
         # 获取这道题的所有答题记录
-        user_answers = UserAnswer.query.filter_by(
-            lesson_id=lesson_id,
-            question_id=question.id
-        ).all()
+        user_answers = [
+            ua for ua in UserAnswer.query.filter_by(
+                lesson_id=lesson_id,
+                question_id=question.id
+            ).all()
+            if ua.quiz_history_id in completed_history_ids
+        ]
         
         total_attempts = len(user_answers)
         correct_attempts = len([ua for ua in user_answers if ua.is_correct])
@@ -2560,8 +2816,14 @@ def student_dashboard_admin(user_id):
         flash('无法查看管理员的仪表盘')
         return redirect(url_for('admin_users'))
     
-    # 获取该学生的所有测验历史记录
-    quiz_history = QuizHistory.query.filter_by(user_id=student.id).all()
+    # 获取该学生的已提交测验历史记录
+    quiz_history = (
+        QuizHistory.query.filter_by(user_id=student.id)
+        .filter(_quiz_completed_filter())
+        .all()
+    )
+    _auto_upgrade_fill_grades(quiz_history)
+    
     # 计算总测验数和平均正确率
     total_quizzes = len(quiz_history)
     if total_quizzes > 0:
@@ -2573,11 +2835,18 @@ def student_dashboard_admin(user_id):
     history_data = db.session.query(Lesson, QuizHistory)\
         .join(QuizHistory, Lesson.id == QuizHistory.lesson_id)\
         .filter(QuizHistory.user_id == student.id)\
+        .filter(_quiz_completed_filter())\
         .order_by(QuizHistory.completed_at.desc())\
         .all()
     
     # 获取已完成的课程ID列表
     completed_lesson_ids = [quiz.lesson_id for quiz in quiz_history]
+    in_progress_lesson_ids = {
+        q.lesson_id
+        for q in QuizHistory.query.filter_by(
+            user_id=student.id, status='in_progress'
+        ).all()
+    }
     
     # 获取当前可用的课程（激活状态且未完成的课程）
     available_lessons = Lesson.query.join(
@@ -2598,6 +2867,7 @@ def student_dashboard_admin(user_id):
         class_avg = db.session.query(func.avg(QuizHistory.correct_answers * 100.0 / QuizHistory.total_questions))\
             .filter(QuizHistory.lesson_id == quiz.lesson_id,
                    QuizHistory.user_id != student.id)\
+            .filter(_quiz_completed_filter())\
             .scalar() or 0
         
         trend_data.append({
@@ -2614,6 +2884,7 @@ def student_dashboard_admin(user_id):
                          history_data=history_data,
                          trend_data=json.dumps(trend_data),
                          lessons=available_lessons,
+                         in_progress_lesson_ids=in_progress_lesson_ids,
                          is_admin_view=True)  # 标记这是管理员视图
 
 @app.route('/student/wrong_questions')
@@ -2630,7 +2901,8 @@ def wrong_questions():
         QuizHistory, UserAnswer.quiz_history_id == QuizHistory.id
     ).filter(
         UserAnswer.user_id == current_user.id,
-        UserAnswer.is_correct == False
+        UserAnswer.is_correct == False,
+        _quiz_completed_filter(),
     ).order_by(
         Lesson.id,
         Question.question_number
@@ -3391,8 +3663,13 @@ def lesson_students(lesson_id):
     for c in lesson.classes:
         students.extend(c.users)
     students = list(set(students))  # 去重
-    # 查询已完成该课程的学生
-    completed_histories = QuizHistory.query.filter_by(lesson_id=lesson_id).all()
+    # 查询已完成该课程的学生（草稿不算完成）
+    completed_histories = (
+        QuizHistory.query.filter_by(lesson_id=lesson_id)
+        .filter(_quiz_completed_filter())
+        .all()
+    )
+    _auto_upgrade_fill_grades(completed_histories)
     completed_students = set(h.user for h in completed_histories)
     completed = [s for s in students if s in completed_students]
     # 未完成：过滤掉已被停用（未激活）的学生
@@ -3402,7 +3679,7 @@ def lesson_students(lesson_id):
     completed_scores = []
     for student in completed:
         # 只取该生第一次完成该课程的记录
-        quiz = QuizHistory.query.filter_by(user_id=student.id, lesson_id=lesson_id).order_by(QuizHistory.completed_at.asc()).first()
+        quiz = _get_completed_quiz(student.id, lesson_id)
         if quiz:
             score = round(quiz.correct_answers / quiz.total_questions * 100, 1) if quiz.total_questions > 0 else 0
             completed_scores.append({
@@ -3412,14 +3689,18 @@ def lesson_students(lesson_id):
     # 按得分降序排序
     completed_scores.sort(key=lambda x: x['score'], reverse=True)
 
-    # 统计题目得分率
+    # 统计题目得分率（仅已提交）
     questions = Question.query.filter_by(lesson_id=lesson_id).order_by(Question.question_number).all()
+    completed_history_ids = {h.id for h in completed_histories}
     question_stats = []
     for question in questions:
-        user_answers = UserAnswer.query.filter_by(
-            lesson_id=lesson_id,
-            question_id=question.id
-        ).all()
+        user_answers = [
+            ua for ua in UserAnswer.query.filter_by(
+                lesson_id=lesson_id,
+                question_id=question.id
+            ).all()
+            if ua.quiz_history_id in completed_history_ids
+        ]
         total_attempts = len(user_answers)
         correct_attempts = len([ua for ua in user_answers if ua.is_correct])
         success_rate = (correct_attempts / total_attempts * 100) if total_attempts > 0 else 0

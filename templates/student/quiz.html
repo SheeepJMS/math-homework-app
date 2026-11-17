@@ -20,17 +20,22 @@
     </div>
 
     <div class="card mb-3">
-        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center flex-wrap gap-2">
             <h5 class="mb-0">{{ lesson.title }} - 答题</h5>
-            <div id="timer" class="text-white">
-                用时：<span id="minutes">00</span>:<span id="seconds">00</span>
+            <div class="d-flex align-items-center gap-3">
+                <div id="saveStatus" class="small text-white-50">
+                    {% if has_draft %}已恢复上次进度{% else %}作答中会自动保存{% endif %}
+                </div>
+                <div id="timer" class="text-white">
+                    用时：<span id="minutes">00</span>:<span id="seconds">00</span>
+                </div>
             </div>
         </div>
     </div>
 
     <form id="quizForm" method="POST" action="{{ url_for('submit_quiz', lesson_id=lesson.id) }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="hidden" name="time_spent" id="timeSpent" value="0">
+        <input type="hidden" name="time_spent" id="timeSpent" value="{{ saved_time_spent|default(0) }}">
         <input type="hidden" name="lesson_id" value="{{ lesson.id }}">
         
         {% for question in questions %}
@@ -126,7 +131,8 @@
         </div>
         {% endfor %}
         
-        <div class="text-center mb-4">
+        <div class="text-center mb-4 d-flex justify-content-center gap-3 flex-wrap">
+            <button type="button" class="btn btn-outline-secondary btn-lg" id="saveProgressBtn">保存进度</button>
             <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">提交答案</button>
         </div>
     </form>
@@ -343,8 +349,18 @@ textarea.form-control {
 
 {% block extra_js %}
 <script>
-let startTime = Date.now();
+const savedAnswers = {{ (saved_answers or {})|tojson }};
+const savedTimeSpent = {{ (saved_time_spent or 0)|int }};
+const saveProgressUrl = {{ url_for('save_quiz_progress', lesson_id=lesson.id)|tojson }};
+const csrfToken = document.querySelector('#quizForm input[name="csrf_token"]').value;
+
+let startTime = Date.now() - (savedTimeSpent * 1000);
 let timerInterval = setInterval(updateTimer, 1000);
+let isSubmitting = false;
+let saveInFlight = false;
+let saveQueued = false;
+let lastSavedSnapshot = '';
+let autosaveTimer = null;
 
 function updateTimer() {
     let elapsedTime = Math.floor((Date.now() - startTime) / 1000);
@@ -356,48 +372,174 @@ function updateTimer() {
     document.getElementById('timeSpent').value = elapsedTime;
 }
 
+function setSaveStatus(text, isError) {
+    const el = document.getElementById('saveStatus');
+    if (!el) return;
+    el.textContent = text;
+    el.classList.toggle('text-warning', !!isError);
+    el.classList.toggle('text-white-50', !isError);
+}
+
+function applyIdkState(idkInput) {
+    const questionId = idkInput.id.replace('question_', '').replace('_idk', '');
+    const answerInputs = document.querySelectorAll(`[name="answer_${questionId}"]`);
+    const radioGroup = document.querySelectorAll(`input[type="radio"][name="answer_${questionId}"]`);
+
+    if (idkInput.checked) {
+        answerInputs.forEach(input => {
+            input.removeAttribute('required');
+            if (input.type === 'radio') {
+                input.checked = false;
+            } else {
+                input.value = '';
+            }
+            input.disabled = true;
+        });
+        radioGroup.forEach(radio => {
+            radio.checked = false;
+            radio.disabled = true;
+        });
+    } else {
+        answerInputs.forEach(input => {
+            if (input.type === 'radio' || input.type === 'text') {
+                input.setAttribute('required', '');
+            }
+            input.disabled = false;
+        });
+        radioGroup.forEach(radio => {
+            radio.disabled = false;
+        });
+    }
+}
+
+function collectAnswersPayload() {
+    const answers = {};
+    document.querySelectorAll('.question-container').forEach(function(questionDiv) {
+        const idkCheckbox = questionDiv.querySelector('.idk-input');
+        if (!idkCheckbox) return;
+        const questionId = idkCheckbox.id.replace('question_', '').replace('_idk', '');
+        const idk = !!idkCheckbox.checked;
+        let value = '';
+        if (!idk) {
+            const checkedRadio = questionDiv.querySelector('input[type="radio"]:checked');
+            const textInput = questionDiv.querySelector('input[type="text"]');
+            const textarea = questionDiv.querySelector('textarea');
+            if (checkedRadio) value = checkedRadio.value;
+            else if (textInput) value = textInput.value.trim();
+            else if (textarea) value = textarea.value.trim();
+        }
+        answers[questionId] = { value: value, idk: idk };
+    });
+    return answers;
+}
+
+function buildSaveSnapshot() {
+    return JSON.stringify({
+        time_spent: parseInt(document.getElementById('timeSpent').value || '0', 10),
+        answers: collectAnswersPayload()
+    });
+}
+
+async function saveProgress(options) {
+    const opts = options || {};
+    if (isSubmitting) return false;
+    if (saveInFlight) {
+        saveQueued = true;
+        return false;
+    }
+
+    const snapshot = buildSaveSnapshot();
+    if (!opts.force && snapshot === lastSavedSnapshot) {
+        if (opts.manual) setSaveStatus('进度无变化', false);
+        return true;
+    }
+
+    saveInFlight = true;
+    if (opts.manual) setSaveStatus('正在保存...', false);
+
+    try {
+        const payload = JSON.parse(snapshot);
+        const resp = await fetch(saveProgressUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify(Object.assign({ csrf_token: csrfToken }, payload)),
+            keepalive: !!opts.keepalive
+        });
+        const data = await resp.json().catch(function() { return {}; });
+        if (!resp.ok || !data.success) {
+            throw new Error((data && data.message) || '保存失败');
+        }
+        lastSavedSnapshot = snapshot;
+        setSaveStatus('已自动保存 ' + (data.saved_at || ''), false);
+        return true;
+    } catch (err) {
+        setSaveStatus((err && err.message) || '保存失败', true);
+        return false;
+    } finally {
+        saveInFlight = false;
+        if (saveQueued) {
+            saveQueued = false;
+            scheduleAutosave(300);
+        }
+    }
+}
+
+function scheduleAutosave(delayMs) {
+    if (autosaveTimer) clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(function() {
+        saveProgress({ force: false });
+    }, delayMs || 1200);
+}
+
+function restoreSavedAnswers() {
+    Object.keys(savedAnswers || {}).forEach(function(qid) {
+        const item = savedAnswers[qid] || {};
+        const idkInput = document.getElementById('question_' + qid + '_idk');
+        if (item.idk && idkInput) {
+            idkInput.checked = true;
+            applyIdkState(idkInput);
+            return;
+        }
+        const value = item.value || '';
+        if (!value) return;
+        const radios = document.querySelectorAll('input[type="radio"][name="answer_' + qid + '"]');
+        let matchedRadio = null;
+        radios.forEach(function(radio) {
+            if (radio.value === value) matchedRadio = radio;
+        });
+        if (matchedRadio) {
+            matchedRadio.checked = true;
+            matchedRadio.dispatchEvent(new Event('change', { bubbles: true }));
+            return;
+        }
+        const textInput = document.querySelector('input[type="text"][name="answer_' + qid + '"]');
+        if (textInput) {
+            textInput.value = value;
+            return;
+        }
+        const textarea = document.querySelector('textarea[name="answer_' + qid + '"]');
+        if (textarea) {
+            textarea.value = value;
+            limitInput(textarea);
+        }
+    });
+}
+
 // 处理"不会做"按钮的点击事件
 document.addEventListener('DOMContentLoaded', function() {
+    restoreSavedAnswers();
+    updateTimer();
+    lastSavedSnapshot = buildSaveSnapshot();
+
     const idkInputs = document.querySelectorAll('.idk-input');
     
     idkInputs.forEach(function(idkInput) {
-        idkInput.addEventListener('click', function(event) {
-            const questionId = this.id.replace('question_', '').replace('_idk', '');
-            const answerInputs = document.querySelectorAll(`[name="answer_${questionId}"]`);
-            const radioGroup = document.querySelectorAll(`input[type="radio"][name="answer_${questionId}"]`);
-            
-            // 如果已经选中，则取消选中
-            if (this.checked) {
-                // 禁用并清空答案输入
-                answerInputs.forEach(input => {
-                    input.removeAttribute('required');
-                    if (input.type === 'radio') {
-                        input.checked = false;
-                    } else {
-                        input.value = '';
-                    }
-                    input.disabled = true;
-                });
-                
-                // 如果是选择题，禁用所有选项
-                radioGroup.forEach(radio => {
-                    radio.checked = false;
-                    radio.disabled = true;
-                });
-            } else {
-                // 重新启用答案输入
-                answerInputs.forEach(input => {
-                    if (input.type === 'radio' || input.type === 'text') {
-                        input.setAttribute('required', '');
-                    }
-                    input.disabled = false;
-                });
-                
-                // 重新启用选择题选项
-                radioGroup.forEach(radio => {
-                    radio.disabled = false;
-                });
-            }
+        idkInput.addEventListener('click', function() {
+            applyIdkState(this);
+            scheduleAutosave();
         });
     });
 
@@ -429,12 +571,36 @@ document.addEventListener('DOMContentLoaded', function() {
                 const emojiSpan = this.nextElementSibling.querySelector('.choice-emoji');
                 emojiSpan.textContent = choiceEmojis[choice];
             }
+            scheduleAutosave();
         });
     });
-});
 
-// 防止重复提交的标志
-let isSubmitting = false;
+    document.querySelectorAll('input[type="text"][name^="answer_"], textarea[name^="answer_"]').forEach(function(input) {
+        input.addEventListener('input', function() {
+            scheduleAutosave(1500);
+        });
+        input.addEventListener('change', function() {
+            scheduleAutosave(500);
+        });
+    });
+
+    const saveBtn = document.getElementById('saveProgressBtn');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', function() {
+            saveProgress({ force: true, manual: true });
+        });
+    }
+
+    // 离开页面时尽量保存一次
+    window.addEventListener('pagehide', function() {
+        if (!isSubmitting) {
+            saveProgress({ force: true, keepalive: true });
+        }
+    });
+    setInterval(function() {
+        if (!isSubmitting) saveProgress({ force: false });
+    }, 30000);
+});
 
 // 提交表单时停止计时器并添加防重复提交逻辑
 document.getElementById('quizForm').addEventListener('submit', function(e) {

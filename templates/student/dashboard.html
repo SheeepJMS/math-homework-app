@@ -112,9 +112,9 @@
                     </a>
                     {% endif %}
                     <div class="lesson-status">
-                        {% set completed = quiz_history|selectattr('lesson_id', 'equalto', lesson.id)|list|length > 0 %}
-                        <span class="status-badge {% if completed %}completed{% else %}pending{% endif %}">
-                            {{ '已完成' if completed else '未完成' }}
+                        {% set in_progress = in_progress_lesson_ids is defined and lesson.id in in_progress_lesson_ids %}
+                        <span class="status-badge {% if in_progress %}in-progress{% else %}pending{% endif %}">
+                            {{ '作答中' if in_progress else '未完成' }}
                         </span>
                         <span class="question-count">
                             {{ lesson.questions|length }} 题
@@ -123,7 +123,7 @@
                 </div>
                 <div class="lesson-actions">
                     <a href="{{ url_for('start_quiz', lesson_id=lesson.id) }}" class="btn btn-primary">
-                        <i class="fas fa-pencil-alt"></i> 开始答题
+                        <i class="fas fa-pencil-alt"></i> {{ '继续答题' if in_progress else '开始答题' }}
                     </a>
                     {% if lesson.video_url %}
                     <a href="{{ url_for('lesson_replay', lesson_id=lesson.id) }}" target="_blank" rel="noopener noreferrer" class="btn btn-info">
@@ -462,6 +462,11 @@
 .status-badge.completed {
     background-color: #e8f5e9;
     color: #2e7d32;
+}
+
+.status-badge.in-progress {
+    background-color: #e3f2fd;
+    color: #1565c0;
 }
 
 .status-badge.pending {

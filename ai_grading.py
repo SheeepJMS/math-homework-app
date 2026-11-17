@@ -61,10 +61,12 @@ def _system_prompt() -> str:
         '（如 1/2 与 \\frac{1}{2}、sqrt(2) 与 √2、47 与 47.0）。\n'
         '2. 选择题：学生写选项字母，或写出与正确选项等价的内容，都可算对；'
         '选了错误选项则算错。\n'
-        '3. 填空题：最终数值/表达式等价即算对。\n'
+        '3. 填空题：数字对就算对。忽略单位、逗号/顿号/空格、多项答案的书写顺序'
+        '（如 13 与 13km；3,5 与 5 3；1, 2 与 2，1）。\n'
         '4. 解答/证明题：对照解析看结论与关键步骤是否实质正确；表述可不同，'
         '关键推理或最终结论错误则判错。\n'
-        '5. 空答、乱写、或与正确结果明显不符 → 错误。拿不准时倾向判错。\n'
+        '5. 空答、乱写、或数字与标准答案明显不符 → 错误。'
+        '写法/单位/顺序差异、数字已对齐时判对。\n'
         '若附带试题图/解析图，请阅读图片中的数学内容再判断。\n'
         '只返回 JSON：{"correct": true/false, "confidence": 0到1, "reason": "一句中文理由"}'
     )
@@ -183,6 +185,43 @@ def grade_with_ai(
     except Exception as e:
         logger.warning('AI grading failed: %s', e)
         return None
+
+
+_NUM_TOKEN = re.compile(
+    r'[+\-]?(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+\-]?\d+)?'
+)
+
+
+def _compact_answer(s: str) -> str:
+    t = (s or '').strip().lower()
+    t = t.replace('\\,', '').replace('\\;', '').replace('\\!', '')
+    t = re.sub(r'\s+', '', t)
+    t = t.replace('$', '')
+    for ch in (',', '，', '、', ';', '；', '/', '|'):
+        t = t.replace(ch, '')
+    t = t.rstrip('.;。')
+    return t
+
+
+def _extract_numbers(s: str) -> List[float]:
+    return [float(x) for x in _NUM_TOKEN.findall(s or '')]
+
+
+def fill_answers_match(student: str, key: str) -> bool:
+    """
+    填空题规则判分：数字对就算对。
+    忽略单位、逗号/顿号/空格，多项答案不要求顺序。
+    """
+    a = (student or '').strip()
+    b = (key or '').strip()
+    if not a or not b:
+        return False
+    if _compact_answer(a) == _compact_answer(b):
+        return True
+    na, nb = _extract_numbers(a), _extract_numbers(b)
+    if not na or not nb:
+        return False
+    return sorted(na) == sorted(nb)
 
 
 def maybe_upgrade_with_ai(
