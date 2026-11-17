@@ -62,6 +62,23 @@
             </div>
         </div>
         <div class="stats">
+            <div class="stat-item recent-30d-stat {% if recent_30d and recent_30d.show_warning %}is-warning{% elif recent_30d and recent_30d.stars >= 4 %}is-full{% endif %}">
+                <span class="stat-label">最近30天完成</span>
+                {% if recent_30d and recent_30d.show_warning %}
+                <div class="recent-30d-mark" title="近30天尚未完成作业">
+                    <span class="recent-warning" aria-label="尚未完成">!</span>
+                </div>
+                <span class="stat-unit recent-30d-count">0 次</span>
+                {% else %}
+                <div class="recent-30d-mark" title="近30天每完成1次作业点亮1颗星，最多4颗">
+                    {% set star_count = recent_30d.stars if recent_30d else 0 %}
+                    {% for i in range(4) %}
+                    <span class="recent-star {% if i < star_count %}lit{% else %}dim{% endif %}">★</span>
+                    {% endfor %}
+                </div>
+                <span class="stat-unit recent-30d-count">{{ recent_30d.count if recent_30d else 0 }} 次</span>
+                {% endif %}
+            </div>
             <div class="stat-item">
                 <span class="stat-label">总完成作业</span>
                 <span class="stat-value">{{ total_quizzes }}</span>
@@ -339,12 +356,13 @@
 
 .stats {
     display: flex;
-    gap: 30px;
+    gap: 20px;
+    align-items: stretch;
 }
 
 .stat-item {
     text-align: center;
-    padding: 0 20px;
+    padding: 0 18px;
     border-left: 1px solid #eee;
 }
 
@@ -368,6 +386,93 @@
     color: #666;
     font-size: 0.9em;
     margin-top: 5px;
+}
+
+.recent-30d-stat {
+    min-width: 140px;
+}
+
+.recent-30d-mark {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+    min-height: 36px;
+    margin: 4px 0 2px;
+}
+
+.recent-star {
+    font-size: 1.35rem;
+    line-height: 1;
+    transition: transform 0.2s ease, color 0.2s ease, text-shadow 0.2s ease;
+}
+
+.recent-star.lit {
+    color: #f5b301;
+    text-shadow: 0 1px 6px rgba(245, 179, 1, 0.35);
+}
+
+.recent-star.dim {
+    color: #e0e0e0;
+}
+
+.recent-30d-stat.is-full .recent-star.lit {
+    color: #ff9800;
+    text-shadow: 0 1px 8px rgba(255, 152, 0, 0.45);
+}
+
+.recent-warning {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #ff6b6b, #e53935);
+    color: #fff;
+    font-size: 1.25rem;
+    font-weight: 800;
+    box-shadow: 0 4px 12px rgba(229, 57, 53, 0.28);
+    animation: recentPulse 1.8s ease-in-out infinite;
+}
+
+.recent-30d-count {
+    font-weight: 600;
+    color: #555;
+}
+
+.recent-30d-stat.is-warning .recent-30d-count {
+    color: #e53935;
+}
+
+.recent-30d-stat.is-full .recent-30d-count {
+    color: #ef6c00;
+}
+
+@keyframes recentPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.06); }
+}
+
+@media (max-width: 992px) {
+    .top-info {
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+    .stats {
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    .stat-item {
+        border-left: none;
+        padding: 10px 14px;
+        background: #f8f9fa;
+        border-radius: 10px;
+    }
 }
 
 .trend-card {

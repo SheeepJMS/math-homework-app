@@ -408,6 +408,22 @@ def _get_in_progress_quiz(user_id, lesson_id):
     )
 
 
+def _recent_30d_completion_stats(user_id):
+    """最近30天正式提交次数；星数最多4颗，0次返回警示标记。"""
+    since = datetime.now() - timedelta(days=30)
+    count = (
+        QuizHistory.query.filter_by(user_id=user_id)
+        .filter(_quiz_completed_filter())
+        .filter(QuizHistory.completed_at >= since)
+        .count()
+    )
+    return {
+        'count': count,
+        'stars': min(count, 4),
+        'show_warning': count == 0,
+    }
+
+
 def _collect_homework_answers_payload(questions):
     """从 JSON 或 form 中收集作业答案。返回 {question_id: {'answer': str, 'idk': bool}}"""
     payload = request.get_json(silent=True)
@@ -1377,7 +1393,8 @@ def student_dashboard():
                          history_data=history_data,
                          trend_data=json.dumps(trend_data),
                          lessons=available_lessons,
-                         in_progress_lesson_ids=in_progress_lesson_ids)
+                         in_progress_lesson_ids=in_progress_lesson_ids,
+                         recent_30d=_recent_30d_completion_stats(current_user.id))
 
 @app.route('/admin/lesson/<int:lesson_id>/kp_notes', methods=['POST'])
 @admin_required
@@ -2885,6 +2902,7 @@ def student_dashboard_admin(user_id):
                          trend_data=json.dumps(trend_data),
                          lessons=available_lessons,
                          in_progress_lesson_ids=in_progress_lesson_ids,
+                         recent_30d=_recent_30d_completion_stats(student.id),
                          is_admin_view=True)  # 标记这是管理员视图
 
 @app.route('/student/wrong_questions')
