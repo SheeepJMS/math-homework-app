@@ -90,13 +90,24 @@
             {% for answer in latest_answers %}
             <div class="card mb-4">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <div class="d-flex align-items-center">
-                        <h5 class="mb-0 me-3">第{{ answer.question.question_number }}题</h5>
-                        <span class="badge {% if answer.question.type == 'choice' %}bg-primary{% elif answer.question.type == 'proof' %}bg-warning{% else %}bg-info{% endif %} me-2">
+                    <div class="d-flex align-items-center flex-wrap gap-2">
+                        <h5 class="mb-0 me-1">第{{ answer.question.question_number }}题</h5>
+                        <span class="badge {% if answer.question.type == 'choice' %}bg-primary{% elif answer.question.type == 'proof' %}bg-warning{% else %}bg-info{% endif %}">
                             {% if answer.question.type == 'choice' %}选择题
                             {% elif answer.question.type == 'proof' %}证明题
                             {% else %}填空题{% endif %}
                         </span>
+                        {% set q_seconds = answer.time_spent if answer.time_spent is not none else 0 %}
+                        {% if q_seconds and q_seconds > 0 %}
+                        {% set pace = answer.pace_label %}
+                        {% set q_m = (q_seconds // 60) %}
+                        {% set q_s = (q_seconds % 60) %}
+                        <span class="question-time-badge pace-{{ answer.pace_key }}" title="本题用时">
+                            <i class="far fa-clock"></i>
+                            {% if q_m > 0 %}{{ q_m }}分{% endif %}{{ '%02d'|format(q_s) }}秒
+                            {% if pace %}<span class="pace-tag">{{ pace }}</span>{% endif %}
+                        </span>
+                        {% endif %}
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         <button type="button"
@@ -316,6 +327,45 @@
 .result-badge.incorrect {
     background-color: #dc3545;
     color: white;
+}
+
+.question-time-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    background: #f1f5f9;
+    color: #475569;
+}
+
+.question-time-badge .pace-tag {
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.7);
+}
+
+.question-time-badge.pace-very-fast {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+.question-time-badge.pace-fast {
+    background: #e3f2fd;
+    color: #1565c0;
+}
+.question-time-badge.pace-fairly-fast {
+    background: #e0f7fa;
+    color: #00838f;
+}
+.question-time-badge.pace-a-bit-slow {
+    background: #fff8e1;
+    color: #f9a825;
+}
+.question-time-badge.pace-slow {
+    background: #fbe9e7;
+    color: #d84315;
 }
 
 .badge {

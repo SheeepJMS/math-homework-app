@@ -347,10 +347,21 @@ class UserAnswer(db.Model):
     quiz_history_id = db.Column(db.Integer, db.ForeignKey('quiz_history.id'), nullable=False)
     answer = db.Column(db.Text, nullable=True)  # 使用Text类型支持更长的答案
     is_correct = db.Column(db.Boolean, default=False)
+    time_spent = db.Column(db.Integer, nullable=True, default=0)  # 该题用时（秒）
     created_at = db.Column(db.DateTime, default=datetime.now)
 
     question = db.relationship('Question', backref='user_answers')
     quiz_history = db.relationship('QuizHistory', backref='answers')
+
+    @property
+    def pace_label(self):
+        """按用时给出速度标签。"""
+        return _question_pace_label(self.time_spent)
+
+    @property
+    def pace_key(self):
+        info = _question_pace_info(self.time_spent)
+        return info['key'] if info else 'unknown'
 
 # 定义答题历史记录模型
 class QuizHistory(db.Model):
@@ -424,8 +435,44 @@ def _recent_30d_completion_stats(user_id):
     }
 
 
+def _question_pace_label(seconds):
+    """按秒数返回速度标签。"""
+    info = _question_pace_info(seconds)
+    return info['label'] if info else None
+
+
+def _question_pace_info(seconds):
+    """按秒数返回 {label, key}；用于展示与样式。"""
+    if seconds is None:
+        return None
+    try:
+        sec = int(seconds)
+    except (TypeError, ValueError):
+        return None
+    if sec < 0:
+        return None
+    minutes = sec / 60.0
+    if minutes < 1:
+        return {'label': '极快', 'key': 'very-fast'}
+    if minutes < 3:
+        return {'label': '快', 'key': 'fast'}
+    if minutes < 5:
+        return {'label': '较快', 'key': 'fairly-fast'}
+    if minutes < 8:
+        return {'label': '略慢', 'key': 'a-bit-slow'}
+    return {'label': '很慢', 'key': 'slow'}
+
+
+def _parse_question_time_spent(raw):
+    try:
+        value = int(raw or 0)
+    except (TypeError, ValueError):
+        value = 0
+    return max(0, value)
+
+
 def _collect_homework_answers_payload(questions):
-    """从 JSON 或 form 中收集作业答案。返回 {question_id: {'answer': str, 'idk': bool}}"""
+    """从 JSON 或 form 中收集作业答案。返回 {question_id: {'answer','idk','time_spent'}}"""
     payload = request.get_json(silent=True)
     answers = {}
     if isinstance(payload, dict) and isinstance(payload.get('answers'), dict):
@@ -435,16 +482,31 @@ def _collect_homework_answers_payload(questions):
             if isinstance(item, dict):
                 idk = bool(item.get('idk'))
                 value = (item.get('value') or item.get('answer') or '').strip()
+                time_spent = _parse_question_time_spent(
+                    item.get('time_spent', item.get('time'))
+                )
             else:
                 idk = False
                 value = str(item or '').strip()
-            answers[q.id] = {'answer': 'IDK' if idk else value, 'idk': idk}
+                time_spent = 0
+            answers[q.id] = {
+                'answer': 'IDK' if idk else value,
+                'idk': idk,
+                'time_spent': time_spent,
+            }
         return answers
 
     for q in questions:
         idk = request.form.get(f'answer_{q.id}_idk') == 'IDK'
         value = (request.form.get(f'answer_{q.id}', '') or '').strip()
-        answers[q.id] = {'answer': 'IDK' if idk else value, 'idk': idk}
+        time_spent = _parse_question_time_spent(
+            request.form.get(f'question_time_{q.id}', 0)
+        )
+        answers[q.id] = {
+            'answer': 'IDK' if idk else value,
+            'idk': idk,
+            'time_spent': time_spent,
+        }
     return answers
 
 
@@ -455,8 +517,9 @@ def _upsert_draft_answers(quiz_history, questions, answer_map):
         for ua in UserAnswer.query.filter_by(quiz_history_id=quiz_history.id).all()
     }
     for q in questions:
-        item = answer_map.get(q.id) or {'answer': '', 'idk': False}
+        item = answer_map.get(q.id) or {'answer': '', 'idk': False, 'time_spent': 0}
         answer_text = item.get('answer') or ''
+        time_spent = _parse_question_time_spent(item.get('time_spent'))
         ua = existing.get(q.id)
         if ua is None:
             ua = UserAnswer(
@@ -466,11 +529,13 @@ def _upsert_draft_answers(quiz_history, questions, answer_map):
                 quiz_history_id=quiz_history.id,
                 answer=answer_text,
                 is_correct=False,
+                time_spent=time_spent,
             )
             db.session.add(ua)
         else:
             ua.answer = answer_text
             ua.is_correct = False
+            ua.time_spent = time_spent
 
 
 # ========== 诊断模块独立表（diag_ 前缀，不影响现有业务）==========
@@ -1549,6 +1614,7 @@ def start_quiz(lesson_id):
             saved_answers[str(ua.question_id)] = {
                 'value': '' if ans.upper() == 'IDK' else ans,
                 'idk': ans.upper() == 'IDK',
+                'time_spent': int(ua.time_spent or 0),
             }
 
     return render_template('student/quiz.html',
@@ -1782,9 +1848,10 @@ def submit_quiz(lesson_id):
 
         # 处理每个题目的答案
         for question in questions:
-            item = answer_map.get(question.id) or {'answer': '', 'idk': False}
+            item = answer_map.get(question.id) or {'answer': '', 'idk': False, 'time_spent': 0}
             idk_answer = bool(item.get('idk'))
             user_answer = (item.get('answer') or '').strip()
+            q_time = _parse_question_time_spent(item.get('time_spent'))
             if idk_answer:
                 user_answer = 'IDK'
 
@@ -1796,7 +1863,8 @@ def submit_quiz(lesson_id):
                     question_id=question.id,
                     quiz_history_id=quiz_history.id,
                     answer='IDK' if idk_answer or (user_answer or '').upper() == 'IDK' else '',
-                    is_correct=False
+                    is_correct=False,
+                    time_spent=q_time,
                 )
                 db.session.add(answer_record)
                 continue
@@ -1812,7 +1880,8 @@ def submit_quiz(lesson_id):
                 question_id=question.id,
                 quiz_history_id=quiz_history.id,
                 answer=user_answer,
-                is_correct=is_correct
+                is_correct=is_correct,
+                time_spent=q_time,
             )
             db.session.add(answer_record)
 

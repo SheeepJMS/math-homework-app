@@ -39,10 +39,14 @@
         <input type="hidden" name="lesson_id" value="{{ lesson.id }}">
         
         {% for question in questions %}
-        <div class="card mb-4 question-container">
+        <div class="card mb-4 question-container" data-question-id="{{ question.id }}" data-question-index="{{ loop.index0 }}">
+            <input type="hidden" name="question_time_{{ question.id }}" id="question_time_{{ question.id }}" value="0">
             <!-- 题目头部 -->
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h6 class="mb-0">第{{ question.question_number }}题</h6>
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <h6 class="mb-0">第{{ question.question_number }}题</h6>
+                    <span class="question-live-timer text-muted small" data-role="live-timer">计时中 0:00</span>
+                </div>
                 <div class="d-flex align-items-center gap-2">
                     <div class="idk-option">
                         <input class="option-input idk-input" 
@@ -156,6 +160,30 @@
 
 .question-container {
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: 2px solid transparent;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.question-container.is-active {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.12);
+}
+
+.question-container.is-timed .question-live-timer {
+    color: #0d6efd !important;
+    font-weight: 600;
+}
+
+.question-live-timer {
+    display: none;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #f1f5f9;
+}
+
+.question-container.is-active .question-live-timer,
+.question-container.is-timed .question-live-timer {
+    display: inline-flex;
 }
 
 .question-image-container {
@@ -362,6 +390,132 @@ let saveQueued = false;
 let lastSavedSnapshot = '';
 let autosaveTimer = null;
 
+const questionOrder = Array.from(document.querySelectorAll('.question-container')).map(function(el) {
+    return el.getAttribute('data-question-id');
+});
+const questionTimes = {};
+const questionLocked = {};
+let activeQuestionId = null;
+let activeSegmentStart = Date.now();
+questionOrder.forEach(function(qid) {
+    const saved = (savedAnswers && savedAnswers[qid]) || {};
+    questionTimes[qid] = parseInt(saved.time_spent || 0, 10) || 0;
+    questionLocked[qid] = false;
+    const hidden = document.getElementById('question_time_' + qid);
+    if (hidden) hidden.value = String(questionTimes[qid]);
+});
+
+function formatClock(totalSeconds) {
+    const sec = Math.max(0, parseInt(totalSeconds || 0, 10) || 0);
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return m + ':' + String(s).padStart(2, '0');
+}
+
+function syncQuestionTimeInputs() {
+    questionOrder.forEach(function(qid) {
+        const hidden = document.getElementById('question_time_' + qid);
+        if (hidden) hidden.value = String(questionTimes[qid] || 0);
+    });
+}
+
+function getQuestionElapsed(qid) {
+    let total = questionTimes[qid] || 0;
+    if (qid === activeQuestionId) {
+        total += Math.max(0, Math.floor((Date.now() - activeSegmentStart) / 1000));
+    }
+    return total;
+}
+
+function updateQuestionTimerUI() {
+    questionOrder.forEach(function(qid) {
+        const card = document.querySelector('.question-container[data-question-id="' + qid + '"]');
+        if (!card) return;
+        const timerEl = card.querySelector('[data-role="live-timer"]');
+        const elapsed = getQuestionElapsed(qid);
+        const isActive = qid === activeQuestionId && !questionLocked[qid];
+        card.classList.toggle('is-active', isActive);
+        card.classList.toggle('is-timed', questionLocked[qid] || (questionTimes[qid] > 0 && !isActive));
+        if (timerEl) {
+            if (questionLocked[qid]) {
+                timerEl.textContent = '已用 ' + formatClock(elapsed);
+            } else if (isActive) {
+                timerEl.textContent = '计时中 ' + formatClock(elapsed);
+            } else if (elapsed > 0) {
+                timerEl.textContent = '已用 ' + formatClock(elapsed);
+            } else {
+                timerEl.textContent = '计时中 0:00';
+            }
+        }
+    });
+    syncQuestionTimeInputs();
+}
+
+function pauseActiveQuestion() {
+    if (!activeQuestionId) return;
+    const add = Math.max(0, Math.floor((Date.now() - activeSegmentStart) / 1000));
+    questionTimes[activeQuestionId] = (questionTimes[activeQuestionId] || 0) + add;
+    activeSegmentStart = Date.now();
+    syncQuestionTimeInputs();
+}
+
+function startQuestionTimer(qid) {
+    if (!qid) {
+        activeQuestionId = null;
+        updateQuestionTimerUI();
+        return;
+    }
+    activeQuestionId = qid;
+    activeSegmentStart = Date.now();
+    questionLocked[qid] = false;
+    updateQuestionTimerUI();
+}
+
+function findNextUnansweredQuestionId(fromIndex) {
+    for (let i = Math.max(0, fromIndex || 0); i < questionOrder.length; i++) {
+        const qid = questionOrder[i];
+        if (!hasAnsweredQuestion(qid)) return qid;
+    }
+    return null;
+}
+
+function hasAnsweredQuestion(qid) {
+    const card = document.querySelector('.question-container[data-question-id="' + qid + '"]');
+    if (!card) return false;
+    const idk = card.querySelector('.idk-input');
+    if (idk && idk.checked) return true;
+    if (card.querySelector('input[type="radio"]:checked')) return true;
+    const textInput = card.querySelector('input[type="text"]');
+    if (textInput && textInput.value.trim() !== '') return true;
+    const textarea = card.querySelector('textarea');
+    if (textarea && textarea.value.trim() !== '') return true;
+    return false;
+}
+
+function finalizeQuestionAndAdvance(qid) {
+    if (!qid || isRestoring) return;
+    if (questionLocked[qid]) {
+        scheduleAutosave(800);
+        return;
+    }
+    // 把当前活跃题时间落盘，再切到下一题
+    pauseActiveQuestion();
+    questionLocked[qid] = true;
+    syncQuestionTimeInputs();
+
+    const idx = questionOrder.indexOf(qid);
+    const nextId = findNextUnansweredQuestionId(idx + 1) || findNextUnansweredQuestionId(0);
+    if (nextId && nextId !== qid) {
+        startQuestionTimer(nextId);
+    } else {
+        // 全部答完：继续把剩余时间累加到最后一题，直到提交
+        activeQuestionId = qid;
+        activeSegmentStart = Date.now();
+        updateQuestionTimerUI();
+    }
+    scheduleAutosave(800);
+}
+
 function updateTimer() {
     let elapsedTime = Math.floor((Date.now() - startTime) / 1000);
     let minutes = Math.floor(elapsedTime / 60);
@@ -370,6 +524,7 @@ function updateTimer() {
     document.getElementById('minutes').textContent = String(minutes).padStart(2, '0');
     document.getElementById('seconds').textContent = String(seconds).padStart(2, '0');
     document.getElementById('timeSpent').value = elapsedTime;
+    updateQuestionTimerUI();
 }
 
 function setSaveStatus(text, isError) {
@@ -413,6 +568,7 @@ function applyIdkState(idkInput) {
 }
 
 function collectAnswersPayload() {
+    pauseActiveQuestion();
     const answers = {};
     document.querySelectorAll('.question-container').forEach(function(questionDiv) {
         const idkCheckbox = questionDiv.querySelector('.idk-input');
@@ -428,8 +584,17 @@ function collectAnswersPayload() {
             else if (textInput) value = textInput.value.trim();
             else if (textarea) value = textarea.value.trim();
         }
-        answers[questionId] = { value: value, idk: idk };
+        answers[questionId] = {
+            value: value,
+            idk: idk,
+            time_spent: getQuestionElapsed(questionId)
+        };
     });
+    // pause 后继续当前题计时
+    if (activeQuestionId && !questionLocked[activeQuestionId]) {
+        activeSegmentStart = Date.now();
+    }
+    syncQuestionTimeInputs();
     return answers;
 }
 
@@ -528,9 +693,18 @@ function restoreSavedAnswers() {
     });
 }
 
+let isRestoring = false;
+
 // 处理"不会做"按钮的点击事件
 document.addEventListener('DOMContentLoaded', function() {
+    isRestoring = true;
     restoreSavedAnswers();
+    questionOrder.forEach(function(qid) {
+        if (hasAnsweredQuestion(qid)) questionLocked[qid] = true;
+    });
+    const firstOpen = findNextUnansweredQuestionId(0) || questionOrder[questionOrder.length - 1] || null;
+    startQuestionTimer(firstOpen);
+    isRestoring = false;
     updateTimer();
     lastSavedSnapshot = buildSaveSnapshot();
 
@@ -539,7 +713,12 @@ document.addEventListener('DOMContentLoaded', function() {
     idkInputs.forEach(function(idkInput) {
         idkInput.addEventListener('click', function() {
             applyIdkState(this);
-            scheduleAutosave();
+            const qid = this.id.replace('question_', '').replace('_idk', '');
+            if (this.checked) {
+                finalizeQuestionAndAdvance(qid);
+            } else {
+                scheduleAutosave();
+            }
         });
     });
 
@@ -570,8 +749,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 const choice = this.value;
                 const emojiSpan = this.nextElementSibling.querySelector('.choice-emoji');
                 emojiSpan.textContent = choiceEmojis[choice];
+                const qid = questionId.replace('answer_', '');
+                finalizeQuestionAndAdvance(qid);
+            } else {
+                scheduleAutosave();
             }
-            scheduleAutosave();
         });
     });
 
@@ -580,7 +762,18 @@ document.addEventListener('DOMContentLoaded', function() {
             scheduleAutosave(1500);
         });
         input.addEventListener('change', function() {
-            scheduleAutosave(500);
+            const qid = this.name.replace('answer_', '');
+            if (this.value.trim() !== '') {
+                finalizeQuestionAndAdvance(qid);
+            } else {
+                scheduleAutosave(500);
+            }
+        });
+        input.addEventListener('blur', function() {
+            const qid = this.name.replace('answer_', '');
+            if (this.value.trim() !== '' && !questionLocked[qid]) {
+                finalizeQuestionAndAdvance(qid);
+            }
         });
     });
 
@@ -667,6 +860,10 @@ document.getElementById('quizForm').addEventListener('submit', function(e) {
         e.preventDefault();
         return false;
     }
+
+    // 提交前结算每题用时到隐藏字段
+    pauseActiveQuestion();
+    syncQuestionTimeInputs();
     
     // 获取提交按钮
     const submitBtn = this.querySelector('button[type="submit"]');
