@@ -261,8 +261,21 @@ class User(UserMixin, db.Model):
     achievement_count = db.Column(db.Integer, default=0)  # 达标次数（80%以上正确率）
     badge_level = db.Column(db.Integer, default=0)  # 徽章等级，默认为0（无徽章）
     report_link = db.Column(db.String(500), nullable=True)  # 课堂智能报告链接
+    # 家长邮箱：用于未交作业提醒；可与账号 email 相同，允许多个孩子共用同一家长邮箱
+    parent_email = db.Column(db.String(120), nullable=True, index=True)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    @property
+    def notify_email(self):
+        """提醒优先用家长邮箱，其次非占位账号邮箱。"""
+        parent = (self.parent_email or '').strip()
+        if parent and not _is_placeholder_email(parent):
+            return parent
+        account = (self.email or '').strip()
+        if account and not _is_placeholder_email(account):
+            return account
+        return ''
     
     # 一对多关系
     answers = db.relationship('UserAnswer', backref='user', lazy=True, cascade="all, delete-orphan")
@@ -433,6 +446,164 @@ def _recent_30d_completion_stats(user_id):
         'stars': min(count, 4),
         'show_warning': count == 0,
     }
+
+
+def _is_placeholder_email(email):
+    e = (email or '').strip().lower()
+    if not e or '@' not in e:
+        return True
+    return e.endswith('@example.com') or e.endswith('@email.com') or e.endswith('@test.com')
+
+
+def _normalize_email(email):
+    return (email or '').strip().lower()
+
+
+def _student_unfinished_lesson_count(user):
+    """统计学生在所属班级中，已激活但尚未正式提交的作业数。"""
+    if not user or not user.class_id:
+        return 0
+    user_class = Class.query.get(user.class_id)
+    if not user_class:
+        return 0
+    lessons = Lesson.query.filter_by(is_active=True).all()
+    user_lessons = [lesson for lesson in lessons if user_class in (lesson.classes or [])]
+    finished_ids = {
+        qh.lesson_id
+        for qh in QuizHistory.query.filter_by(user_id=user.id).filter(_quiz_completed_filter()).all()
+    }
+    return len([l for l in user_lessons if l.id not in finished_ids])
+
+
+def _send_plain_email(to_email, subject, body):
+    """发送纯文本邮件。优先 Resend API，其次 SMTP。未配置时返回错误信息。"""
+    to_email = _normalize_email(to_email)
+    if _is_placeholder_email(to_email):
+        return False, '无效邮箱'
+
+    resend_key = (os.environ.get('RESEND_API_KEY') or '').strip()
+    sender = (
+        os.environ.get('MAIL_DEFAULT_SENDER')
+        or os.environ.get('MAIL_FROM')
+        or 'Burning Math <onboarding@resend.dev>'
+    ).strip()
+
+    if resend_key:
+        try:
+            resp = requests.post(
+                'https://api.resend.com/emails',
+                headers={
+                    'Authorization': f'Bearer {resend_key}',
+                    'Content-Type': 'application/json',
+                },
+                json={
+                    'from': sender,
+                    'to': [to_email],
+                    'subject': subject,
+                    'text': body,
+                },
+                timeout=20,
+            )
+            if resp.status_code in (200, 201):
+                return True, 'ok'
+            return False, f'Resend错误: {resp.status_code} {resp.text[:200]}'
+        except Exception as e:
+            return False, f'Resend异常: {e}'
+
+    mail_server = (os.environ.get('MAIL_SERVER') or '').strip()
+    mail_user = (os.environ.get('MAIL_USERNAME') or '').strip()
+    mail_pass = (os.environ.get('MAIL_PASSWORD') or '').strip()
+    if not mail_server or not mail_user or not mail_pass:
+        return False, '未配置邮件服务（请设置 RESEND_API_KEY 或 MAIL_SERVER/MAIL_USERNAME/MAIL_PASSWORD）'
+
+    import smtplib
+    from email.mime.text import MIMEText
+
+    port = int(os.environ.get('MAIL_PORT') or 587)
+    use_tls = (os.environ.get('MAIL_USE_TLS', 'true') or 'true').lower() != 'false'
+    msg = MIMEText(body, 'plain', 'utf-8')
+    msg['Subject'] = subject
+    msg['From'] = sender if '<' in sender else (f'Burning Math <{mail_user}>' if sender == mail_user or not sender else sender)
+    msg['To'] = to_email
+    try:
+        with smtplib.SMTP(mail_server, port, timeout=20) as server:
+            if use_tls:
+                server.starttls()
+            server.login(mail_user, mail_pass)
+            server.sendmail(mail_user, [to_email], msg.as_string())
+        return True, 'ok'
+    except Exception as e:
+        return False, f'SMTP异常: {e}'
+
+
+def send_weekly_homework_reminders(force=False):
+    """
+    给有未交作业且已填家长邮箱的学生发提醒。
+    force=True 时忽略“是否周五17点”的时间窗检查。
+    """
+    import pytz
+
+    tz_name = os.environ.get('HOMEWORK_REMINDER_TZ', 'America/Vancouver')
+    try:
+        tz = pytz.timezone(tz_name)
+    except Exception:
+        tz = pytz.timezone('America/Vancouver')
+    now_local = datetime.now(tz)
+
+    if not force:
+        # 仅周五 17:00-17:59 触发（配合每小时 cron）
+        if now_local.weekday() != 4 or now_local.hour != 17:
+            return {
+                'skipped': True,
+                'reason': f'非提醒窗口（当前本地 {now_local.strftime("%A %H:%M")} {tz_name}）',
+                'sent': 0,
+                'failed': 0,
+                'targets': 0,
+            }
+
+    subject = '作业提醒：本周烧脑数学作业未完成'
+    students = User.query.filter_by(is_admin=False, is_active=True).all()
+    sent = 0
+    failed = 0
+    skipped = 0
+    details = []
+
+    for user in students:
+        unfinished = _student_unfinished_lesson_count(user)
+        to_email = user.notify_email
+        if unfinished <= 0:
+            skipped += 1
+            continue
+        if not to_email:
+            skipped += 1
+            details.append({'user': user.username, 'status': 'no_email', 'unfinished': unfinished})
+            continue
+
+        body = (
+            f'您好，\n\n'
+            f'学生 {user.username}：本周烧脑数学的作业未完成，请让孩子及时完成作业哦！\n'
+            f'当前未完成作业：{unfinished} 份。\n\n'
+            f'Burning Math Academy\n'
+        )
+        ok, msg = _send_plain_email(to_email, subject, body)
+        if ok:
+            sent += 1
+            details.append({'user': user.username, 'email': to_email, 'status': 'sent', 'unfinished': unfinished})
+        else:
+            failed += 1
+            details.append({'user': user.username, 'email': to_email, 'status': 'failed', 'error': msg, 'unfinished': unfinished})
+
+    result = {
+        'skipped_window': False,
+        'local_time': now_local.strftime('%Y-%m-%d %H:%M %Z'),
+        'targets_considered': len(students),
+        'sent': sent,
+        'failed': failed,
+        'skipped': skipped,
+        'details': details[:50],
+    }
+    print(f'[homework-reminder] {result}')
+    return result
 
 
 def _question_pace_label(seconds):
@@ -940,21 +1111,32 @@ def register():
         password = request.form['password']
         confirm_password = request.form['confirm_password']
         class_id = request.form['class_id']
+        parent_email = _normalize_email(request.form.get('parent_email') or request.form.get('email'))
         
         if password != confirm_password:
             flash('两次输入的密码不一致')
+            return redirect(url_for('register'))
+
+        if _is_placeholder_email(parent_email):
+            flash('请填写有效的家长邮箱，用于作业提醒')
             return redirect(url_for('register'))
         
         if User.query.filter_by(username=username).first():
             flash('用户名已存在')
             return redirect(url_for('register'))
-        
-        # 为email生成一个默认值
-        default_email = f"{username}@example.com"
+
+        # 账号 email 仍需唯一：优先用家长邮箱，冲突则回退占位邮箱
+        account_email = parent_email
+        if User.query.filter_by(email=account_email).first():
+            account_email = f"{username}@example.com"
+            # 极少数用户名冲突时再加后缀
+            if User.query.filter_by(email=account_email).first():
+                account_email = f"{username}.{int(time.time())}@example.com"
         
         new_user = User(
             username=username,
-            email=default_email,  # 使用默认email
+            email=account_email,
+            parent_email=parent_email,
             password=password,
             class_id=class_id,
             is_active=True  # 默认设置为激活状态
@@ -1053,17 +1235,11 @@ def admin_users(class_id=None):
             ).all()
             class_users[class_] = students
     
-    # 统计每个学生未完成作业数
+    # 统计每个学生未完成作业数（仅正式提交算完成）
     unfinished_count = defaultdict(int)
-    lessons = Lesson.query.filter_by(is_active=True).all()
     for class_, students in class_users.items():
         for user in students:
-            # 该学生所在班级的所有课程
-            user_lessons = [lesson for lesson in lessons if class_ in lesson.classes]
-            # 该学生已完成的课程id
-            finished_ids = set(qh.lesson_id for qh in user.quiz_history)
-            # 未完成课程数
-            unfinished_count[user.id] = len([l for l in user_lessons if l.id not in finished_ids])
+            unfinished_count[user.id] = _student_unfinished_lesson_count(user)
     
     return render_template('admin/users.html', 
                          admin_users=admin_users,
@@ -3109,10 +3285,12 @@ def add_user():
     if User.query.filter_by(email=email).first():
         return redirect(url_for('admin_users'))
     
-    # 创建新用户
+    # 创建新用户（后台添加时的邮箱同时作为家长邮箱，用于作业提醒）
+    parent_email = _normalize_email(email)
     new_user = User(
         username=username,
         email=email,
+        parent_email=None if _is_placeholder_email(parent_email) else parent_email,
         password=password,
         is_active=True
     )
@@ -3709,11 +3887,19 @@ def edit_user(user_id):
     username = request.form.get('username')
     class_id = request.form.get('class_id')
     report_link = (request.form.get('report_link') or '').strip() or None
+    parent_email_raw = request.form.get('parent_email') or request.form.get('email')
+    parent_email = _normalize_email(parent_email_raw) if (parent_email_raw or '').strip() else None
 
     if not username or not class_id:
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({'success': False, 'msg': '用户名和班级不能为空'})
         flash('用户名和班级不能为空', 'error')
+        return redirect(url_for('admin_users'))
+
+    if parent_email and _is_placeholder_email(parent_email):
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'msg': '请填写有效的家长邮箱'})
+        flash('请填写有效的家长邮箱', 'error')
         return redirect(url_for('admin_users'))
 
     # 检查用户名是否已存在（排除当前用户）
@@ -3727,11 +3913,17 @@ def edit_user(user_id):
     user.username = username
     user.class_id = class_id
     user.report_link = report_link
+    user.parent_email = parent_email
     
     try:
         db.session.commit()
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({'success': True, 'msg': '用户信息更新成功'})
+            return jsonify({
+                'success': True,
+                'msg': '用户信息更新成功',
+                'parent_email': user.parent_email or '',
+                'display_email': user.notify_email or user.email or '',
+            })
         flash('用户信息更新成功', 'success')
     except Exception as e:
         db.session.rollback()
@@ -3880,6 +4072,41 @@ def admin_mark_all_question_correct(lesson_id, question_number):
         'changed_answers': changed_count,
         'affected_quiz_histories': len(affected_quiz_ids),
     })
+
+@app.route('/admin/reminders/homework', methods=['POST'])
+@admin_required
+def admin_send_homework_reminders():
+    """管理员手动立即发送未交作业提醒（忽略周五时间窗）。"""
+    result = send_weekly_homework_reminders(force=True)
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({'success': True, 'result': result})
+    flash(
+        f"提醒发送完成：成功 {result.get('sent', 0)}，失败 {result.get('failed', 0)}，跳过 {result.get('skipped', 0)}",
+        'success'
+    )
+    return redirect(url_for('admin_users'))
+
+
+@app.route('/cron/weekly-homework-reminder', methods=['GET', 'POST'])
+@csrf.exempt
+def cron_weekly_homework_reminder():
+    """
+    定时任务入口：每周五本地 17 点发送未交作业提醒。
+    鉴权：CRON_SECRET（query token / header X-Cron-Secret）。
+    """
+    expected = (os.environ.get('CRON_SECRET') or '').strip()
+    provided = (
+        request.args.get('token')
+        or request.headers.get('X-Cron-Secret')
+        or request.headers.get('Authorization', '').replace('Bearer ', '')
+    ).strip()
+    if not expected or provided != expected:
+        return jsonify({'success': False, 'message': 'unauthorized'}), 401
+
+    force = (request.args.get('force') or '').lower() in ('1', 'true', 'yes')
+    result = send_weekly_homework_reminders(force=force)
+    return jsonify({'success': True, 'result': result})
+
 
 # 诊断模块蓝图（独立路由与表，不影响现有业务）
 from diagnostic.routes import diagnostic_bp
